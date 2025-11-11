@@ -14,7 +14,16 @@ const ServicesSchema = mongoose.Schema({
         type: String,
         required: true
     },
+    scope :{
+        type: String ,
+        required : true
+    },
+    deletedAt: {
+        type: Date,
+        default: null
+    }
 },
+
     {
         timestamps: true
     });

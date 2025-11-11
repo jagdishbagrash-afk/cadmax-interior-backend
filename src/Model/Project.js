@@ -1,6 +1,4 @@
 const mongoose = require("mongoose");
-
-
 const ProjectSchema = mongoose.Schema({
     title: {
         type: String,
@@ -19,6 +17,18 @@ const ProjectSchema = mongoose.Schema({
         type: String,
         required: true
     },
+    amount: {
+        type: Number,
+        required: true
+    },
+    categroy :{
+    
+    },
+    deletedAt: {
+        type: Date,
+        default: null
+    },
+
 },
     {
         timestamps: true

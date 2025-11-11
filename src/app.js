@@ -1,7 +1,7 @@
 const dotenv = require("dotenv");
 dotenv.config();
 
-require("./dbconfigration");
+// require("./dbconfigration");
 const express = require("express");
 const app = express();
 const cors = require("cors");
@@ -29,6 +29,8 @@ app.get("/", (req, res) => {
 const PORT = process.env.REACT_APP_SERVER_DOMAIN || 5000;
 app.use("/api", require("./Routes/AuthRoute"));
 app.use("/api", require("./Routes/ContactRoute"));
+app.use("/api", require("./Routes/ServicesRoute"));
+
 
 
 const server = app.listen(PORT, () => console.log("Server is running at port : " + PORT));
