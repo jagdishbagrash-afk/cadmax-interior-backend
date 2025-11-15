@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const categroy = mongoose.Schema({
+const category = mongoose.Schema({
     name: {
         type: String,
     },
@@ -13,4 +13,4 @@ const categroy = mongoose.Schema({
     }
 });
 
-mongoose.model("categroy", categroy);
+mongoose.model("category", category);

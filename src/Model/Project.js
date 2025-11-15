@@ -21,7 +21,7 @@ const ProjectSchema = mongoose.Schema({
         type: Number,
         required: true
     },
-    categroy :{
+    category :{
     
     },
     deletedAt: {

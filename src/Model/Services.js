@@ -17,6 +17,10 @@ const ServicesSchema = mongoose.Schema({
         type: String ,
         required : true
     },
+    area :{
+        type :String,
+        required :true
+    },
     deletedAt: {
         type: Date,
         default: null
