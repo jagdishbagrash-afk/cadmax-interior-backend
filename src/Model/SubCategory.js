@@ -14,9 +14,13 @@ const categorySchema = mongoose.Schema({
     },
     superCategory: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "superCategory",   
-        required: false
-    }
+        ref: "superCategory",
+    },
+    category: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "subCategory",
+    },
+   
 });
 
-module.exports = mongoose.model("category", categorySchema);
+module.exports = mongoose.model("subCategory", categorySchema);

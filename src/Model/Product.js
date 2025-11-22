@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const ProjectSchema = mongoose.Schema({
+const ProductSchema = mongoose.Schema({
     title: {
         type: String,
         required: true
@@ -21,17 +21,25 @@ const ProjectSchema = mongoose.Schema({
         type: Number,
         required: true
     },
-    category :{
-    
+    superCategory: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "superCategory",
+    },
+    subcategory: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "subcategory",
+    },
+    category: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "category",
     },
     deletedAt: {
         type: Date,
         default: null
     },
-
 },
     {
         timestamps: true
     });
 
-mongoose.model("Project", ProjectSchema);
+mongoose.model("product", ProductSchema);

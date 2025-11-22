@@ -1,15 +1,15 @@
-const Category = require("../Model/category");
+const Category = require("../Model/Category");
 const CatchAsync = require("../Utill/catchAsync");
 const { errorResponse, successResponse, validationErrorResponse } = require("../Utill/ErrorHandling");
 
 exports.addCategory = CatchAsync(
     async (req, res) => {
         try {
-            const { name, Image } = req.body;
+            const { name, Image, superCategory } = req.body;
             if (!name || !Image) {
                 return validationErrorResponse(res, "All fields are required", 400,);
             }
-            const Category = new Category({ name, Image });
+            const Category = new Category({ name, Image, superCategory });
             const record = await Category.save();
             return successResponse(res, "Category created successfully.", 201, record);
         } catch (error) {
@@ -23,7 +23,7 @@ exports.addCategory = CatchAsync(
 exports.getAllCategorys = CatchAsync(
     async (req, res) => {
         try {
-            const Categorys = await Category.find().sort({ createdAt: -1 });
+            const Categorys = await Category.find().sort({ createdAt: -1 }).populate("superCategory");
             return successResponse(res, "Categorys list successfully.", 201, Categorys);
         } catch (error) {
             return errorResponse(res, error.message || "Internal Server Error", 500);
@@ -48,11 +48,11 @@ exports.getCategoryById = CatchAsync(
 
 exports.updateCategory = async (req, res) => {
     try {
-        const { name, Image } = req.body;
+        const { name, Image, superCategory } = req.body;
 
         const updatedCategory = await Category.findByIdAndUpdate(
             req.params.id,
-            { name, Image },
+            { name, Image, superCategory },
             { new: true, runValidators: true }
         );
 

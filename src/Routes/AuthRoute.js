@@ -2,14 +2,14 @@ const { signup, login, resetpassword, profilegettoken, verifyToken, updateProfil
 
 const userRoute = require("express").Router();
 
-userRoute.post("/signup", signup)
-userRoute.post("/login", login)
+userRoute.post("/user/signup", signup)
+userRoute.post("/user/login", login)
 
-userRoute.post("/reset-password", verifyToken, resetpassword)
+userRoute.post("/user/reset-password", verifyToken, resetpassword)
 
-userRoute.get("/profile", verifyToken,  profilegettoken)
+userRoute.get("/user/profile", verifyToken,  profilegettoken)
 
-userRoute.post("/profile-update", verifyToken ,  updateProfile)
+userRoute.post("/user/profile-update", verifyToken ,  updateProfile)
 
 
 
