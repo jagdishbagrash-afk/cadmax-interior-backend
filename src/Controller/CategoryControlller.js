@@ -7,7 +7,7 @@ exports.addCategory = CatchAsync(
         try {
             const { name, SuperCategory } = req.body;
 
-             const uploadedFiles = req.files || {};
+            const uploadedFiles = req.files || {};
             const makeFileUrl = (fieldName) => {
                 if (!uploadedFiles[fieldName] || uploadedFiles[fieldName].length === 0) return null;
                 const file = uploadedFiles[fieldName][0];
@@ -16,7 +16,7 @@ exports.addCategory = CatchAsync(
             if (!name || !SuperCategory) {
                 return validationErrorResponse(res, "All fields are required", 400,);
             }
-            const Categorys = new Category({ name, Image: makeFileUrl("Image") , SuperCategory });
+            const Categorys = new Category({ name, Image: makeFileUrl("Image"), SuperCategory });
             const record = await Categorys.save();
             return successResponse(res, "Category created successfully.", 201, record);
         } catch (error) {
@@ -55,11 +55,20 @@ exports.getCategoryById = CatchAsync(
 
 exports.updateCategory = async (req, res) => {
     try {
-        const { name, Image, superCategory } = req.body;
+        const { name, superCategory } = req.body;
+
+        const uploadedFiles = req.files || {};
+
+        const makeFileUrl = (fieldName) => {
+            if (!uploadedFiles[fieldName] || uploadedFiles[fieldName].length === 0)
+                return undefined;
+            const file = uploadedFiles[fieldName][0];
+            return `${req.protocol}://${req.get("host")}/Images/${file.filename}`;
+        };
 
         const updatedCategory = await Category.findByIdAndUpdate(
             req.params.id,
-            { name, Image, superCategory },
+            { name, Image: makeFileUrl("Images"), superCategory },
             { new: true, runValidators: true }
         );
 
@@ -74,23 +83,26 @@ exports.updateCategory = async (req, res) => {
     }
 };
 
-exports.deleteCategory = async (req, res) => {
-    try {
-        const deletedCategory = await Category.findByIdAndUpdate(
-            req.params.id,
-            { deletedAt: new Date() },
-            { new: true, runValidators: true }
-        );
-
-        if (!deletedCategory) {
-            return validationErrorResponse(res, "Category not found.", 400, deletedCategory);
-
+exports.toggleCategoryStatus = CatchAsync(
+    async (req, res) => {
+        try {
+            const { id } = req.params;
+            const superCategory = await Category.findById(id);
+            if (!superCategory) {
+                return validationErrorResponse(res, "Category not found.", 400);
+            }
+            // Toggle logic
+            const newStatus = superCategory.status === true ? false : true;
+            superCategory.status = newStatus;
+            await superCategory.save();
+            return successResponse(
+                res,
+                `Category ${newStatus === true ? "Blocked" : "Activated"} successfully.`,
+                200,
+                superCategory
+            );
+        } catch (error) {
+            return errorResponse(res, error.message || "Internal Server Error", 500);
         }
-        return successResponse(res, "Category deleted successfully.", 201, deletedCategory);
-
-
-    } catch (error) {
-        return errorResponse(res, error.message || "Internal Server Error", 500);
-
     }
-};
+);

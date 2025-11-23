@@ -1,7 +1,7 @@
 const express = require('express');
-const { addSuperCategory, getAllSuperCategorys, getSuperCategoryById, updateSuperCategory, deleteSuperCategory } = require("../Controller/SuperCategoryController");
-const { addCategory, getAllCategorys, getCategoryById, updateCategory, deleteCategory } = require('../Controller/CategoryControlller');
-const { addSubCategory, getSubCategoryById, getAllSubCategorys, updateSubCategory, deleteSubCategory } = require('../Controller/SubCategoryController');
+const { addSuperCategory, getAllSuperCategorys, getSuperCategoryById, updateSuperCategory, toggleSuperCategoryStatus } = require("../Controller/SuperCategoryController");
+const { addCategory, getAllCategorys, getCategoryById, updateCategory, toggleCategoryStatus } = require('../Controller/CategoryControlller');
+const { addSubCategory, getSubCategoryById, getAllSubCategorys, updateSubCategory, toggleSubCategoryStatus } = require('../Controller/SubCategoryController');
 const upload = require('../Multer');
 const router = express.Router();
 
@@ -18,11 +18,12 @@ router.get("/supercategory/get", getAllSuperCategorys);
 
 router.get("/supercategory/get/:id", getSuperCategoryById);
 
-router.post("/supercategory/update/:id", updateSuperCategory);
+router.post("/supercategory/update/:id",
+    upload.fields([
+        { name: "Image", maxCount: 1 },
+    ]), updateSuperCategory);
 
-router.get("/supercategory/delete/:id", deleteSuperCategory);
-
-
+router.get("/supercategory/status/:id", toggleSuperCategoryStatus);
 
 // Category   List 
 
@@ -34,10 +35,11 @@ router.get("/category/get", getAllCategorys);
 
 router.get("/category/get/:id", getCategoryById);
 
-router.post("/category/update/:id", updateCategory);
+router.post("/category/update/:id", upload.fields([
+    { name: "Image", maxCount: 1 },
+]), updateCategory);
 
-router.get("/category/delete/:id", deleteCategory);
-
+router.get("/category/status/:id", toggleCategoryStatus);
 
 
 //Sub Category   List 
@@ -50,9 +52,11 @@ router.get("/subcategory/get", getAllSubCategorys);
 
 router.get("/subcategory/get/:id", getSubCategoryById);
 
-router.post("/category/update/:id", updateSubCategory);
+router.post("/category/update/:id", upload.fields([
+    { name: "Image", maxCount: 1 },
+]), updateSubCategory);
 
-router.get("/category/delete/:id", deleteSubCategory);
+router.get("/subcategory/status/:id", toggleSubCategoryStatus);
 
 
 module.exports = router;

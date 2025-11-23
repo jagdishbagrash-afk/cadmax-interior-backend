@@ -53,13 +53,24 @@ exports.getSuperCategoryById = CatchAsync(
     }
 );
 
+
+
 exports.updateSuperCategory = async (req, res) => {
     try {
-        const { name, Image } = req.body;
+        const { name } = req.body;
+
+        const uploadedFiles = req.files || {};
+
+        const makeFileUrl = (fieldName) => {
+            if (!uploadedFiles[fieldName] || uploadedFiles[fieldName].length === 0)
+                return undefined;
+            const file = uploadedFiles[fieldName][0];
+            return `${req.protocol}://${req.get("host")}/Images/${file.filename}`;
+        };
 
         const updatedSuperCategory = await SuperCategory.findByIdAndUpdate(
             req.params.id,
-            { name, Image },
+            { name, Image: makeFileUrl("Images") },
             { new: true, runValidators: true }
         );
 
@@ -74,20 +85,26 @@ exports.updateSuperCategory = async (req, res) => {
     }
 };
 
-exports.deleteSuperCategory = async (req, res) => {
-    try {
-        const deletedSuperCategory = await SuperCategory.findByIdAndUpdate(
-            req.params.id,
-            { deletedAt: new Date() },
-            { new: true, runValidators: true }
-        );
-        if (!deletedSuperCategory) {
-            return validationErrorResponse(res, "SuperCategory not found.", 400, deletedSuperCategory);
-
+exports.toggleSuperCategoryStatus = CatchAsync(
+    async (req, res) => {
+        try {
+            const { id } = req.params;
+            const superCategory = await SuperCategory.findById(id);
+            if (!superCategory) {
+                return validationErrorResponse(res, "SuperCategory not found.", 400);
+            }
+            // Toggle logic
+            const newStatus = superCategory.status === true ? false : true;
+            superCategory.status = newStatus;
+            await superCategory.save();
+            return successResponse(
+                res,
+                `SuperCategory ${newStatus === true ? "Blocked" : "Activated"} successfully.`,
+                200,
+                superCategory
+            );
+        } catch (error) {
+            return errorResponse(res, error.message || "Internal Server Error", 500);
         }
-        return successResponse(res, "SuperCategory deleted successfully.", 201, deletedSuperCategory);
-    } catch (error) {
-        return errorResponse(res, error.message || "Internal Server Error", 500);
-
     }
-};
+);

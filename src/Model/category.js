@@ -16,6 +16,10 @@ const categorySchema = mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "SuperCategory",   
         required: false
+    } ,
+     status : {
+        type: Boolean ,
+        default : false 
     }
 });
 

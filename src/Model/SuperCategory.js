@@ -10,6 +10,10 @@ const SuperCategorySchema = mongoose.Schema({
     deletedAt: {
         type: Date,
         default: null
+    },
+    status : {
+        type: Boolean ,
+        default : false 
     }
 });
 

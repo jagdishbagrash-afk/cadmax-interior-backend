@@ -9,7 +9,7 @@ exports.addSubCategory = CatchAsync(
             if (!name || !SuperCategory || !category) {
                 return validationErrorResponse(res, "All fields are required", 400,);
             }
-               const uploadedFiles = req.files || {};
+            const uploadedFiles = req.files || {};
             const makeFileUrl = (fieldName) => {
                 if (!uploadedFiles[fieldName] || uploadedFiles[fieldName].length === 0) return null;
                 const file = uploadedFiles[fieldName][0];
@@ -54,11 +54,20 @@ exports.getSubCategoryById = CatchAsync(
 
 exports.updateSubCategory = async (req, res) => {
     try {
-        const { name, Image, superCategory, category } = req.body;
+        const { name, superCategory, category } = req.body;
+
+        const uploadedFiles = req.files || {};
+
+        const makeFileUrl = (fieldName) => {
+            if (!uploadedFiles[fieldName] || uploadedFiles[fieldName].length === 0)
+                return undefined;
+            const file = uploadedFiles[fieldName][0];
+            return `${req.protocol}://${req.get("host")}/Images/${file.filename}`;
+        };
 
         const updatedSubCategory = await SubCategory.findByIdAndUpdate(
             req.params.id,
-            { name, Image, superCategory, category },
+            { name, Image: makeFileUrl("Images"), superCategory, category },
             { new: true, runValidators: true }
         );
 
@@ -73,21 +82,26 @@ exports.updateSubCategory = async (req, res) => {
     }
 };
 
-exports.deleteSubCategory = async (req, res) => {
-    try {
-        const deletedSubCategory = await SubCategory.findByIdAndUpdate(
-            req.params.id,
-            { deletedAt: new Date() },
-            { new: true, runValidators: true }
-        );
-
-        if (!deletedSubCategory) {
-            return validationErrorResponse(res, "SubCategory not found.", 400, deletedSubCategory);
-
+exports.toggleSubCategoryStatus = CatchAsync(
+    async (req, res) => {
+        try {
+            const { id } = req.params;
+            const superCategory = await SubCategory.findById(id);
+            if (!superCategory) {
+                return validationErrorResponse(res, "SubCategory not found.", 400);
+            }
+            // Toggle logic
+            const newStatus = superCategory.status === true ? false : true;
+            superCategory.status = newStatus;
+            await superCategory.save();
+            return successResponse(
+                res,
+                `Sub Category ${newStatus === true ? "Blocked" : "Activated"} successfully.`,
+                200,
+                superCategory
+            );
+        } catch (error) {
+            return errorResponse(res, error.message || "Internal Server Error", 500);
         }
-        return successResponse(res, "SubCategory deleted successfully.", 201, deletedSubCategory);
-    } catch (error) {
-        return errorResponse(res, error.message || "Internal Server Error", 500);
-
     }
-};
+);

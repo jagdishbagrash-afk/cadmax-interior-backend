@@ -20,7 +20,11 @@ const categorySchema = mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "category",
     },
-   
+    status: {
+        type: Boolean,
+        default: false
+    }
+
 });
 
 module.exports = mongoose.model("subCategory", categorySchema);
