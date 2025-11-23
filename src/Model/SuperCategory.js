@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const SuperCategory = mongoose.Schema({
+const SuperCategorySchema = mongoose.Schema({
     name: {
         type: String,
     },
@@ -13,4 +13,4 @@ const SuperCategory = mongoose.Schema({
     }
 });
 
-mongoose.model("superCategory", SuperCategory);
+module.exports = mongoose.model("SuperCategory", SuperCategorySchema);

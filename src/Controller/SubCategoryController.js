@@ -5,12 +5,18 @@ const { errorResponse, successResponse, validationErrorResponse } = require("../
 exports.addSubCategory = CatchAsync(
     async (req, res) => {
         try {
-            const { name, Image, superCategory, category } = req.body;
-            if (!name || !Image) {
+            const { name, SuperCategory, category } = req.body;
+            if (!name || !SuperCategory || !category) {
                 return validationErrorResponse(res, "All fields are required", 400,);
             }
-            const SubCategory = new SubCategory({ name, Image, superCategory, category });
-            const record = await SubCategory.save();
+               const uploadedFiles = req.files || {};
+            const makeFileUrl = (fieldName) => {
+                if (!uploadedFiles[fieldName] || uploadedFiles[fieldName].length === 0) return null;
+                const file = uploadedFiles[fieldName][0];
+                return `${req.protocol}://${req.get("host")}/Images/${file.filename}`;
+            };
+            const SubCategorys = new SubCategory({ name, Image: makeFileUrl("Image"), SuperCategory, category });
+            const record = await SubCategorys.save();
             return successResponse(res, "SubCategory created successfully.", 201, record);
         } catch (error) {
             console.log(error);
@@ -23,7 +29,7 @@ exports.addSubCategory = CatchAsync(
 exports.getAllSubCategorys = CatchAsync(
     async (req, res) => {
         try {
-            const SubCategorys = await SubCategory.find().sort({ createdAt: -1 }).populate("superCategory").populate("category");
+            const SubCategorys = await SubCategory.find().sort({ createdAt: -1 }).populate("SuperCategory").populate("category");
             return successResponse(res, "SubCategorys list successfully.", 201, SubCategorys);
         } catch (error) {
             return errorResponse(res, error.message || "Internal Server Error", 500);

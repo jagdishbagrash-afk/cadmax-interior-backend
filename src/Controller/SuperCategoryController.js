@@ -5,12 +5,19 @@ const { errorResponse, successResponse, validationErrorResponse } = require("../
 exports.addSuperCategory = CatchAsync(
     async (req, res) => {
         try {
-            const { name, Image } = req.body;
-            if (!name || !Image) {
+            const { name } = req.body;
+
+            const uploadedFiles = req.files || {};
+            const makeFileUrl = (fieldName) => {
+                if (!uploadedFiles[fieldName] || uploadedFiles[fieldName].length === 0) return null;
+                const file = uploadedFiles[fieldName][0];
+                return `${req.protocol}://${req.get("host")}/Images/${file.filename}`;
+            };
+            if (!name) {
                 return validationErrorResponse(res, "All fields are required", 400,);
             }
-            const SuperCategory = new SuperCategory({ name, Image });
-            const record = await SuperCategory.save();
+            const SuperCategorys = new SuperCategory({ name, Image: makeFileUrl("Image") });
+            const record = await SuperCategorys.save();
             return successResponse(res, "SuperCategory created successfully.", 201, record);
         } catch (error) {
             console.log(error);
@@ -74,14 +81,11 @@ exports.deleteSuperCategory = async (req, res) => {
             { deletedAt: new Date() },
             { new: true, runValidators: true }
         );
-
         if (!deletedSuperCategory) {
             return validationErrorResponse(res, "SuperCategory not found.", 400, deletedSuperCategory);
 
         }
         return successResponse(res, "SuperCategory deleted successfully.", 201, deletedSuperCategory);
-
-
     } catch (error) {
         return errorResponse(res, error.message || "Internal Server Error", 500);
 

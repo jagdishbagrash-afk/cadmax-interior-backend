@@ -5,12 +5,19 @@ const { errorResponse, successResponse, validationErrorResponse } = require("../
 exports.addCategory = CatchAsync(
     async (req, res) => {
         try {
-            const { name, Image, superCategory } = req.body;
-            if (!name || !Image) {
+            const { name, SuperCategory } = req.body;
+
+             const uploadedFiles = req.files || {};
+            const makeFileUrl = (fieldName) => {
+                if (!uploadedFiles[fieldName] || uploadedFiles[fieldName].length === 0) return null;
+                const file = uploadedFiles[fieldName][0];
+                return `${req.protocol}://${req.get("host")}/Images/${file.filename}`;
+            };
+            if (!name || !SuperCategory) {
                 return validationErrorResponse(res, "All fields are required", 400,);
             }
-            const Category = new Category({ name, Image, superCategory });
-            const record = await Category.save();
+            const Categorys = new Category({ name, Image: makeFileUrl("Image") , SuperCategory });
+            const record = await Categorys.save();
             return successResponse(res, "Category created successfully.", 201, record);
         } catch (error) {
             console.log(error);
@@ -23,7 +30,7 @@ exports.addCategory = CatchAsync(
 exports.getAllCategorys = CatchAsync(
     async (req, res) => {
         try {
-            const Categorys = await Category.find().sort({ createdAt: -1 }).populate("superCategory");
+            const Categorys = await Category.find().sort({ createdAt: -1 }).populate("SuperCategory");
             return successResponse(res, "Categorys list successfully.", 201, Categorys);
         } catch (error) {
             return errorResponse(res, error.message || "Internal Server Error", 500);

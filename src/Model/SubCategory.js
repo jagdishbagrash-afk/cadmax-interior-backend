@@ -12,13 +12,13 @@ const categorySchema = mongoose.Schema({
         type: Date,
         default: null
     },
-    superCategory: {
+    SuperCategory: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "superCategory",
+        ref: "SuperCategory",
     },
     category: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "subCategory",
+        ref: "category",
     },
    
 });
