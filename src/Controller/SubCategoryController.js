@@ -54,10 +54,9 @@ exports.getSubCategoryById = CatchAsync(
 
 exports.updateSubCategory = async (req, res) => {
     try {
-        const { name, superCategory, category } = req.body;
-
+        const { name, SuperCategory, category } = req.body;
+        console.log("req.body" ,req.body)
         const uploadedFiles = req.files || {};
-
         const makeFileUrl = (fieldName) => {
             if (!uploadedFiles[fieldName] || uploadedFiles[fieldName].length === 0)
                 return undefined;
@@ -67,7 +66,7 @@ exports.updateSubCategory = async (req, res) => {
 
         const updatedSubCategory = await SubCategory.findByIdAndUpdate(
             req.params.id,
-            { name, Image: makeFileUrl("Images"), superCategory, category },
+            { name, Image: makeFileUrl("Images"), SuperCategory, category },
             { new: true, runValidators: true }
         );
 
