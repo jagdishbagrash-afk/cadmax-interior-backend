@@ -1,6 +1,7 @@
 const Category = require("../Model/Category");
 const CatchAsync = require("../Utill/catchAsync");
 const { errorResponse, successResponse, validationErrorResponse } = require("../Utill/ErrorHandling");
+const deleteUploadedFiles = require("../Utill/fileDeleter");
 
 exports.addCategory = CatchAsync(
     async (req, res) => {
@@ -11,7 +12,7 @@ exports.addCategory = CatchAsync(
             const makeFileUrl = (fieldName) => {
                 if (!uploadedFiles[fieldName] || uploadedFiles[fieldName].length === 0) return null;
                 const file = uploadedFiles[fieldName][0];
-                return `${req.protocol}://${req.get("host")}/Images/${file.filename}`;
+                return `${req.protocol}://${req.get("host")}/uploads/${file.filename}`;
             };
             if (!name || !SuperCategory) {
                 return validationErrorResponse(res, "All fields are required", 400,);
@@ -57,20 +58,25 @@ exports.updateCategory = async (req, res) => {
     try {
         const { name, SuperCategory } = req.body;
 
-        const uploadedFiles = req.files || {};
+        const data = await Category.findById(req.params.id);
 
-        const makeFileUrl = (fieldName) => {
-            if (!uploadedFiles[fieldName] || uploadedFiles[fieldName].length === 0)
-                return undefined;
-            const file = uploadedFiles[fieldName][0];
-            return `${req.protocol}://${req.get("host")}/Images/${file.filename}`;
-        };
+        if (name) data.name = name;
+        if (SuperCategory) data.SuperCategory = SuperCategory;
 
-        const updatedCategory = await Category.findByIdAndUpdate(
-            req.params.id,
-            { name, Image: makeFileUrl("Images"), SuperCategory },
-            { new: true, runValidators: true }
-        );
+        if (req.file && req.file.filename) {
+            if (data.image) {
+                try {
+                    await deleteUploadedFiles([data.Image]);
+                } catch (err) {
+                    console.log("Error deleting old data image:", err.message);
+                }
+            }
+
+            const newImageUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+            data.Image = newImageUrl;
+        }
+
+        const updatedCategory = await data.save();
 
         if (!updatedCategory) {
             return validationErrorResponse(res, "Category not found.", 400, updatedCategory);
@@ -101,6 +107,17 @@ exports.toggleCategoryStatus = CatchAsync(
                 200,
                 superCategory
             );
+        } catch (error) {
+            return errorResponse(res, error.message || "Internal Server Error", 500);
+        }
+    }
+);
+
+exports.getAllCategoryStatus = CatchAsync(
+    async (req, res) => {
+        try {
+            const Categorys = await Category.find().sort({ createdAt: -1 , status: true}).populate("SuperCategory");
+            return successResponse(res, "Categorys list successfully.", 201, Categorys);
         } catch (error) {
             return errorResponse(res, error.message || "Internal Server Error", 500);
         }

@@ -1,6 +1,7 @@
 const SubCategory = require("../Model/SubCategory");
 const CatchAsync = require("../Utill/catchAsync");
 const { errorResponse, successResponse, validationErrorResponse } = require("../Utill/ErrorHandling");
+const deleteUploadedFiles = require("../Utill/fileDeleter");
 
 exports.addSubCategory = CatchAsync(
     async (req, res) => {
@@ -13,7 +14,7 @@ exports.addSubCategory = CatchAsync(
             const makeFileUrl = (fieldName) => {
                 if (!uploadedFiles[fieldName] || uploadedFiles[fieldName].length === 0) return null;
                 const file = uploadedFiles[fieldName][0];
-                return `${req.protocol}://${req.get("host")}/Images/${file.filename}`;
+                return `${req.protocol}://${req.get("host")}/uploads/${file.filename}`;
             };
             const SubCategorys = new SubCategory({ name, Image: makeFileUrl("Image"), SuperCategory, category });
             const record = await SubCategorys.save();
@@ -55,21 +56,27 @@ exports.getSubCategoryById = CatchAsync(
 exports.updateSubCategory = async (req, res) => {
     try {
         const { name, SuperCategory, category } = req.body;
-        console.log("req.body" ,req.body)
-        const uploadedFiles = req.files || {};
-        const makeFileUrl = (fieldName) => {
-            if (!uploadedFiles[fieldName] || uploadedFiles[fieldName].length === 0)
-                return undefined;
-            const file = uploadedFiles[fieldName][0];
-            return `${req.protocol}://${req.get("host")}/Images/${file.filename}`;
-        };
+        const data = await SubCategory.findById(req.params.id);
+       
+               if (name) data.name = name;
+               if (SuperCategory) data.SuperCategory = SuperCategory;
+               if (category) data.category = category;
 
-        const updatedSubCategory = await SubCategory.findByIdAndUpdate(
-            req.params.id,
-            { name, Image: makeFileUrl("Images"), SuperCategory, category },
-            { new: true, runValidators: true }
-        );
-
+       
+               if (req.file && req.file.filename) {
+                   if (data.image) {
+                       try {
+                           await deleteUploadedFiles([data.Image]);
+                       } catch (err) {
+                           console.log("Error deleting old data image:", err.message);
+                       }
+                   }
+       
+                   const newImageUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+                   data.Image = newImageUrl;
+               }
+       
+               const updatedSubCategory = await data.save();
         if (!updatedSubCategory) {
             return validationErrorResponse(res, "SubCategory not found.", 400, updatedSubCategory);
         }
@@ -99,6 +106,18 @@ exports.toggleSubCategoryStatus = CatchAsync(
                 200,
                 superCategory
             );
+        } catch (error) {
+            return errorResponse(res, error.message || "Internal Server Error", 500);
+        }
+    }
+);
+
+
+exports.getAllSubCategoryStatus = CatchAsync(
+    async (req, res) => {
+        try {
+            const SubCategorys = await SubCategory.find().sort({ createdAt: -1, status:true }).populate("SuperCategory").populate("category");
+            return successResponse(res, "SubCategorys list successfully.", 201, SubCategorys);
         } catch (error) {
             return errorResponse(res, error.message || "Internal Server Error", 500);
         }

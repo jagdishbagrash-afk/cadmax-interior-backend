@@ -1,7 +1,7 @@
 const express = require('express');
-const { addSuperCategory, getAllSuperCategorys, getSuperCategoryById, updateSuperCategory, toggleSuperCategoryStatus } = require("../Controller/SuperCategoryController");
-const { addCategory, getAllCategorys, getCategoryById, updateCategory, toggleCategoryStatus } = require('../Controller/CategoryControlller');
-const { addSubCategory, getSubCategoryById, getAllSubCategorys, updateSubCategory, toggleSubCategoryStatus } = require('../Controller/SubCategoryController');
+const { addSuperCategory, getAllSuperCategorys, getSuperCategoryById, updateSuperCategory, toggleSuperCategoryStatus, getAllSuperCategoryStatus } = require("../Controller/SuperCategoryController");
+const { addCategory, getAllCategorys, getCategoryById, updateCategory, toggleCategoryStatus, getAllCategoryStatus } = require('../Controller/CategoryControlller');
+const { addSubCategory, getSubCategoryById, getAllSubCategorys, updateSubCategory, toggleSubCategoryStatus, getAllSubCategoryStatus } = require('../Controller/SubCategoryController');
 const upload = require('../Multer');
 const router = express.Router();
 
@@ -15,6 +15,9 @@ router.post("/supercategory/add",
     addSuperCategory);
 
 router.get("/supercategory/get", getAllSuperCategorys);
+
+router.get("/supercategory/get-status", getAllSuperCategoryStatus);
+
 
 router.get("/supercategory/get/:id", getSuperCategoryById);
 
@@ -33,6 +36,9 @@ router.post("/category/add", upload.fields([
 
 router.get("/category/get", getAllCategorys);
 
+router.get("/category/get-status", getAllCategoryStatus);
+
+
 router.get("/category/get/:id", getCategoryById);
 
 router.post("/category/update/:id", upload.fields([
@@ -49,10 +55,12 @@ router.post("/subcategory/add", upload.fields([
 ]), addSubCategory);
 
 router.get("/subcategory/get", getAllSubCategorys);
+router.get("/subcategory/get-status", getAllSubCategoryStatus);
+
 
 router.get("/subcategory/get/:id", getSubCategoryById);
 
-router.post("/category/update/:id", upload.fields([
+router.post("/subcategory/update/:id", upload.fields([
     { name: "Image", maxCount: 1 },
 ]), updateSubCategory);
 
