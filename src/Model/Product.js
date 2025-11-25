@@ -1,45 +1,46 @@
 const mongoose = require("mongoose");
-const ProductSchema = mongoose.Schema({
+const ProductSchema = mongoose.Schema(
+  {
     title: {
-        type: String,
-        required: true
+      type: String,
+      required: [true, "Title is required"],
     },
-    content: {
-        type: String,
-        required: true
+    description: {
+      type: String,
+      required: [true, "Description is required"],
     },
-    Stock: {
-        type: String,
-        requirte: true,
-        default: "instock",
+    stock: {
+      type: Number,
+      required: [true, "Stock is required"],
     },
-    productImage: {
-        type: String,
-        required: true
+    image: {
+      type: String,
+      required: [true, "Image is required"],
     },
     amount: {
-        type: Number,
-        required: true
+      type: Number,
+      required: [true, "Amount is required"],
     },
     superCategory: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "superCategory",
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "superCategory",
+      required: [true, "SuperCategory is required"],
     },
     subcategory: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "subcategory",
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "subcategory",
+      required: [true, "Subcategory is required"],
     },
     category: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "category",
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "category",
+      required: [true, "Category is required"],
     },
     deletedAt: {
-        type: Date,
-        default: null
+      type: Date,
+      default: null,
     },
-},
-    {
-        timestamps: true
-    });
+  },{ timestamps: true,}
+);
 
 mongoose.model("product", ProductSchema);

@@ -1,81 +1,157 @@
-const Project = require("../Model/Project");
+const Product = require("../Model/Product");
+const catchAsync = require("../Utils/catchAsync");
+const { successResponse, errorResponse, validationErrorResponse } = require("../Utils/response");
+const deleteUploadedFiles = require("../Utils/deleteUploadedFiles");
 
-exports.addProject = async (req, res) => {
+exports.addProduct = catchAsync(async (req, res) => {
   try {
-    const { title, content, Stock, productImage } = req.body;
+    const {
+      title,
+      description,
+      stock,
+      amount,
+      superCategory,
+      subcategory,
+      category,
+    } = req.body;
 
-    if (!title || !content || !productImage) {
-      return res.status(400).json({ message: "All fields are required" });
+    // Validation
+    if (!title || !description || !stock || !amount || !superCategory || !subcategory || !category) {
+      return validationErrorResponse(res, "All fields are required", 400);
     }
 
-    const project = new Project({ title, content, Stock, productImage });
-    await project.save();
+    // Image Handling
+    let image = null;
+    if (req.file && req.file.filename) {
+      image = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+    } else {
+      return validationErrorResponse(res, "Product image is required", 400);
+    }
 
-    res.status(201).json({
-      message: "Project created successfully",
-      project,
+    const product = new Product({
+      title,
+      description,
+      stock,
+      amount,
+      superCategory,
+      subcategory,
+      category,
+      image,
     });
+
+    await product.save();
+
+    return successResponse(res, "Product added successfully", 201, product);
+
   } catch (error) {
-    res.status(500).json({ message: "Server error", error });
+    return errorResponse(res, error.message || "Internal Server Error", 500);
   }
-};
+});
 
-exports.getAllProjects = async (req, res) => {
+exports.getAllProducts = catchAsync(async (req, res) => {
   try {
-    const projects = await Project.find().sort({ createdAt: -1 });
-    res.status(200).json(projects);
+    const products = await Product.find()
+      .populate("superCategory")
+      .populate("subcategory")
+      .populate("category")
+      .sort({ createdAt: -1 });
+
+    return successResponse(res, "All products fetched", 200, products);
+
   } catch (error) {
-    res.status(500).json({ message: "Server error", error });
+    return errorResponse(res, error.message || "Internal Server Error", 500);
   }
-};
+});
 
-exports.getProjectById = async (req, res) => {
+exports.getProductById = catchAsync(async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id);
+    const product = await Product.findById(req.params.id)
+      .populate("superCategory")
+      .populate("subcategory")
+      .populate("category");
 
-    if (!project) {
-      return res.status(404).json({ message: "Project not found" });
+    if (!product) {
+      return errorResponse(res, "Product not found", 404);
     }
 
-    res.status(200).json(project);
+    return successResponse(res, "Product fetched successfully", 200, product);
+
   } catch (error) {
-    res.status(500).json({ message: "Server error", error });
+    return errorResponse(res, error.message || "Internal Server Error", 500);
   }
-};
+});
 
-exports.updateProject = async (req, res) => {
+exports.updateProduct = catchAsync(async (req, res) => {
   try {
-    const { title, content, Stock, productImage } = req.body;
+    const id = req.params.id;
 
-    const updatedProject = await Project.findByIdAndUpdate(
-      req.params.id,
-      { title, content, Stock, productImage },
-      { new: true, runValidators: true }
-    );
-
-    if (!updatedProject) {
-      return res.status(404).json({ message: "Project not found" });
+    const product = await Product.findById(id);
+    if (!product || product.deletedAt) {
+      return validationErrorResponse(res, "Product not found", 404);
     }
 
-    res.status(200).json({
-      message: "Project updated successfully",
-      updatedProject,
-    });
-  } catch (error) {
-    res.status(500).json({ message: "Server error", error });
-  }
-};
+    const {
+      title,
+      description,
+      stock,
+      amount,
+      superCategory,
+      subcategory,
+      category
+    } = req.body;
 
-exports.deleteProject = async (req, res) => {
-  try {
-    const deletedProject = await Project.findByIdAndDelete(req.params.id);
+    if (title) product.title = title;
+    if (description) product.description = description;
+    if (stock) product.stock = stock;
+    if (amount) product.amount = amount;
+    if (superCategory) product.superCategory = superCategory;
+    if (subcategory) product.subcategory = subcategory;
+    if (category) product.category = category;
 
-    if (!deletedProject) {
-      return res.status(404).json({ message: "Project not found" });
+    // Image handling
+    if (req.file && req.file.filename) {
+      if (product.image) {
+        try {
+          await deleteUploadedFiles([product.image]);
+        } catch (err) {
+          console.log("Error deleting old product image:", err.message);
+        }
+      }
+
+      const newImageUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+      product.image = newImageUrl;
     }
 
-    res.status(200).json({ message: "Project deleted successfully" });
+    const updatedProduct = await product.save();
+
+    return successResponse(res, "Product updated successfully", 200, updatedProduct);
+
   } catch (error) {
-    res.status(500).json({ message: "Server error", error });
+    return errorResponse(res, error.message || "Internal Server Error", 500);
   }
-};
+});
+
+exports.deleteProduct = catchAsync(async (req, res) => {
+  try {
+    const id = req.params.id;
+    const product = await Product.findById(id);
+
+    if (!product) {
+      return validationErrorResponse(res, "Product not found", 404);
+    }
+
+    if (product.deletedAt) {
+      product.deletedAt = null;
+      await product.save();
+      return successResponse(res, "Product restored successfully", 200);
+    }
+
+    product.deletedAt = new Date();
+    await product.save();
+
+    return successResponse(res, "Product deleted successfully", 200);
+
+  } catch (error) {
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});
