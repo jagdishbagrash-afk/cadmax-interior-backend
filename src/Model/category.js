@@ -14,12 +14,12 @@ const categorySchema = mongoose.Schema({
     },
     SuperCategory: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "SuperCategory",   
+        ref: "SuperCategory",
         required: false
-    } ,
-     status : {
-        type: Boolean ,
-        default : false 
+    },
+    status: {
+        type: Boolean,
+        default: false
     }
 });
 

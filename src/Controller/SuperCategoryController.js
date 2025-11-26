@@ -55,41 +55,43 @@ exports.getSuperCategoryById = CatchAsync(
 
 
 
+
 exports.updateSuperCategory = async (req, res) => {
     try {
 
-        const { name,  } = req.body;
-              const data = await SuperCategory.findById(req.params.id);
-             
-                     if (name) data.name = name;
-                     if (SuperCategory) data.SuperCategory = SuperCategory;
-                     if (category) data.category = category;
-      
-             
-                     if (req.file && req.file.filename) {
-                         if (data.image) {
-                             try {
-                                 await deleteUploadedFiles([data.Image]);
-                             } catch (err) {
-                                 console.log("Error deleting old data image:", err.message);
-                             }
-                         }
-                         const newImageUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
-                         data.Image = newImageUrl;
-                     }
-             
-                     const updatedSuperCategory = await data.save();
+        const { name } = req.body;
 
-        if (!updatedSuperCategory) {
-            return validationErrorResponse(res, "SuperCategory not found.", 400, updatedSuperCategory);
+        const data = await SuperCategory.findById(req.params.id);
+
+        if (!data) {
+            return validationErrorResponse(res, "SuperCategory not found.", 404);
         }
-        return successResponse(res, "SuperCategorys updated successfully.", 201, updatedSuperCategory);
+
+        if (name) data.name = name;
+
+        if (req.file && req.file.filename) {
+
+            if (data.Image) {
+                try {
+                    await deleteUploadedFiles([data.Image]);
+                } catch (err) {
+                    console.log("Error deleting old image:", err.message);
+                }
+            }
+
+            const newImageUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+            data.Image = newImageUrl;
+        }
+
+        const updatedSuperCategory = await data.save();
+
+        return successResponse(res, "SuperCategory updated successfully.", 200, updatedSuperCategory);
 
     } catch (error) {
         return errorResponse(res, error.message || "Internal Server Error", 500);
-
     }
 };
+
 
 exports.toggleSuperCategoryStatus = CatchAsync(
     async (req, res) => {
@@ -119,7 +121,7 @@ exports.toggleSuperCategoryStatus = CatchAsync(
 exports.getAllSuperCategoryStatus = CatchAsync(
     async (req, res) => {
         try {
-            const SuperCategorys = await SuperCategory.find({status : true}).sort({ createdAt: -1 });
+            const SuperCategorys = await SuperCategory.find({ status: true }).sort({ createdAt: -1 });
             return successResponse(res, "SuperCategorys list successfully.", 201, SuperCategorys);
         } catch (error) {
             return errorResponse(res, error.message || "Internal Server Error", 500);

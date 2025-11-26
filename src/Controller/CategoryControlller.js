@@ -56,6 +56,43 @@ exports.getCategoryById = CatchAsync(
 
 exports.updateCategory = async (req, res) => {
     try {
+
+        const { name, Category } = req.body;
+
+        const data = await SuperCategory.findById(req.params.id);
+
+        if (!data) {
+            return validationErrorResponse(res, "Category not found.", 404);
+        }
+
+        if (name) data.name = name;
+        if (Category) data.Category = Category;
+
+        if (req.file && req.file.filename) {
+
+            if (data.Image) {
+                try {
+                    await deleteUploadedFiles([data.Image]);
+                } catch (err) {
+                    console.log("Error deleting old image:", err.message);
+                }
+            }
+
+            const newImageUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+            data.Image = newImageUrl;
+        }
+
+        const updatedSuperCategory = await data.save();
+
+        return successResponse(res, "Category updated successfully.", 200, updatedSuperCategory);
+
+    } catch (error) {
+        return errorResponse(res, error.message || "Internal Server Error", 500);
+    }
+};
+
+exports.updateCategory = async (req, res) => {
+    try {
         const { name, SuperCategory } = req.body;
 
         const data = await Category.findById(req.params.id);
