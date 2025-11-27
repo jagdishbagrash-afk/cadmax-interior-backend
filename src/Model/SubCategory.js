@@ -12,10 +12,10 @@ const categorySchema = mongoose.Schema({
         type: Date,
         default: null
     },
-    SuperCategory: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "SuperCategory",
-    },
+    // SuperCategory: {
+    //     type: mongoose.Schema.Types.ObjectId,
+    //     ref: "SuperCategory",
+    // },
     category: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "category",

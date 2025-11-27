@@ -6,7 +6,7 @@ const deleteUploadedFiles = require("../Utill/fileDeleter");
 exports.addCategory = CatchAsync(
     async (req, res) => {
         try {
-            const { name, SuperCategory } = req.body;
+            const { name } = req.body;
 
             const uploadedFiles = req.files || {};
             const makeFileUrl = (fieldName) => {
@@ -14,10 +14,10 @@ exports.addCategory = CatchAsync(
                 const file = uploadedFiles[fieldName][0];
                 return `${req.protocol}://${req.get("host")}/uploads/${file.filename}`;
             };
-            if (!name || !SuperCategory) {
+            if (!name ) {
                 return validationErrorResponse(res, "All fields are required", 400,);
             }
-            const Categorys = new Category({ name, Image: makeFileUrl("Image"), SuperCategory });
+            const Categorys = new Category({ name, Image: makeFileUrl("Image") });
             const record = await Categorys.save();
             return successResponse(res, "Category created successfully.", 201, record);
         } catch (error) {
@@ -31,7 +31,7 @@ exports.addCategory = CatchAsync(
 exports.getAllCategorys = CatchAsync(
     async (req, res) => {
         try {
-            const Categorys = await Category.find().sort({ createdAt: -1 }).populate("SuperCategory");
+            const Categorys = await Category.find().sort({ createdAt: -1 });
             return successResponse(res, "Categorys list successfully.", 201, Categorys);
         } catch (error) {
             return errorResponse(res, error.message || "Internal Server Error", 500);
@@ -153,7 +153,7 @@ exports.toggleCategoryStatus = CatchAsync(
 exports.getAllCategoryStatus = CatchAsync(
     async (req, res) => {
         try {
-            const Categorys = await Category.find().sort({ createdAt: -1 , status: true}).populate("SuperCategory");
+            const Categorys = await Category.find({ status: false});
             return successResponse(res, "Categorys list successfully.", 201, Categorys);
         } catch (error) {
             return errorResponse(res, error.message || "Internal Server Error", 500);

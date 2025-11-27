@@ -47,6 +47,9 @@ router.post("/category/update/:id", upload.fields([
 
 router.get("/category/status/:id", toggleCategoryStatus);
 
+router.get("/category/status", getAllCategoryStatus);
+
+
 
 //Sub Category   List 
 
