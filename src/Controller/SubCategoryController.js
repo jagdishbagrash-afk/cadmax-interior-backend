@@ -3,7 +3,7 @@ const CatchAsync = require("../Utill/catchAsync");
 const { errorResponse, successResponse, validationErrorResponse } = require("../Utill/ErrorHandling");
 const deleteUploadedFiles = require("../Utill/fileDeleter");
 
-exports.addSubCategory = CatchAsync(
+exports.AddSubCategory = CatchAsync(
     async (req, res) => {
         try {
             const { name, category } = req.body;
@@ -27,7 +27,7 @@ exports.addSubCategory = CatchAsync(
 )
 
 
-exports.getAllSubCategorys = CatchAsync(
+exports.GetAllSubCategorys = CatchAsync(
     async (req, res) => {
         try {
             const SubCategorys = await SubCategory.find().sort({ createdAt: -1 }).populate("category");
@@ -38,7 +38,7 @@ exports.getAllSubCategorys = CatchAsync(
     }
 );
 
-exports.getSubCategoryById = CatchAsync(
+exports.GetSubCategoryById = CatchAsync(
     async (req, res) => {
         try {
             const SubCategory = await SubCategory.findById(req.params.id).populate("category");
@@ -53,7 +53,7 @@ exports.getSubCategoryById = CatchAsync(
     }
 );
 
-exports.updateSubCategory = async (req, res) => {
+exports.UpdateSubCategory = async (req, res) => {
     try {
         const { name, SuperCategory, category } = req.body;
         const data = await SubCategory.findById(req.params.id);
@@ -88,7 +88,7 @@ exports.updateSubCategory = async (req, res) => {
     }
 };
 
-exports.toggleSubCategoryStatus = CatchAsync(
+exports.ToggleSubCategoryStatus = CatchAsync(
     async (req, res) => {
         try {
             const { id } = req.params;
@@ -113,7 +113,7 @@ exports.toggleSubCategoryStatus = CatchAsync(
 );
 
 
-exports.getAllSubCategoryStatus = CatchAsync(
+exports.GetAllSubCategoryStatus = CatchAsync(
     async (req, res) => {
         try {
             const SubCategorys = await SubCategory.find().sort({ createdAt: -1, status: true }).populate("category");
