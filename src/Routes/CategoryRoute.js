@@ -48,8 +48,6 @@ router.get("/category/status/:id", toggleCategoryStatus);
 
 router.get("/category/status", getAllCategoryStatus);
 
-
-
 //Sub Category   List 
 
 router.post("/subcategory/add", upload.fields([

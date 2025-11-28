@@ -89,70 +89,71 @@ const deleteFile = async (fileUrl) => {
 
 
 
-const uploadMultipleFiles = (req, res) => {
-  return new Promise((resolve, reject) => {
-    upload.array("images", 10)(req, res, (err) => {
-      if (err) {
-        console.error("Multer Error:", err);
-        reject({ status: false, message: "File upload failed", error: err.message });
-      } else if (!req.files || req.files.length === 0) {
-        reject({ status: false, message: "No files received" });
-      } else {
-        const fileUrls = req.files.map((file) => file.location);
-        resolve({
-          status: true,
-          message: "Files uploaded successfully",
-          fileUrls,
-        });
-      }
-    });
-  });
-};
+// const uploadMultipleFiles = (req, res) => {
+//   return new Promise((resolve, reject) => {
+//     upload.array("images", 10)(req, res, (err) => {
+//       if (err) {
+//         console.error("Multer Error:", err);
+//         reject({ status: false, message: "File upload failed", error: err.message });
+//       } else if (!req.files || req.files.length === 0) {
+//         reject({ status: false, message: "No files received" });
+//       } else {
+//         const fileUrls = req.files.map((file) => file.location);
+//         resolve({
+//           status: true,
+//           message: "Files uploaded successfully",
+//           fileUrls,
+//         });
+//       }
+//     });
+//   });
+// };
 
 
 
 
-// // ======================================================
-// // ✅ FUNCTION 2: Delete Multiple Files
-// // ======================================================
-const deleteMultipleFiles = async (fileUrls = []) => {
-  const bucketName = process.env.S3_BUCKET_NAME;
-  if (!Array.isArray(fileUrls) || fileUrls.length === 0) {
-    return { status: false, message: "No file URLs provided" };
-  }
+// // // ======================================================
+// // // ✅ FUNCTION 2: Delete Multiple Files
+// // // ======================================================
+// const deleteMultipleFiles = async (fileUrls = []) => {
+//   const bucketName = process.env.S3_BUCKET_NAME;
+//   if (!Array.isArray(fileUrls) || fileUrls.length === 0) {
+//     return { status: false, message: "No file URLs provided" };
+//   }
 
-  try {
-    const results = [];
+//   try {
+//     const results = [];
 
-    for (const fileUrl of fileUrls) {
-      let key = decodeURIComponent(
-        fileUrl.split(
-          `https://${bucketName}.s3.${process.env.AWS_REGION}.amazonaws.com/`
-        )[1]
-      );
+//     for (const fileUrl of fileUrls) {
+//       let key = decodeURIComponent(
+//         fileUrl.split(
+//           `https://${bucketName}.s3.${process.env.AWS_REGION}.amazonaws.com/`
+//         )[1]
+//       );
 
-      if (!key || !key.startsWith(UPLOADS_FOLDER)) {
-        results.push({ fileUrl, status: false, message: "Invalid file URL" });
-        continue;
-      }
+//       if (!key || !key.startsWith(UPLOADS_FOLDER)) {
+//         results.push({ fileUrl, status: false, message: "Invalid file URL" });
+//         continue;
+//       }
 
-      try {
-        await s3Client.send(new HeadObjectCommand({ Bucket: bucketName, Key: key }));
-        await s3Client.send(new DeleteObjectCommand({ Bucket: bucketName, Key: key }));
-        results.push({ fileUrl, status: true, message: "Deleted successfully" });
-      } catch (error) {
-        if (error.name === "NotFound") {
-          results.push({ fileUrl, status: false, message: "File not found" });
-        } else {
-          results.push({ fileUrl, status: false, message: error.message });
-        }
-      }
-    }
+//       try {
+//         await s3Client.send(new HeadObjectCommand({ Bucket: bucketName, Key: key }));
+//         await s3Client.send(new DeleteObjectCommand({ Bucket: bucketName, Key: key }));
+//         results.push({ fileUrl, status: true, message: "Deleted successfully" });
+//       } catch (error) {
+//         if (error.name === "NotFound") {
+//           results.push({ fileUrl, status: false, message: "File not found" });
+//         } else {
+//           results.push({ fileUrl, status: false, message: error.message });
+//         }
+//       }
+//     }
 
-    return { status: true, message: "Delete process completed", results };
-  } catch (error) {
-    return { status: false, message: "Error deleting files", error: error.message };
-  }
-};
+//     return { status: true, message: "Delete process completed", results };
+//   } catch (error) {
+//     return { status: false, message: "Error deleting files", error: error.message };
+//   }
+// };
+
 
 module.exports = { upload, uploadFile, deleteFile  };
