@@ -54,6 +54,24 @@ exports.GetSubCategoryById = CatchAsync(
     }
 );
 
+exports.getSubCategoryByCategory = CatchAsync(async (req, res) => {
+    try {
+      const categoryId = req.params.id;
+      const subCategories = await SubCategory.find({
+        category: categoryId,
+        deletedAt: null 
+      }).populate("category");
+
+      if (!subCategories || subCategories?.length === 0) {
+        return validationErrorResponse(res, "No Subcategories found for this category.", 404);
+      }
+      return successResponse(res, "Subcategories fetched successfully.", 200, subCategories);
+    } catch (error) {
+      return errorResponse(res, error.message || "Internal Server Error", 500);
+    }
+  }
+);
+
 exports.UpdateSubCategory = async (req, res) => {
     try {
         const { name, SuperCategory, category } = req.body;

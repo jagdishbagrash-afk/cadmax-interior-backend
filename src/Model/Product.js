@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+
 const ProductSchema = mongoose.Schema(
   {
     title: {
@@ -21,14 +22,9 @@ const ProductSchema = mongoose.Schema(
       type: Number,
       required: [true, "Amount is required"],
     },
-    superCategory: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "superCategory",
-      required: [true, "SuperCategory is required"],
-    },
     subcategory: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "subcategory",
+      ref: "subCategory",
       required: [true, "Subcategory is required"],
     },
     category: {
@@ -36,11 +32,30 @@ const ProductSchema = mongoose.Schema(
       ref: "category",
       required: [true, "Category is required"],
     },
+    // Newly Added Fields
+    dimensions: {
+      type: String,
+      required: [true, "Dimensions is required"],
+    },
+    material: {
+      type: String,
+      required: [true, "Material is required"],
+    },
+    product: {
+      type: String,
+      required: [true, "Product is required"],
+    },
+    terms: {
+      type: String,
+      required: [true, "Terms is required"],
+    },
+
     deletedAt: {
       type: Date,
       default: null,
     },
-  },{ timestamps: true,}
+  },
+  { timestamps: true }
 );
 
-mongoose.model("product", ProductSchema);
+module.exports = mongoose.model("Product", ProductSchema);
