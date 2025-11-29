@@ -1,22 +1,25 @@
 const Product = require("../Model/Product");
-const catchAsync = require("../Utils/catchAsync");
-const { successResponse, errorResponse, validationErrorResponse } = require("../Utils/response");
-const deleteUploadedFiles = require("../Utils/deleteUploadedFiles");
+const CatchAsync = require("../Utill/catchAsync");
+const { successResponse, errorResponse, validationErrorResponse } = require("../Utill/ErrorHandling");
+const deleteUploadedFiles = require("../Utill/fileDeleter");
 
-exports.addProduct = catchAsync(async (req, res) => {
+exports.addProduct = CatchAsync(async (req, res) => {
   try {
     const {
       title,
       description,
       stock,
       amount,
-      superCategory,
       subcategory,
       category,
+      dimensions,
+      material,
+      product,
+      terms
     } = req.body;
 
     // Validation
-    if (!title || !description || !stock || !amount || !superCategory || !subcategory || !category) {
+    if (!title || !description || !stock || !amount || !subcategory || !category || !dimensions || !material || !product || !terms) {
       return validationErrorResponse(res, "All fields are required", 400);
     }
 
@@ -28,30 +31,32 @@ exports.addProduct = catchAsync(async (req, res) => {
       return validationErrorResponse(res, "Product image is required", 400);
     }
 
-    const product = new Product({
+    const newProduct = new Product({
       title,
       description,
       stock,
       amount,
-      superCategory,
       subcategory,
       category,
+      dimensions,
+      material,
+      product,
+      terms,
       image,
     });
 
-    await product.save();
+    await newProduct.save();
 
-    return successResponse(res, "Product added successfully", 201, product);
+    return successResponse(res, "Product added successfully", 201, newProduct);
 
   } catch (error) {
     return errorResponse(res, error.message || "Internal Server Error", 500);
   }
 });
 
-exports.getAllProducts = catchAsync(async (req, res) => {
+exports.getAllProducts = CatchAsync(async (req, res) => {
   try {
     const products = await Product.find()
-      .populate("superCategory")
       .populate("subcategory")
       .populate("category")
       .sort({ createdAt: -1 });
@@ -63,10 +68,9 @@ exports.getAllProducts = catchAsync(async (req, res) => {
   }
 });
 
-exports.getProductById = catchAsync(async (req, res) => {
+exports.getProductById = CatchAsync(async (req, res) => {
   try {
     const product = await Product.findById(req.params.id)
-      .populate("superCategory")
       .populate("subcategory")
       .populate("category");
 
@@ -81,12 +85,12 @@ exports.getProductById = catchAsync(async (req, res) => {
   }
 });
 
-exports.updateProduct = catchAsync(async (req, res) => {
+exports.updateProduct = CatchAsync(async (req, res) => {
   try {
     const id = req.params.id;
 
-    const product = await Product.findById(id);
-    if (!product || product.deletedAt) {
+    const productData = await Product.findById(id);
+    if (!productData || productData.deletedAt) {
       return validationErrorResponse(res, "Product not found", 404);
     }
 
@@ -95,34 +99,40 @@ exports.updateProduct = catchAsync(async (req, res) => {
       description,
       stock,
       amount,
-      superCategory,
       subcategory,
-      category
+      category,
+      dimensions,
+      material,
+      product,
+      terms
     } = req.body;
 
-    if (title) product.title = title;
-    if (description) product.description = description;
-    if (stock) product.stock = stock;
-    if (amount) product.amount = amount;
-    if (superCategory) product.superCategory = superCategory;
-    if (subcategory) product.subcategory = subcategory;
-    if (category) product.category = category;
+    if (title) productData.title = title;
+    if (description) productData.description = description;
+    if (stock) productData.stock = stock;
+    if (amount) productData.amount = amount;
+    if (subcategory) productData.subcategory = subcategory;
+    if (category) productData.category = category;
+    if (dimensions) productData.dimensions = dimensions;
+    if (material) productData.material = material;
+    if (product) productData.product = product;
+    if (terms) productData.terms = terms;
 
-    // Image handling
+    // Image Handling
     if (req.file && req.file.filename) {
-      if (product.image) {
-        try {
-          await deleteUploadedFiles([product.image]);
-        } catch (err) {
-          console.log("Error deleting old product image:", err.message);
+      try {
+        if (productData.image) {
+          await deleteUploadedFiles([productData.image]);
         }
+      } catch (err) {
+        console.log("Error deleting old product image:", err.message);
       }
 
       const newImageUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
-      product.image = newImageUrl;
+      productData.image = newImageUrl;
     }
 
-    const updatedProduct = await product.save();
+    const updatedProduct = await productData.save();
 
     return successResponse(res, "Product updated successfully", 200, updatedProduct);
 
@@ -131,7 +141,7 @@ exports.updateProduct = catchAsync(async (req, res) => {
   }
 });
 
-exports.deleteProduct = catchAsync(async (req, res) => {
+exports.deleteProduct = CatchAsync(async (req, res) => {
   try {
     const id = req.params.id;
     const product = await Product.findById(id);

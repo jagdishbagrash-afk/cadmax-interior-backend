@@ -1,7 +1,7 @@
 const express = require('express');
 const { addSuperCategory, getAllSuperCategorys, getSuperCategoryById, updateSuperCategory, toggleSuperCategoryStatus, getAllSuperCategoryStatus } = require("../Controller/SuperCategoryController");
 const { addCategory, getAllCategorys, getCategoryById, updateCategory, toggleCategoryStatus, getAllCategoryStatus } = require('../Controller/CategoryControlller');
-const { AddSubCategory, GetAllSubCategorys, GetAllSubCategoryStatus, GetSubCategoryById, UpdateSubCategory, ToggleSubCategoryStatus } = require('../Controller/SubCategoryController');
+const { AddSubCategory, GetAllSubCategorys, GetAllSubCategoryStatus, GetSubCategoryById, UpdateSubCategory, ToggleSubCategoryStatus, getSubCategoryByCategory } = require('../Controller/SubCategoryController');
 const { upload } = require("../Utill/S3");
 
 const router = express.Router();
@@ -52,6 +52,8 @@ router.get("/category/get/:id", getCategoryById);
 router.get("/category/status/:id", toggleCategoryStatus);
 
 router.get("/category/status", getAllCategoryStatus);
+
+router.get("/subcategory/category/:id", getSubCategoryByCategory);
 
 //Sub Category   List 
 
