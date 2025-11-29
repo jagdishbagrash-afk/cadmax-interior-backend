@@ -1,7 +1,7 @@
 const Product = require("../Model/Product");
 const CatchAsync = require("../Utill/catchAsync");
 const { successResponse, errorResponse, validationErrorResponse } = require("../Utill/ErrorHandling");
-const deleteUploadedFiles = require("../Utill/fileDeleter");
+const { deleteFile } = require("../Utill/S3");
 
 exports.addProduct = CatchAsync(async (req, res) => {
   try {
@@ -25,8 +25,8 @@ exports.addProduct = CatchAsync(async (req, res) => {
 
     // Image Handling
     let image = null;
-    if (req.file && req.file.filename) {
-      image = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+    if (req.file && req.file.location) {
+      image = `${req.protocol}://${req.get("host")}/uploads/${req.file.location}`;
     } else {
       return validationErrorResponse(res, "Product image is required", 400);
     }
@@ -90,7 +90,7 @@ exports.updateProduct = CatchAsync(async (req, res) => {
     const id = req.params.id;
 
     const productData = await Product.findById(id);
-    if (!productData || productData.deletedAt) {
+    if (!productData) {
       return validationErrorResponse(res, "Product not found", 404);
     }
 
@@ -119,16 +119,16 @@ exports.updateProduct = CatchAsync(async (req, res) => {
     if (terms) productData.terms = terms;
 
     // Image Handling
-    if (req.file && req.file.filename) {
+    if (req.file && req.file.location) {
       try {
         if (productData.image) {
-          await deleteUploadedFiles([productData.image]);
+          await deleteFile(productData.image);
         }
       } catch (err) {
         console.log("Error deleting old product image:", err.message);
       }
 
-      const newImageUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+      const newImageUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.location}`;
       productData.image = newImageUrl;
     }
 
