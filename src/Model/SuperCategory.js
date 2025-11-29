@@ -11,10 +11,12 @@ const SuperCategorySchema = mongoose.Schema({
         type: Date,
         default: null
     },
-    status : {
-        type: Boolean ,
-        default : false 
+    status: {
+        type: Boolean,
+        default: false
     }
-});
+},
+
+    { timestamps: true });
 
 module.exports = mongoose.model("SuperCategory", SuperCategorySchema);
