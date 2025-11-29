@@ -2,6 +2,7 @@ const SubCategory = require("../Model/SubCategory");
 const CatchAsync = require("../Utill/catchAsync");
 const { errorResponse, successResponse, validationErrorResponse } = require("../Utill/ErrorHandling");
 const deleteUploadedFiles = require("../Utill/fileDeleter");
+const { deleteFile } = require("../Utill/S3");
 
 exports.AddSubCategory = CatchAsync(
     async (req, res) => {
@@ -66,7 +67,7 @@ exports.UpdateSubCategory = async (req, res) => {
         if (req.file && req.file.filename) {
             if (data.image) {
                 try {
-                    await deleteUploadedFiles([data.Image]);
+                    await deleteFile([data.Image]);
                 } catch (err) {
                     console.log("Error deleting old data image:", err.message);
                 }
