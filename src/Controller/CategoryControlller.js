@@ -31,8 +31,6 @@ exports.addCategory = CatchAsync(async (req, res) => {
     }
 });
 
-
-
 exports.getAllCategorys = CatchAsync(
     async (req, res) => {
         try {
@@ -59,46 +57,45 @@ exports.getCategoryById = CatchAsync(
     }
 );
 
-exports.updateCategory = async (req, res) => {
-    try {
-        const { name } = req.body;
+exports.updateCategory = CatchAsync(
+    async (req, res) => {
+        try {
+            const { name } = req.body;
 
-        const data = await Category.findById(req.params.id);
+            const data = await Category.findById(req.params.id);
 
-        if (!data) {
-            return validationErrorResponse(res, "Category not found.", 404);
-        }
-
-        // ✅ Update name if provided
-        if (name) data.name = name;
-
-        // ✅ If new image uploaded → delete old image first
-        if (req.file && req.file.location) {
-
-            if (data.Image) {
-                try {
-                    await deleteFile(data.Image);   // ✅ S3 old image delete
-                } catch (err) {
-                    console.log("Error deleting old image:", err.message);
-                }
+            if (!data) {
+                return validationErrorResponse(res, "Category not found.", 404);
             }
 
-            // ✅ Store new S3 image URL
-            data.Image = req.file.location;
+            // ✅ Update name if provided
+            if (name) data.name = name;
+
+            // ✅ If new image uploaded → delete old image first
+            if (req.file && req.file.location) {
+
+                if (data.Image) {
+                    try {
+                        await deleteFile(data.Image);   // ✅ S3 old image delete
+                    } catch (err) {
+                        console.log("Error deleting old image:", err.message);
+                    }
+                }
+
+                // ✅ Store new S3 image URL
+                data.Image = req.file.location;
+            }
+
+            const updatedCategory = await data.save();
+            console.log("updatedCategory", updatedCategory)
+            return successResponse(res, "Category updated successfully.", 200, updatedCategory);
+
+        } catch (error) {
+            console.log(error);
+            return errorResponse(res, error.message || "Internal Server Error", 500);
         }
-
-        const updatedCategory = await data.save();
-        console.log("updatedCategory" ,updatedCategory)
-        return successResponse(res, "Category updated successfully.", 200, updatedCategory);
-
-    } catch (error) {
-        console.log(error);
-        return errorResponse(res, error.message || "Internal Server Error", 500);
     }
-};
-
-
-
+);
 
 exports.toggleCategoryStatus = CatchAsync(
     async (req, res) => {
@@ -127,7 +124,7 @@ exports.toggleCategoryStatus = CatchAsync(
 exports.getAllCategoryStatus = CatchAsync(
     async (req, res) => {
         try {
-            const Categorys = await Category.find({ status: false});
+            const Categorys = await Category.find({ status: false });
             return successResponse(res, "Categorys list successfully.", 201, Categorys);
         } catch (error) {
             return errorResponse(res, error.message || "Internal Server Error", 500);
