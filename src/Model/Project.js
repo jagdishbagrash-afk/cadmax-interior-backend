@@ -14,7 +14,7 @@ const ProjectSchema = mongoose.Schema(
       type: String,
       required: [true, "Brief is required"],
     },
-    image: {
+    Image: {
       type: String,
       required: [true, "Image is required"],
     },
@@ -22,10 +22,17 @@ const ProjectSchema = mongoose.Schema(
       type: String,
       required: [true, "Solution is required"],
     },
+    content: {
+      type: String,
+    },
     deletedAt: {
       type: Date,
       default: null,
     },
+    status: {
+      type: Boolean,
+      default: false
+    }
   },
   { timestamps: true }
 );

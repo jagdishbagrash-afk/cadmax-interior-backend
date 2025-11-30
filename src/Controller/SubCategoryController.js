@@ -1,3 +1,4 @@
+const Category = require("../Model/Category");
 const SubCategory = require("../Model/SubCategory");
 const CatchAsync = require("../Utill/catchAsync");
 const { errorResponse, successResponse, validationErrorResponse } = require("../Utill/ErrorHandling");
@@ -93,7 +94,7 @@ exports.UpdateSubCategory = CatchAsync(
 
                 if (data.Image) {
                     try {
-                        await deleteFile(data.Image);   
+                        await deleteFile(data.Image);
                     } catch (err) {
                         console.log("Error deleting old image:", err.message);
                     }
@@ -148,3 +149,36 @@ exports.GetAllSubCategoryStatus = CatchAsync(
         }
     }
 );
+
+
+exports.GetSubCategoryByNameCategory = CatchAsync(async (req, res) => {
+    try {
+        console.log("hello")
+        const { name } = req.params;
+        console.log("req.params", req.params)
+        console.log("name", name)
+        const cleanName = name.replaceAll("-", " ");
+
+        const category = await Category.findOne({ name: cleanName });
+
+
+        if (!category) {
+            return validationErrorResponse(res, "Category not found.", 404);
+        }
+        const subCategories = await SubCategory.find({
+            category: category._id,
+            deletedAt: null,
+        });
+
+        if (!subCategories || subCategories.length === 0) {
+            return validationErrorResponse(
+                res,
+                "No Subcategories found for this category.",
+                404
+            );
+        }
+        return successResponse(res, "Subcategories fetched successfully.", 200, subCategories);
+    } catch (error) {
+        return errorResponse(res, error.message || "Internal Server Error", 500);
+    }
+});

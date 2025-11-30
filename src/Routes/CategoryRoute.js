@@ -1,6 +1,6 @@
 const express = require('express');
 const { addCategory, getAllCategorys, getCategoryById, updateCategory, toggleCategoryStatus, getAllCategoryStatus } = require('../Controller/CategoryControlller');
-const { AddSubCategory, GetAllSubCategorys, GetAllSubCategoryStatus, GetSubCategoryById, UpdateSubCategory, ToggleSubCategoryStatus, getSubCategoryByCategory } = require('../Controller/SubCategoryController');
+const { AddSubCategory, GetAllSubCategorys, GetAllSubCategoryStatus, GetSubCategoryById, UpdateSubCategory, ToggleSubCategoryStatus, getSubCategoryByCategory, GetSubCategoryByNameCategory } = require('../Controller/SubCategoryController');
 const { upload } = require("../Utill/S3");
 
 const router = express.Router();
@@ -45,6 +45,8 @@ router.get("/subcategory/get/:id", GetSubCategoryById);
 router.post("/subcategory/update/:id", upload.single("Image"), UpdateSubCategory);
 
 router.get("/subcategory/status/:id", ToggleSubCategoryStatus);
+
+router.get("/subcategory/category_name/:name", GetSubCategoryByNameCategory);
 
 
 module.exports = router;
