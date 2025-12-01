@@ -1,63 +1,69 @@
 const mongoose = require("mongoose");
-const bcrypt = require("bcrypt");
 
-const userSchema = new mongoose.Schema(
-  {
-    name: {
-      type: String,
-      required: [true, "Name is required."],
-      trim: true,
-      minlength: 2,
-      maxlength: 50,
-    },
-    email: {
-      type: String,
-      required: [true, "Email is required."],
-      unique: true,
-      lowercase: true,
-      trim: true,
-      match: [
-        /^\S+@\S+\.\S+$/,
-        "Please enter a valid email address."
-      ],
-    },
-    password: {
-      type: String,
-      required: [true, "Password is required."],
-      minlength: 6,
-      select: false, // don't send password in queries by default
-    },
-    phone: {
-      type: String,
-      trim: true,
-      match: [
-        /^[6-9]\d{9}$/,
-        "Please enter a valid phone number."
-      ],
-    },
-    profileImage: {
-      type: String,
-      default: "https://via.placeholder.com/150",
-    },
-    role: {
-      type: String,
-      enum: ["user", "admin"],
-      default: "user",
-    },
-    isActive: {
-      type: Boolean,
-      default: true,
-    },
+const UserSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: [true, "Name is required"],
+    minlength: [2, "Name must be at least 2 characters long"],
+    maxlength: [50, "Name must be less than 50 characters"],
+    trim: true,
   },
-  { timestamps: true }
-);
+  phone: {
+    type: Number,
+    required: [true, "Phone number is required"],
+    unique: true,
+    validate: {
+      validator: function (v) {
+        return /^[0-9]{10}$/.test(v);
+      },
+      message: "Phone number must be exactly 10 digits"
+    }
+  },
+  email: {
+    type: String,
+    unique: true,
+    trim: true,
+    lowercase: true,
+    sparse: true,
+    validate: {
+      validator: function (v) {
+        if (!v) return true;
+        return /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,})+$/.test(v);
+      },
+      message: "Invalid email format"
+    }
+  },
+  profileImage: {
+    type: String,
+    default: null,
+  },
+  password: {
+    type: String,
+    minlength: [8, "Password must be at least 8 characters long"],
+  },
+  OTP: {
+    type: String,
+    maxlength: [6, "OTP must be at most 6 digits"],
+  },
+  status: {
+    type: String,
+    values: ["active", "inactive"],
+    default: "active",
+  },
+  role: {
+    type: String,
+    enum: {
+      values: ["admin", "customer",],
+      message: "Role must be admin, customer,"
+    },
+    default: "customer",
+  },
+  deleted_at: {
+    type: Date,
+    default: null
+  }
+}, { timestamps: true });
 
-// 🔑 Hash password before saving
-// userSchema.pre("save", async function (next) {
-//   if (!this.isModified("password")) return next(); // only hash if password is new/changed
-//   this.password = await bcrypt.hash(this.password, 10);
-//   next();
-// });
+UserSchema.index({ name: 1, email: 1 }, { unique: true });
 
-const User = mongoose.model("User", userSchema);
-module.exports = User;
+module.exports = mongoose.model("User", UserSchema);

@@ -1,9 +1,8 @@
 const jwt = require("jsonwebtoken");
 const catchAsync = require("../Utill/catchAsync");
-const User = require("../Model/User");
 const bcrypt = require("bcrypt");
 const { errorResponse, successResponse } = require("../Utill/ErrorHandling");
-// const logger = require("../Utill/Logger");
+const User = require("../model/User");
 
 
 
@@ -17,71 +16,24 @@ const signToken = async (id) => {
 
 exports.isValidEmail = (email) => { const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; return emailRegex.test(email); };
 
-
-exports.verifyToken = async (req, res, next) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(400).json({
-        status: false,
-        message: "User is not authorized or Token is missing",
-      });
-    }
-
-    const token = authHeader.split(" ")[1];
-
-    // Verify token
-    const decode = jwt.verify(token, process.env.JWT_SECRET);
-    if (!decode) {
-      return res.status(401).json({
-        status: false,
-        message: "Unauthorized",
-      });
-    }
-
-    // Find user
-    const user = await User.findById(decode.id);
-    if (!user) {
-      return res.status(404).json({
-        status: false,
-        message: "User not found",
-      });
-    }
-
-    req.User = user;
-    next();
-  } catch (err) {
-    console.log("Token verification error:", err);
-    return res.status(401).json({
-      status: false,
-      message: "Invalid or expired token",
-      error: err.message, // log error message
-    });
-  }
-};
-
-
-
-
 exports.signup = catchAsync(async (req, res) => {
   try {
-    const { email, password, name, phone, profileImage } = req.body;
-    // const hashedPassword = await bcrypt.hash(password, 12);
+    const { email, password, name, phone, profileImage , role } = req.body;
+    const hashedPassword = await bcrypt.hash(password, 12);
     // Create new user with referral data
     const newUser = new User({
       email,
-      password: password,
+      password: hashedPassword,
       name,
       phone,
-      profileImage
+      profileImage,
+      role: "customer"
     });
-
     const result = await newUser.save();
     return successResponse(res, "Account created successfully. Let’s get started!", 201, {
       userId: result._id,
     });
   } catch (error) {
-    // logger.error("Error during signup:", error);
     return errorResponse(res, error.message || "Internal Server Error", 500);
   }
 });
