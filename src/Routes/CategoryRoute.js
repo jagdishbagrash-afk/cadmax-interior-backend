@@ -1,38 +1,16 @@
 const express = require('express');
-const { addSuperCategory, getAllSuperCategorys, getSuperCategoryById, updateSuperCategory, toggleSuperCategoryStatus, getAllSuperCategoryStatus } = require("../Controller/SuperCategoryController");
 const { addCategory, getAllCategorys, getCategoryById, updateCategory, toggleCategoryStatus, getAllCategoryStatus } = require('../Controller/CategoryControlller');
-const { AddSubCategory, GetAllSubCategorys, GetAllSubCategoryStatus, GetSubCategoryById, UpdateSubCategory, ToggleSubCategoryStatus, getSubCategoryByCategory } = require('../Controller/SubCategoryController');
+const { AddSubCategory, GetAllSubCategorys, GetAllSubCategoryStatus, GetSubCategoryById, UpdateSubCategory, ToggleSubCategoryStatus, getSubCategoryByCategory, GetSubCategoryByNameCategory } = require('../Controller/SubCategoryController');
 const { upload } = require("../Utill/S3");
 
 const router = express.Router();
 
-//Super Category   List 
-
-// router.post("/supercategory/add",
-
-//     uploadFile.fields([
-//         { name: "Image", maxCount: 1 },
-//     ]),
-//     addSuperCategory);
-// router.get("/supercategory/get", getAllSuperCategorys);
-
-// router.get("/supercategory/get-status", getAllSuperCategoryStatus);
-
-
-// router.get("/supercategory/get/:id", getSuperCategoryById);
-
-// router.post("/supercategory/update/:id",
-//     uploadFile.fields([
-//         { name: "Image", maxCount: 1 },
-//     ]), updateSuperCategory);
-
-// router.get("/supercategory/status/:id", toggleSuperCategoryStatus);
 
 // Category   List 
 
 
 router.post(
-    "/category",
+    "/category/add",
     upload.single("Image"),
     addCategory
 );
@@ -57,23 +35,18 @@ router.get("/subcategory/category/:id", getSubCategoryByCategory);
 
 //Sub Category   List 
 
+router.post("/subcategory/add", upload.single("Image"), AddSubCategory);
 
+router.get("/subcategory/get", GetAllSubCategorys);
+router.get("/subcategory/get-status", GetAllSubCategoryStatus);
 
-// router.post("/subcategory/add", uploadFile.fields([
-//     { name: "Image", maxCount: 1 },
-// ]), AddSubCategory);
+router.get("/subcategory/get/:id", GetSubCategoryById);
 
-// router.get("/subcategory/get", GetAllSubCategorys);
-// router.get("/subcategory/get-status", GetAllSubCategoryStatus);
+router.post("/subcategory/update/:id", upload.single("Image"), UpdateSubCategory);
 
+router.get("/subcategory/status/:id", ToggleSubCategoryStatus);
 
-// router.get("/subcategory/get/:id", GetSubCategoryById);
-
-// router.post("/subcategory/update/:id", uploadFile.fields([
-//     { name: "Image", maxCount: 1 },
-// ]), UpdateSubCategory);
-
-// router.get("/subcategory/status/:id", ToggleSubCategoryStatus);
+router.get("/subcategory/category_name/:name", GetSubCategoryByNameCategory);
 
 
 module.exports = router;

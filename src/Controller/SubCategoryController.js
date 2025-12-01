@@ -1,32 +1,37 @@
+const Category = require("../Model/Category");
 const SubCategory = require("../Model/SubCategory");
 const CatchAsync = require("../Utill/catchAsync");
 const { errorResponse, successResponse, validationErrorResponse } = require("../Utill/ErrorHandling");
-const deleteUploadedFiles = require("../Utill/fileDeleter");
 const { deleteFile } = require("../Utill/S3");
 
-exports.AddSubCategory = CatchAsync(
-    async (req, res) => {
-        try {
-            const { name, category } = req.body;
-            if (!name || !category) {
-                return validationErrorResponse(res, "All fields are required", 400,);
-            }
-            const uploadedFiles = req.files || {};
-            const makeFileUrl = (fieldName) => {
-                if (!uploadedFiles[fieldName] || uploadedFiles[fieldName].length === 0) return null;
-                const file = uploadedFiles[fieldName][0];
-                return `${req.protocol}://${req.get("host")}/uploads/${file.filename}`;
-            };
-            const SubCategorys = new SubCategory({ name, Image: makeFileUrl("Image"), category });
-            const record = await SubCategorys.save();
-            return successResponse(res, "SubCategory created successfully.", 201, record);
-        } catch (error) {
-            console.log(error);
-            return errorResponse(res, error.message || "Internal Server Error", 500);
-        }
-    }
-)
+exports.AddSubCategory = CatchAsync(async (req, res) => {
+    try {
+        const { name, category } = req.body;
 
+        if (!name) {
+            return validationErrorResponse(res, "Category name is required", 400);
+        }
+
+        let imageUrl = null;
+
+        if (req.file) {
+            imageUrl = req.file.location;   // ✅ S3 image URL
+        }
+
+        const Categorys = new SubCategory({
+            name,
+            Image: imageUrl,
+            category
+        });
+
+        const record = await Categorys.save();
+        return successResponse(res, "Category created successfully.", 201, record);
+
+    } catch (error) {
+        console.log(error);
+        return errorResponse(res, error.message || "Internal Server Error", 500);
+    }
+});
 
 exports.GetAllSubCategorys = CatchAsync(
     async (req, res) => {
@@ -56,56 +61,59 @@ exports.GetSubCategoryById = CatchAsync(
 
 exports.getSubCategoryByCategory = CatchAsync(async (req, res) => {
     try {
-      const categoryId = req.params.id;
-      const subCategories = await SubCategory.find({
-        category: categoryId,
-        deletedAt: null 
-      }).populate("category");
+        const categoryId = req.params.id;
+        const subCategories = await SubCategory.find({
+            category: categoryId,
+            deletedAt: null
+        }).populate("category");
 
-      if (!subCategories || subCategories?.length === 0) {
-        return validationErrorResponse(res, "No Subcategories found for this category.", 404);
-      }
-      return successResponse(res, "Subcategories fetched successfully.", 200, subCategories);
-    } catch (error) {
-      return errorResponse(res, error.message || "Internal Server Error", 500);
-    }
-  }
-);
-
-exports.UpdateSubCategory = async (req, res) => {
-    try {
-        const { name, SuperCategory, category } = req.body;
-        const data = await SubCategory.findById(req.params.id);
-
-        if (name) data.name = name;
-        //    if (SuperCategory) data.SuperCategory = SuperCategory;
-        if (category) data.category = category;
-
-
-        if (req.file && req.file.filename) {
-            if (data.image) {
-                try {
-                    await deleteFile([data.Image]);
-                } catch (err) {
-                    console.log("Error deleting old data image:", err.message);
-                }
-            }
-
-            const newImageUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
-            data.Image = newImageUrl;
+        if (!subCategories || subCategories?.length === 0) {
+            return validationErrorResponse(res, "No Subcategories found for this category.", 404);
         }
-
-        const updatedSubCategory = await data.save();
-        if (!updatedSubCategory) {
-            return validationErrorResponse(res, "SubCategory not found.", 400, updatedSubCategory);
-        }
-        return successResponse(res, "SubCategorys updated successfully.", 201, updatedSubCategory);
-
+        return successResponse(res, "Subcategories fetched successfully.", 200, subCategories);
     } catch (error) {
         return errorResponse(res, error.message || "Internal Server Error", 500);
-
     }
-};
+}
+);
+
+exports.UpdateSubCategory = CatchAsync(
+    async (req, res) => {
+        try {
+            const { name, category } = req.body;
+            const data = await SubCategory.findById(req.params.id);
+
+            if (!data) {
+                return validationErrorResponse(res, "Category not found.", 404);
+            }
+
+            if (name) data.name = name;
+            if (category) data.category = category;
+
+            if (req.file && req.file.location) {
+
+                if (data.Image) {
+                    try {
+                        await deleteFile(data.Image);
+                    } catch (err) {
+                        console.log("Error deleting old image:", err.message);
+                    }
+                }
+
+                // ✅ Store new S3 image URL
+                data.Image = req.file.location;
+            }
+
+            const updatedCategory = await data.save();
+            console.log("updatedCategory", updatedCategory)
+            return successResponse(res, "Category updated successfully.", 200, updatedCategory);
+
+        } catch (error) {
+            console.log(error);
+            return errorResponse(res, error.message || "Internal Server Error", 500);
+        }
+    }
+);
 
 exports.ToggleSubCategoryStatus = CatchAsync(
     async (req, res) => {
@@ -131,7 +139,6 @@ exports.ToggleSubCategoryStatus = CatchAsync(
     }
 );
 
-
 exports.GetAllSubCategoryStatus = CatchAsync(
     async (req, res) => {
         try {
@@ -142,3 +149,36 @@ exports.GetAllSubCategoryStatus = CatchAsync(
         }
     }
 );
+
+
+exports.GetSubCategoryByNameCategory = CatchAsync(async (req, res) => {
+    try {
+        console.log("hello")
+        const { name } = req.params;
+        console.log("req.params", req.params)
+        console.log("name", name)
+        const cleanName = name.replaceAll("-", " ");
+
+        const category = await Category.findOne({ name: cleanName });
+
+
+        if (!category) {
+            return validationErrorResponse(res, "Category not found.", 404);
+        }
+        const subCategories = await SubCategory.find({
+            category: category._id,
+            deletedAt: null,
+        });
+
+        if (!subCategories || subCategories.length === 0) {
+            return validationErrorResponse(
+                res,
+                "No Subcategories found for this category.",
+                404
+            );
+        }
+        return successResponse(res, "Subcategories fetched successfully.", 200, subCategories);
+    } catch (error) {
+        return errorResponse(res, error.message || "Internal Server Error", 500);
+    }
+});
