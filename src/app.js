@@ -31,12 +31,8 @@ const PORT = process.env.REACT_APP_SERVER_DOMAIN || 5000;
 app.use("/api", require("./Routes/ContactRoute"));
 app.use("/api", require("./Routes/ServicesRoute"));
 app.use("/api", require("./Routes/AppRoute"));
-
-
 app.use("/api", require("./Routes/CategoryRoute"));
-
-
-
+app.use("/api", require("./Routes/ProductRoute"));
 
 const server = app.listen(PORT, () => console.log("Server is running at port : " + PORT));
 server.timeout = 360000;
