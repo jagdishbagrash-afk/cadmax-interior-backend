@@ -165,3 +165,59 @@ exports.deleteProduct = CatchAsync(async (req, res) => {
     return errorResponse(res, error.message || "Internal Server Error", 500);
   }
 });
+
+exports.getProductByCategory = CatchAsync(async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return validationErrorResponse(res, "Id is required", 400);
+    }
+
+    const products = await Product.find({
+      category: id,
+      deletedAt: null
+    })
+      .populate("subcategory")
+      .populate("category")
+      .sort({ createdAt: -1 });
+
+    const subCategoryMap = new Map();
+    products.forEach(product => {
+      if (product.subcategory?._id) {
+        subCategoryMap.set(
+          product.subcategory._id.toString(),
+          {
+            _id: product.subcategory._id,
+            name: product.subcategory.name
+          }
+        );
+      }
+    });
+
+    const uniqueSubcategories = Array.from(subCategoryMap.values());
+
+    return successResponse(res, "Products and subcategories fetched", 200, {
+        products,
+        subcategories: uniqueSubcategories
+      });
+  } catch (error) {
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});
+
+exports.getProductBySubCategory = CatchAsync(async (req, res) => {
+  try {
+    const { id } = req.params; 
+    const products = await Product.find({
+      subcategory: id,
+      deletedAt: null
+    })
+      .populate("subcategory")
+      .populate("category")
+      .sort({ createdAt: -1 });
+    return successResponse(res, "Products fetched by category", 200, products);
+  } catch (error) {
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});
