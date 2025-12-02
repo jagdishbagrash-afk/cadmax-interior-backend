@@ -9,17 +9,17 @@ const ServicesSchema = mongoose.Schema({
         type: String,
         required: true
     },
-    servicesImage: {
+    Image: {
         type: String,
         required: true
     },
-    scope :{
-        type: String ,
-        required : true
+    scope: {
+        type: String,
+        required: true
     },
-    area :{
-        type :String,
-        required :true
+    area: {
+        type: String,
+        required: true
     },
     deletedAt: {
         type: Date,

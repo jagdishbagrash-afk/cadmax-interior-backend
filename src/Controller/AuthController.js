@@ -2,9 +2,7 @@ const jwt = require("jsonwebtoken");
 const catchAsync = require("../Utill/catchAsync");
 const bcrypt = require("bcrypt");
 const { errorResponse, successResponse } = require("../Utill/ErrorHandling");
-const User = require("../model/User");
-
-
+const User = require("../Model/User");
 
 const signToken = async (id) => {
   const token = jwt.sign({ id }, process.env.JWT_SECRET, {

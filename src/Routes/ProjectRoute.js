@@ -10,5 +10,4 @@ router.post("/project/edit/:id", upload.single("image"), UpdateProject);
 router.post("/project/status/:id", ToggleProjectStatus);
 router.post("/project/status", GetAllProjectStatus);
 
-
 module.exports = router;

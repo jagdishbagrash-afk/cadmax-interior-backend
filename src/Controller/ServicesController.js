@@ -7,11 +7,17 @@ exports.addService = CatchAsync(
   async (req, res) => {
     try {
       const { title, content, servicesImage, scope } = req.body;
+        let imageUrl = null;
 
-      if (!title || !content || !servicesImage || !scope) {
+        if (req.file) {
+            imageUrl = req.file.location;   // ✅ S3 image URL
+        }
+
+      if (!title || !content  || !scope) {
         return validationErrorResponse(res, "All fields are required", 400, );
       }
-      const service = new Services({ title, content, servicesImage, scope });
+
+      const service = new Services({ title, content, Image : imageUrl, scope });
       const record = await service.save();
       return successResponse(res, "Services created successfully.", 201, record);
     } catch (error) {
