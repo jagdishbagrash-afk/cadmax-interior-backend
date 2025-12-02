@@ -6,11 +6,9 @@ const { deleteFile } = require("../Utill/S3");
 exports.addCategory = CatchAsync(async (req, res) => {
     try {
         const { name } = req.body;
-
         if (!name) {
             return validationErrorResponse(res, "Category name is required", 400);
         }
-
         let imageUrl = null;
 
         if (req.file) {
