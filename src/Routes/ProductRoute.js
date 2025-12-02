@@ -1,6 +1,6 @@
 const router = require("express").Router();
 const { getAllProducts, addProduct, getProductById, updateProduct, deleteProduct, getProductByCategory, getProductBySubCategory } = require("../Controller/ProductController");
-const upload = require("../Utill/uploader");
+const { upload } = require("../Utill/S3");
 
 router.post("/product/add", upload.single("image"), addProduct);       
 router.get("/product/list", getAllProducts);    

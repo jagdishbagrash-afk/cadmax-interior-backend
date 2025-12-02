@@ -14,19 +14,19 @@ exports.addProduct = CatchAsync(async (req, res) => {
       category,
       dimensions,
       material,
-      product,
+      type,
       terms
     } = req.body;
 
     // Validation
-    if (!title || !description || !stock || !amount || !subcategory || !category || !dimensions || !material || !product || !terms) {
+    if (!title || !description || !stock || !amount || !subcategory || !category || !dimensions || !material || !type || !terms) {
       return validationErrorResponse(res, "All fields are required", 400);
     }
 
     // Image Handling
     let image = null;
     if (req.file && req.file.location) {
-      image = `${req.protocol}://${req.get("host")}/uploads/${req.file.location}`;
+      image = req.file.location;
     } else {
       return validationErrorResponse(res, "Product image is required", 400);
     }
@@ -40,7 +40,7 @@ exports.addProduct = CatchAsync(async (req, res) => {
       category,
       dimensions,
       material,
-      product,
+      type,
       terms,
       image,
     });
@@ -103,7 +103,7 @@ exports.updateProduct = CatchAsync(async (req, res) => {
       category,
       dimensions,
       material,
-      product,
+      type,
       terms
     } = req.body;
 
@@ -115,10 +115,12 @@ exports.updateProduct = CatchAsync(async (req, res) => {
     if (category) productData.category = category;
     if (dimensions) productData.dimensions = dimensions;
     if (material) productData.material = material;
-    if (product) productData.product = product;
+    if (product) productData.type = type;
     if (terms) productData.terms = terms;
 
     // Image Handling
+
+    // console.log("req.file", req.file);
     if (req.file && req.file.location) {
       try {
         if (productData.image) {
@@ -128,7 +130,7 @@ exports.updateProduct = CatchAsync(async (req, res) => {
         console.log("Error deleting old product image:", err.message);
       }
 
-      const newImageUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.location}`;
+      const newImageUrl = req.file.location;
       productData.image = newImageUrl;
     }
 
