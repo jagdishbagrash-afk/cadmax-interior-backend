@@ -108,7 +108,7 @@ exports.profilegettoken = catchAsync(async (req, res, next) => {
 
 exports.resetpassword = catchAsync(async (req, res) => {
   try {
-    const email = req?.User?._id;
+    const email = req?.user?.id;
     const { newPassword } = req.body;
     const user = await User.findById({ _id: email });
     if (!user) {
@@ -129,7 +129,7 @@ exports.resetpassword = catchAsync(async (req, res) => {
 // ✅ Profile Update
 exports.updateProfile = async (req, res) => {
   try {
-    const userId = req.User._id; // userId from token (middleware sets req.user)
+    const userId = req?.user?.id; // userId from token (middleware sets req.user)
     const { name, phone, profileImage, email } = req.body;
 
     // Find and update user
