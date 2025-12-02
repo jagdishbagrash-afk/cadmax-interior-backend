@@ -1,4 +1,4 @@
-const Category = require("../Model/Category");
+const Category = require("../Model/Categroy");
 const SubCategory = require("../Model/SubCategory");
 const CatchAsync = require("../Utill/catchAsync");
 const { errorResponse, successResponse, validationErrorResponse } = require("../Utill/ErrorHandling");

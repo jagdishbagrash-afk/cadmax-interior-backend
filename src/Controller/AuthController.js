@@ -86,7 +86,7 @@ exports.login = catchAsync(async (req, res, next) => {
 
 exports.profilegettoken = catchAsync(async (req, res, next) => {
   try {
-    const userId = req?.User?._id;
+    const userId = req?.user?.id;
     if (!userId) {
       return res.status(400).json({ msg: "User not authenticated" });
     }
