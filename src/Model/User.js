@@ -3,14 +3,12 @@ const mongoose = require("mongoose");
 const UserSchema = new mongoose.Schema({
   name: {
     type: String,
-    required: [true, "Name is required"],
     minlength: [2, "Name must be at least 2 characters long"],
     maxlength: [50, "Name must be less than 50 characters"],
     trim: true,
   },
   phone: {
     type: Number,
-    required: [true, "Phone number is required"],
     unique: true,
     validate: {
       validator: function (v) {
@@ -57,6 +55,9 @@ const UserSchema = new mongoose.Schema({
       message: "Role must be admin, customer,"
     },
     default: "customer",
+  },
+  gender :{
+    type :String ,
   },
   deleted_at: {
     type: Date,

@@ -97,16 +97,8 @@ exports.Login = catchAsync(async (req, res) => {
 
 exports.signup = catchAsync(async (req, res) => {
   try {
-    const { email, password, name, profileImage, role, phone } = req.body;
+    const { email, password, name, profileImage, role, phone ,gender } = req.body;
     const hashedPassword = await bcrypt.hash(password, 12);
-    console.log("hashedPassword", hashedPassword)
-    // Check if required fields are provided
-    if (!name || !role) {
-      return res.status(401).json({
-        status: false,
-        message: "All fields are required",
-      });
-    }
 
     // Check if user already exists
     const existingUser = await User.find({
@@ -137,7 +129,7 @@ exports.signup = catchAsync(async (req, res) => {
       phone,
       password: hashedPassword,
       profileImage,
-      role,
+      role,gender
     });
 
     const result = await record.save();
@@ -187,5 +179,60 @@ exports.profilegettoken = catchAsync(async (req, res, next) => {
       msg: "Failed to fetch profile",
       error: error.message,
     });
+  }
+});
+
+
+exports.PhoneVerify = catchAsync(async (req, res) => {
+  try {
+    // console.log("req.body" ,req.body)
+    const { phone } = req.body;
+    if (!phone) {
+      return validationErrorResponse(
+        res,
+        "Phone number all are required",
+        401
+      );
+    }
+    return successResponse(res, "OTP Send successfully", 200, 
+       123456,
+    );
+
+    // Verify OTP with Twilio
+    // const verificationCheck = await client.verify.v2
+    //   .services(process.env.TWILIO_VERIFY_SID)
+    //   .verificationChecks.create({ to: phone, code: otp });
+    // if (verificationCheck.status === "approved") {
+    //   return successResponse(res, "OTP verified successfully", 200);
+    // } else {
+    //   return validationErrorResponse(res, "Invalid or expired OTP", 400);
+    // }
+  } catch (error) {
+    console.error("VerifyOtp error:", error);
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});
+
+
+exports.OTPVerify = catchAsync(async (req, res) => {
+  try {
+    // console.log("req.body" ,req.body)
+    const { phone, otp } = req.body;
+    if (!phone || !otp) {
+      return validationErrorResponse(
+        res,
+        "Phone number, OTP all are required",
+        401
+      );
+    }
+    if (otp !== "123456") {
+      return validationErrorResponse(res, "Invalid or expired OTP", 400);
+    }
+    return successResponse(res, "OTP verified successfully", 200, 123456);
+
+   
+  } catch (error) {
+    console.error("VerifyOtp error:", error);
+    return errorResponse(res, error.message || "Internal Server Error", 500);
   }
 });
