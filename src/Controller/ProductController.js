@@ -5,6 +5,9 @@ const { deleteFile } = require("../Utill/S3");
 
 exports.addProduct = CatchAsync(async (req, res) => {
   try {
+    console.log("req.body", req.body);
+    console.log("req.file", req.files);
+    return;
     const {
       title,
       description,

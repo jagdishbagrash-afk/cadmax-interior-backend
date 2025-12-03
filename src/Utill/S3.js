@@ -21,10 +21,33 @@ const upload = multer({
             cb(null, { fieldName: file.fieldname });
         },
         key: (req, file, cb) => {
-            cb(null, `${UPLOADS_FOLDER}${Date.now()}-${file.originalname.replace(/\s/g, '')}`);
+            const safeName = file.originalname
+                ? file.originalname.replace(/\s/g, '')
+                : 'file';
+            cb(null, `${UPLOADS_FOLDER}${Date.now()}-${safeName}`);
         },
         contentDisposition: 'inline',
     }),
+
+    // ✅ THIS IS THE IMPORTANT PART
+    fileFilter: (req, file, cb) => {
+        // If no file, or invalid file object → silently skip
+        if (!file || !file.mimetype) {
+            return cb(null, false);
+        }
+
+        // Optional: allow only real file types
+        if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') {
+            return cb(null, true);
+        }
+
+        // Reject unsupported types without throwing
+        return cb(null, false);
+    },
+
+    limits: {
+        fileSize: 10 * 1024 * 1024, // 10MB
+    },
 });
 
 // ✅ Upload Function
