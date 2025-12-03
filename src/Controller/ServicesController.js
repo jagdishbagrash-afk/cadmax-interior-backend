@@ -6,7 +6,8 @@ const { errorResponse, successResponse, validationErrorResponse } = require("../
 exports.addService = CatchAsync(
   async (req, res) => {
     try {
-      const { title, content, servicesImage, scope } = req.body;
+      console.log("servicesImage" ,req.body)
+      const { title, content, scope } = req.body;
         let imageUrl = null;
 
         if (req.file) {

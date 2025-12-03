@@ -8,7 +8,6 @@ const ProjectSchema = mongoose.Schema(
     },
     designed: {
       type: String,
-      required: [true, "Designed is required"],
     },
     brief: {
       type: String,

@@ -46,7 +46,8 @@ exports.GetProjectById = CatchAsync(
     async (req, res) => {
         try {
             const projects = await Project.findById(req.params.id);
-            if (!Category) {
+            console.log("projects", projects)
+            if (!projects) {
                 return validationErrorResponse(res, "Project not found.", 400, projects);
             }
             return successResponse(res, "Project Details successfully.", 201, projects);
@@ -102,7 +103,7 @@ exports.ToggleProjectStatus = CatchAsync(
             const { id } = req.params;
             const superProject = await Project.findById(id);
             if (!superProject) {
-                return validationErrorResponse(res, "Category not found.", 400);
+                return validationErrorResponse(res, "superProject not found.", 400);
             }
             // Toggle logic
             const newStatus = superProject.status === true ? false : true;
