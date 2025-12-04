@@ -5,7 +5,7 @@ const { upload } = require("../Utill/S3");
 router.post("/product/add", upload.any(), addProduct);       
 router.get("/product/list", getAllProducts);    
 router.get("/product/:id", getProductById);  
-router.post("/product/edit/:id", upload.single("image"), updateProduct);  
+router.post("/product/edit/:id", upload.any(), updateProduct);  
 router.post("/product/delete/:id", deleteProduct);
 
 router.get("/product/category/:id", getProductByCategory);
