@@ -6,19 +6,19 @@ const { errorResponse, successResponse, validationErrorResponse } = require("../
 exports.addService = CatchAsync(
   async (req, res) => {
     try {
-      console.log("servicesImage" ,req.body)
+      console.log("servicesImage", req.body)
       const { title, content, scope } = req.body;
-        let imageUrl = null;
+      let imageUrl = null;
 
-        if (req.file) {
-            imageUrl = req.file.location;   // ✅ S3 image URL
-        }
-
-      if (!title || !content  || !scope) {
-        return validationErrorResponse(res, "All fields are required", 400, );
+      if (req.file) {
+        imageUrl = req.file.location;   // ✅ S3 image URL
       }
 
-      const service = new Services({ title, content, Image : imageUrl, scope });
+      if (!title || !content || !scope) {
+        return validationErrorResponse(res, "All fields are required", 400,);
+      }
+
+      const service = new Services({ title, content, Image: imageUrl, scope });
       const record = await service.save();
       return successResponse(res, "Services created successfully.", 201, record);
     } catch (error) {

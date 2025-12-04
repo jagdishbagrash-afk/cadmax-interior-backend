@@ -22,6 +22,12 @@ const contactSchema = mongoose.Schema({
     phone_number: {
         type: Number,
     },
+    area : {
+        tye :String,
+    },
+    timeline : {type: String},
+    payment : {type :String},
+    
     created_at: {
         type: Date,
         default: Date.now

@@ -1,12 +1,10 @@
 const contactmodal = require("../Model/Contact");
 const catchAsync = require('../Utill/catchAsync');
 // const logger = require("../Utill/Logger");
-const emailTemplate = require("../contactemail")
-const nodemailer = require("nodemailer");
 
 exports.ContactPost = catchAsync(async (req, res) => {
     try {
-        const { email, name, message, services, phone_number } = req.body;
+        const { email, name, message, services, phone_number, timeline, area, payment } = req.body;
 
         if (!email || !name || !message || !services || !phone_number) {
             return res.status(400).json({
@@ -14,9 +12,8 @@ exports.ContactPost = catchAsync(async (req, res) => {
                 message: "All fields (email, name, message, services, phone_number) are required.",
             });
         }
-
         // Save to DB
-        const record = new contactmodal({ email, name, message, services, phone_number });
+        const record = new contactmodal({ email, name, message, services, phone_number, timeline, area, payment });
         const result = await record.save();
 
         if (!result) {
@@ -25,37 +22,6 @@ exports.ContactPost = catchAsync(async (req, res) => {
                 message: "Failed to save contact details.",
             });
         }
-
-        const transporter = nodemailer.createTransport({
-            host: "smtpout.secureserver.net", // ✅ GoDaddy SMTP Host
-            port: 465,                        // ✅ SSL Port
-            secure: true,                      // ✅ SSL enable
-            auth: {
-                user: process.env.EMAIL_USER,  // e.g. info@cadmaxpro.com
-                pass: process.env.EMAIL_PASS   // e.g. #6PJU@hW8p5EFrG
-            }
-        });
-
-        transporter.verify((err, success) => {
-            if (err) console.error("SMTP Error:", err);
-            else console.log("SMTP Server is ready to take messages");
-        });
-
-        // 1️⃣ Send Confirmation to User
-        await transporter.sendMail({
-            from: `"Cadmaxpro " <${process.env.EMAIL_USER}>`,
-            to: email,
-            subject: "Thank You for Contacting Cadmaxpro! 🌟",
-            html: emailTemplate({ name, email, phone_number, services, message, isUser: true }),
-        });
-
-        // 2️⃣ Send Notification to Admin
-        await transporter.sendMail({
-            from: `"Cadmaxpro Website" <${process.env.EMAIL_USER}>`,
-            to: process.env.EMAIL_USER,
-            subject: "📩 New Contact Request",
-            html: emailTemplate({ name, email, phone_number, services, message }),
-        });
 
         res.json({
             status: true,

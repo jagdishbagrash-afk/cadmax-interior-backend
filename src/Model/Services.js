@@ -14,11 +14,11 @@ const ServicesSchema = mongoose.Schema({
         required: true
     },
     scope: {
-        type: String,
+        type: Array,
         required: true
     },
     area: {
-        type: String,
+        type: Array,
         required: true
     },
     deletedAt: {
