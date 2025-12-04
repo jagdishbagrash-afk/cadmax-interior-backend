@@ -15,39 +15,36 @@ const { validationErrorResponse, errorResponse, successResponse } = require("../
 
 exports.SendOtp = catchAsync(async (req, res) => {
   try {
-    console.log("phone", req.body)
     const { phone } = req.body;
+
     if (!phone) {
       return validationErrorResponse(res, "Phone number is required", 401);
     }
-    const user = await User.findOne({ phone: phone });
-        if (!user) {
-      return successResponse(res, "OTP verified, please sign up now", 200, {
-        role: role,
+
+    // Find user by phone
+    const user = await User.findOne({ phone });
+
+    if (!user) {
+      return successResponse(res, "Phone not registered. Please sign up first.", 200, {
+        isNewUser: true
       });
     }
-    if (user) {
-      if (user?.deleted_at != null) {
-        return errorResponse(res, "This account is blocked", 200);
-      }
+
+    if (user?.deleted_at != null) {
+      return errorResponse(res, "This account is blocked", 403);
     }
 
-    return successResponse(res, "OTP sent successfully", 200, 123456);
+    return successResponse(res, "OTP sent successfully", 200, {
+      otp: 123456,      // Replace with real OTP
+      isNewUser: false
+    });
 
-    // const verification = await client.verify.v2
-    //   .services(process.env.TWILIO_VERIFY_SID)
-    //   .verifications.create({ to: phone, channel: "sms" });
-
-    // if (verification.status === "pending") {
-    //   return successResponse(res, "OTP sent successfully", 200);
-    // } else {
-    //   return errorResponse(res, "Failed to send OTP", 500);
-    // }
   } catch (error) {
     console.error("SendOtp error:", error);
     return errorResponse(res, error.message || "Internal Server Error", 500);
   }
 });
+
 
 exports.Login = catchAsync(async (req, res) => {
   try {
