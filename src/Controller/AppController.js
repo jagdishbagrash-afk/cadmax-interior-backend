@@ -21,6 +21,11 @@ exports.SendOtp = catchAsync(async (req, res) => {
       return validationErrorResponse(res, "Phone number is required", 401);
     }
     const user = await User.findOne({ phone: phone });
+        if (!user) {
+      return successResponse(res, "OTP verified, please sign up now", 200, {
+        role: role,
+      });
+    }
     if (user) {
       if (user?.deleted_at != null) {
         return errorResponse(res, "This account is blocked", 200);
