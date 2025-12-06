@@ -1,4 +1,4 @@
-const BookingModel = require("../Model/Bookings");
+const BookingModel = require("../Model/Booking");
 const catchAsync = require("../Utill/catchAsync");
 const { errorResponse, successResponse } = require("../Utill/ErrorHandling");
 
