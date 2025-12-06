@@ -1,8 +1,6 @@
 const mongoose = require("mongoose");
 const dotenv = require("dotenv");
-
 dotenv.config();
-
 mongoose.connect(process.env.DB_URL, {
    serverSelectionTimeoutMS: 5000,
    autoIndex: false,

@@ -35,7 +35,7 @@ exports.SendOtp = catchAsync(async (req, res) => {
     }
 
     return successResponse(res, "OTP sent successfully", 200, {
-      otp: 123456,      // Replace with real OTP
+      otp: 123456,      
       isNewUser: false
     });
 
