@@ -34,6 +34,8 @@ app.use("/api", require("./Routes/AppRoute"));
 app.use("/api", require("./Routes/CategoryRoute"));
 app.use("/api", require("./Routes/ProductRoute"));
 app.use("/api", require("./Routes/ProjectRoute"));
+app.use("/api", require("./Routes/BookingRoute"));
+
 
 const server = app.listen(PORT, () => console.log("Server is running at port : " + PORT));
 server.timeout = 360000;
