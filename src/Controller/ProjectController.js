@@ -96,7 +96,6 @@ exports.UpdateProject = CatchAsync(
     }
 );
 
-
 exports.ToggleProjectStatus = CatchAsync(
     async (req, res) => {
         try {
