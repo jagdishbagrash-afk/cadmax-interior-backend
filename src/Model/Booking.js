@@ -3,7 +3,6 @@ const mongoose = require("mongoose");
 const bookingschema = mongoose.Schema({
     project_type: {
         type: String,
-
     },
     servcies_model: {
         type: String,
@@ -15,6 +14,9 @@ const bookingschema = mongoose.Schema({
         type: String
     },
     finish_level: {
+        type: String
+    },
+    scope: {
         type: String
     },
     name: {
@@ -36,19 +38,16 @@ const bookingschema = mongoose.Schema({
         type: String
     },
     rate: {
-        type: String
+        type: Number
     },
     subtotal: {
-        type: String
+        type: Number
     },
     taxes: {
-        type: String
+        type: Number
     },
     total_amount: {
-        type: String
+        type: Number
     }
-
 })
-
-
 module.exports = mongoose.model("booking", bookingschema)

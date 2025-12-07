@@ -7,7 +7,7 @@ exports.BookingAdd = catchAsync(async (req, res) => {
         const {
             project_type, servcies_model, area, budget_range, finish_level,
             name, email, phone_number, city, phone_mode, timeLine,
-            rate, subtotal, taxes, total_amount
+            rate, subtotal, taxes, total_amount ,scope
         } = req.body;
 
         const booking = await BookingModel.create({
@@ -25,7 +25,8 @@ exports.BookingAdd = catchAsync(async (req, res) => {
             rate,
             subtotal,
             taxes,
-            total_amount
+            total_amount ,
+            scope
         });
 
         return successResponse(res, "Booking Success", 201, booking)
