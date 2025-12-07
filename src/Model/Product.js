@@ -38,6 +38,9 @@ const ProductSchema = mongoose.Schema(
     //   type: String,
     //   required: [true, "Image is required"],
     // },
+    slug :{
+      type :String 
+    },
     amount: {
       type: Number,
       required: [true, "Amount is required"],

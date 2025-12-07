@@ -3,6 +3,33 @@ const CatchAsync = require("../Utill/catchAsync");
 const { successResponse, errorResponse, validationErrorResponse } = require("../Utill/ErrorHandling");
 const { deleteFile } = require("../Utill/S3");
 
+
+
+const makeSlug = (text) => {
+  return text
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/[\s\_]+/g, "-")
+    .replace(/[^\w\-]+/g, "")
+    .replace(/\-\-+/g, "-");
+};
+
+const generateUniqueSlug = async (Model, title) => {
+  let baseSlug = makeSlug(title);
+  let slug = baseSlug;
+  let counter = 1;
+
+  while (await Model.findOne({ slug })) {
+    slug = `${baseSlug}-${counter}`;
+    counter++;
+  }
+
+  return slug;
+};
+
+
+
 exports.addProduct = CatchAsync(async (req, res) => {
   try {
     // 1️⃣ Parse variants
@@ -50,8 +77,11 @@ exports.addProduct = CatchAsync(async (req, res) => {
       }
     }
 
+    const slug = await generateUniqueSlug(Product, req.body.title?.[0]);
+
     const newProduct = new Product({
       title: req.body.title?.[0] || "",
+      slug: slug,
       description: req.body.description?.[0] || "",
       amount: Number(req.body.amount?.[0]) || "",
       category: req.body.category?.[0] || "",
@@ -132,7 +162,6 @@ exports.updateProduct = CatchAsync(async (req, res) => {
     "type",
     "terms"
   ];
-
   fields.forEach(f => {
     if (req.body[f] !== undefined) {
       product[f] = value(req.body[f]);
@@ -291,9 +320,9 @@ exports.getProductByCategory = CatchAsync(async (req, res) => {
     const uniqueSubcategories = Array.from(subCategoryMap.values());
 
     return successResponse(res, "Products and subcategories fetched", 200, {
-        products,
-        subcategories: uniqueSubcategories
-      });
+      products,
+      subcategories: uniqueSubcategories
+    });
   } catch (error) {
     return errorResponse(res, error.message || "Internal Server Error", 500);
   }
@@ -301,7 +330,7 @@ exports.getProductByCategory = CatchAsync(async (req, res) => {
 
 exports.getProductBySubCategory = CatchAsync(async (req, res) => {
   try {
-    const { id } = req.params; 
+    const { id } = req.params;
     const products = await Product.find({
       subcategory: id,
       deletedAt: null
@@ -310,6 +339,22 @@ exports.getProductBySubCategory = CatchAsync(async (req, res) => {
       .populate("category")
       .sort({ createdAt: -1 });
     return successResponse(res, "Products fetched by category", 200, products);
+  } catch (error) {
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});
+
+
+exports.getProductByName = CatchAsync(async (req, res) => {
+  try {
+    const product = await Product.findOne({ slug: req.params.id })
+      .populate("subcategory")
+      .populate("category");
+    if (!product) {
+      return errorResponse(res, "Product not found", 404);
+    }
+
+    return successResponse(res, "Product fetched successfully", 200, product);
   } catch (error) {
     return errorResponse(res, error.message || "Internal Server Error", 500);
   }
