@@ -344,7 +344,6 @@ exports.getProductBySubCategory = CatchAsync(async (req, res) => {
   }
 });
 
-
 exports.getProductByName = CatchAsync(async (req, res) => {
   try {
     const product = await Product.findOne({ slug: req.params.id })

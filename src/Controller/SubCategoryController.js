@@ -62,6 +62,7 @@ exports.GetSubCategoryById = CatchAsync(
 exports.getSubCategoryByCategory = CatchAsync(async (req, res) => {
     try {
         const categoryId = req.params.id;
+        console.log("categoryId0" , categoryId)
         const subCategories = await SubCategory.find({
             category: categoryId,
             deletedAt: null
