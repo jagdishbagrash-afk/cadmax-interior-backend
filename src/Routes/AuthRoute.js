@@ -1,16 +1,19 @@
-const { signup, login, profilegettoken } = require("../Controller/AuthController");
+const { signup, Login, SendOtp, profilegettoken, PhoneVerify, OTPVerify } = require("../Controller/AppController");
+const { login, GetAllUser } = require("../Controller/AuthController");
 const { verifyToken } = require("../Utill/tokenVerify");
+const UserRoute = require("express").Router();
 
-const userRoute = require("express").Router();
+UserRoute.post("/user/signup", signup)
+UserRoute.post("/user/login", Login)
+UserRoute.post("/user/send_otp", SendOtp)
+UserRoute.post("/user/phone_verify", PhoneVerify)
+UserRoute.post("/user/otp_verify", OTPVerify)
 
-userRoute.post("/user/signup", signup)
-userRoute.post("/user/login", login)
+UserRoute.post("/admin/login", login)
 
-// userRoute.post("/user/reset-password", verifyToken, resetpassword)
+UserRoute.get("/admin/alluser", GetAllUser)
 
-userRoute.get("/user/profile", verifyToken,  profilegettoken)
-
-// userRoute.post("/user/profile-update", verifyToken ,  updateProfile)
+UserRoute.get("/user/profile", verifyToken ,profilegettoken)
 
 
-module.exports = userRoute;
+module.exports = UserRoute;

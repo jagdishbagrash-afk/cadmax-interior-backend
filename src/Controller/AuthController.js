@@ -11,26 +11,61 @@ const signToken = async (id) => {
   return token;
 };
 
-
 exports.isValidEmail = (email) => { const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; return emailRegex.test(email); };
 
 exports.signup = catchAsync(async (req, res) => {
   try {
-    const { email, password, name, phone, profileImage , role } = req.body;
+    const { email, password, name, profileImage, role, phone ,gender } = req.body;
     const hashedPassword = await bcrypt.hash(password, 12);
-    // Create new user with referral data
-    const newUser = new User({
-      email,
-      password: hashedPassword,
+    // Check if user already exists
+    const existingUser = await User.find({
+      $or: [{ email }, { phone }],
+    });
+
+    if (existingUser.length > 0) {
+      const errors = {};
+      existingUser.forEach((user) => {
+        if (user.email === email) {
+          errors.email = "Email is already in use!";
+        }
+        if (user.phone === phone) {
+          errors.phone = "Phone number is already in use!";
+        }
+      });
+
+      return res.status(400).json({
+        status: false,
+        message: "Email or phone number already exists",
+        errors,
+      });
+    }
+
+    const record = new User({
       name,
+      email,
       phone,
+      password: hashedPassword,
       profileImage,
-      role: "customer"
+      role,gender
     });
-    const result = await newUser.save();
-    return successResponse(res, "Account created successfully. Let’s get started!", 201, {
-      userId: result._id,
-    });
+
+    const result = await record.save();
+    console.log("result", result)
+    const token = jwt.sign(
+      { id: result._id, role: result.role, email: result.email },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN || "24h" }
+    );
+    return successResponse(
+      res,
+      "You have been registered successfully !!",
+      201,
+      {
+        user: result,
+        token: token,
+        role: result?.role,
+      }
+    );
   } catch (error) {
     return errorResponse(res, error.message || "Internal Server Error", 500);
   }
@@ -82,6 +117,8 @@ exports.login = catchAsync(async (req, res, next) => {
     });
   }
 });
+
+
 
 
 exports.profilegettoken = catchAsync(async (req, res, next) => {
@@ -148,3 +185,15 @@ exports.updateProfile = async (req, res) => {
     return errorResponse(res, error.message || "Internal Server Error", 500);
   }
 };
+
+
+exports.GetAllUser = catchAsync(
+    async (req, res) => {
+        try {
+            const Users = await User.find({role :"customer"}).sort({ createdAt: -1 });
+            return successResponse(res, "Users list successfully.", 201, Users);
+        } catch (error) {
+            return errorResponse(res, error.message || "Internal Server Error", 500);
+        }
+    }
+);

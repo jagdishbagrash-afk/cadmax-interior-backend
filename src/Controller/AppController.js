@@ -99,9 +99,8 @@ exports.Login = catchAsync(async (req, res) => {
 
 exports.signup = catchAsync(async (req, res) => {
   try {
-    const { email, password, name, profileImage, role, phone ,gender } = req.body;
-    const hashedPassword = await bcrypt.hash(password, 12);
-
+    const { email, name, profileImage, role, phone ,gender } = req.body;
+console.log(" req.body" , req.body)
     // Check if user already exists
     const existingUser = await User.find({
       $or: [{ email }, { phone }],
@@ -129,7 +128,6 @@ exports.signup = catchAsync(async (req, res) => {
       name,
       email,
       phone,
-      password: hashedPassword,
       profileImage,
       role,gender
     });
