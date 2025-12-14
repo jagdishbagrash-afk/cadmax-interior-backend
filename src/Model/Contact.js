@@ -27,7 +27,6 @@ const contactSchema = mongoose.Schema({
     },
     timeline : {type: String},
     payment : {type :String},
-    
     created_at: {
         type: Date,
         default: Date.now

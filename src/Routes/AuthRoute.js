@@ -1,5 +1,5 @@
 const { signup, Login, SendOtp, profilegettoken, PhoneVerify, OTPVerify } = require("../Controller/AppController");
-const { login, GetAllUser } = require("../Controller/AuthController");
+const { login, GetAllUser, DeleteUser } = require("../Controller/AuthController");
 const { verifyToken } = require("../Utill/tokenVerify");
 const UserRoute = require("express").Router();
 
@@ -15,5 +15,6 @@ UserRoute.get("/admin/alluser", GetAllUser)
 
 UserRoute.get("/user/profile", verifyToken ,profilegettoken)
 
+router.post("/user/delete/:id", DeleteUser);
 
 module.exports = UserRoute;
