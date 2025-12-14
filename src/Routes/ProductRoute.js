@@ -9,7 +9,6 @@ router.post("/product/edit/:id", upload.any(), updateProduct);
 router.post("/product/delete/:id", deleteProduct);
 router.get("/product/category/:id", getProductByCategory);
 router.get("/product/subcategory/:id", getProductBySubCategory);
-
 router.get("/product/details/:id", getProductByName);  
 
 module.exports = router;
