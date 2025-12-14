@@ -15,6 +15,6 @@ UserRoute.get("/admin/alluser", GetAllUser)
 
 UserRoute.get("/user/profile", verifyToken ,profilegettoken)
 
-router.post("/user/delete/:id", DeleteUser);
+UserRoute.post("/user/delete/:id", DeleteUser);
 
 module.exports = UserRoute;
