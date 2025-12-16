@@ -23,7 +23,7 @@ const contactSchema = mongoose.Schema({
         type: Number,
     },
     area : {
-        tye :String,
+        type :String,
     },
     timeline : {type: String},
     payment : {type :String},

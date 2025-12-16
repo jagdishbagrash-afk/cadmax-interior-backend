@@ -4,6 +4,7 @@ const catchAsync = require('../Utill/catchAsync');
 
 exports.ContactPost = catchAsync(async (req, res) => {
     try {
+        console.log("req.body" ,req.body)
         const { email, name, message, services, phone_number, timeline, area, payment } = req.body;
 
         if (!email || !name || !message || !services || !phone_number) {
