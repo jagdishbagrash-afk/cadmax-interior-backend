@@ -9,6 +9,10 @@ const BannerSchema = mongoose.Schema({
     },
     Image: {
         type: String
+    },
+    deleted_at: {
+        type: Date,
+        default: null
     }
 },
 

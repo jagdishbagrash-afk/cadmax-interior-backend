@@ -14,7 +14,7 @@ exports.AddProject = CatchAsync(async (req, res) => {
         let imageUrl = null;
 
         if (req.file) {
-            imageUrl = req.file.location;  
+            imageUrl = req.file.location;
         }
 
         const Projects = new Project({
@@ -96,29 +96,6 @@ exports.UpdateProject = CatchAsync(
     }
 );
 
-exports.ToggleProjectStatus = CatchAsync(
-    async (req, res) => {
-        try {
-            const { id } = req.params;
-            const superProject = await Project.findById(id);
-            if (!superProject) {
-                return validationErrorResponse(res, "superProject not found.", 400);
-            }
-            // Toggle logic
-            const newStatus = superProject.status === true ? false : true;
-            superProject.status = newStatus;
-            await superProject.save();
-            return successResponse(
-                res,
-                `Category ${newStatus === true ? "Blocked" : "Activated"} successfully.`,
-                200,
-                superProject
-            );
-        } catch (error) {
-            return errorResponse(res, error.message || "Internal Server Error", 500);
-        }
-    }
-);
 
 exports.GetAllProjectStatus = CatchAsync(
     async (req, res) => {
@@ -130,3 +107,28 @@ exports.GetAllProjectStatus = CatchAsync(
         }
     }
 );
+
+
+exports.ProjectDelete = CatchAsync(async (req, res) => {
+    try {
+        const id = req.params.id;
+        const userrecord = await Project.findById(id);
+        console.log("userrecord", userrecord)
+        if (!userrecord) {
+            return validationErrorResponse(res, "Project not found", 404);
+        }
+        if (userrecord.deletedAt) {
+            userrecord.deletedAt = null;
+            await userrecord.save();
+            return successResponse(res, "Project restored successfully", 200);
+        }
+
+        userrecord.deletedAt = new Date();
+        const record = await userrecord.save();
+        console.log("record", record)
+        return successResponse(res, "Project deleted successfully", 200);
+
+    } catch (error) {
+        return errorResponse(res, error.message || "Internal Server Error", 500);
+    }
+});

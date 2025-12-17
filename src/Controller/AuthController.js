@@ -15,7 +15,7 @@ exports.isValidEmail = (email) => { const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]
 
 exports.signup = catchAsync(async (req, res) => {
   try {
-    const { email, password, name, profileImage, role, phone ,gender } = req.body;
+    const { email, password, name, profileImage, role, phone, gender } = req.body;
     const hashedPassword = await bcrypt.hash(password, 12);
     // Check if user already exists
     const existingUser = await User.find({
@@ -46,7 +46,7 @@ exports.signup = catchAsync(async (req, res) => {
       phone,
       password: hashedPassword,
       profileImage,
-      role,gender
+      role, gender
     });
 
     const result = await record.save();
@@ -188,14 +188,14 @@ exports.updateProfile = async (req, res) => {
 
 
 exports.GetAllUser = catchAsync(
-    async (req, res) => {
-        try {
-            const Users = await User.find({role :"customer"}).sort({ createdAt: -1 });
-            return successResponse(res, "Users list successfully.", 201, Users);
-        } catch (error) {
-            return errorResponse(res, error.message || "Internal Server Error", 500);
-        }
+  async (req, res) => {
+    try {
+      const Users = await User.find({ role: "customer" }).sort({ createdAt: -1 });
+      return successResponse(res, "Users list successfully.", 201, Users);
+    } catch (error) {
+      return errorResponse(res, error.message || "Internal Server Error", 500);
     }
+  }
 );
 
 
@@ -204,20 +204,23 @@ exports.DeleteUser = catchAsync(async (req, res) => {
   try {
     const id = req.params.id;
     const userrecord = await User.findById(id);
-
+console.log("userrecord" ,userrecord)
     if (!userrecord) {
       return validationErrorResponse(res, "User not found", 404);
     }
 
     if (userrecord.deleted_at) {
       userrecord.deleted_at = null;
+      userrecord.status = "active"
+
       await userrecord.save();
       return successResponse(res, "User restored successfully", 200);
     }
 
     userrecord.deleted_at = new Date();
-    await userrecord.save();
-
+    userrecord.status = "inactive"
+  const record =   await userrecord.save();
+console.log("record"  ,record)
     return successResponse(res, "User deleted successfully", 200);
 
   } catch (error) {

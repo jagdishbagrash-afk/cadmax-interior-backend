@@ -1,5 +1,5 @@
 const { signup, Login, SendOtp, profilegettoken, PhoneVerify, OTPVerify } = require("../Controller/AppController");
-const { AddBanner, UpdateBanner, GetAllBanner } = require("../Controller/BannerController");
+const { AddBanner, UpdateBanner, GetAllBanner, BannerDelete } = require("../Controller/BannerController");
 const { getAllCategorys } = require("../Controller/CategoryControlller");
 const { getProductById, getProductBySubCategory } = require("../Controller/ProductController");
 const { getSubCategoryByCategory } = require("../Controller/SubCategoryController");
@@ -21,5 +21,7 @@ AppRoute.post("/admin/banner/add",  upload.single("Image"),AddBanner);
 AppRoute.post("/admin/banner/edit/:id", upload.single("Image"), UpdateBanner);
 AppRoute.get("/admin/banner/get", GetAllBanner);
 AppRoute.get("/app/banner/get", GetAllBanner);
+
+AppRoute.post("/banner/delete/:id", BannerDelete);
 
 module.exports = AppRoute;
