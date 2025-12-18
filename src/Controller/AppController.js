@@ -48,7 +48,6 @@ exports.SendOtp = catchAsync(async (req, res) => {
 
 exports.Login = catchAsync(async (req, res) => {
   try {
-    // console.log("req.body" ,req.body)
     const { phone, otp } = req.body;
     if (!phone || !otp) {
       return validationErrorResponse(
@@ -61,11 +60,6 @@ exports.Login = catchAsync(async (req, res) => {
       return validationErrorResponse(res, "Invalid or expired OTP", 400);
     }
     const user = await User.findOne({ phone: phone });
-    if (!user) {
-      return successResponse(res, "OTP verified, please sign up now", 200, {
-        role: role,
-      });
-    }
 
     if (user?.deleted_at != null) {
       return errorResponse(res, "This account is blocked", 200);
@@ -73,10 +67,10 @@ exports.Login = catchAsync(async (req, res) => {
 
     const token = jwt.sign(
       { id: user._id, role: user.role, email: user.email },
-      process.env.JWT_SECRET_KEY,
+      process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || "24h" }
     );
-    // console.log("token" ,token)
+
     return successResponse(res, "OTP verified successfully", 200, {
       user: user,
       token: token,
@@ -100,7 +94,7 @@ exports.Login = catchAsync(async (req, res) => {
 exports.signup = catchAsync(async (req, res) => {
   try {
     const { email, name, profileImage, role, phone ,gender } = req.body;
-console.log(" req.body" , req.body)
+    console.log(" req.body" , req.body)
     // Check if user already exists
     const existingUser = await User.find({
       $or: [{ email }, { phone }],
