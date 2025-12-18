@@ -13,63 +13,6 @@ const signToken = async (id) => {
 
 exports.isValidEmail = (email) => { const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; return emailRegex.test(email); };
 
-exports.signup = catchAsync(async (req, res) => {
-  try {
-    const { email, password, name, profileImage, role, phone, gender } = req.body;
-    const hashedPassword = await bcrypt.hash(password, 12);
-    // Check if user already exists
-    const existingUser = await User.find({
-      $or: [{ email }, { phone }],
-    });
-
-    if (existingUser.length > 0) {
-      const errors = {};
-      existingUser.forEach((user) => {
-        if (user.email === email) {
-          errors.email = "Email is already in use!";
-        }
-        if (user.phone === phone) {
-          errors.phone = "Phone number is already in use!";
-        }
-      });
-
-      return res.status(400).json({
-        status: false,
-        message: "Email or phone number already exists",
-        errors,
-      });
-    }
-
-    const record = new User({
-      name,
-      email,
-      phone,
-      password: hashedPassword,
-      profileImage,
-      role, gender
-    });
-
-    const result = await record.save();
-    console.log("result", result)
-    const token = jwt.sign(
-      { id: result._id, role: result.role, email: result.email },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || "24h" }
-    );
-    return successResponse(
-      res,
-      "You have been registered successfully !!",
-      201,
-      {
-        user: result,
-        token: token,
-        role: result?.role,
-      }
-    );
-  } catch (error) {
-    return errorResponse(res, error.message || "Internal Server Error", 500);
-  }
-});
 
 exports.login = catchAsync(async (req, res, next) => {
   try {
@@ -108,9 +51,6 @@ exports.login = catchAsync(async (req, res, next) => {
     });
   }
 });
-
-
-
 
 exports.profilegettoken = catchAsync(async (req, res, next) => {
   try {
@@ -153,7 +93,6 @@ exports.resetpassword = catchAsync(async (req, res) => {
   }
 });
 
-
 // ✅ Profile Update
 exports.updateProfile = async (req, res) => {
   try {
@@ -177,7 +116,6 @@ exports.updateProfile = async (req, res) => {
   }
 };
 
-
 exports.GetAllUser = catchAsync(
   async (req, res) => {
     try {
@@ -188,33 +126,3 @@ exports.GetAllUser = catchAsync(
     }
   }
 );
-
-
-
-exports.DeleteUser = catchAsync(async (req, res) => {
-  try {
-    const id = req.params.id;
-    const userrecord = await User.findById(id);
-console.log("userrecord" ,userrecord)
-    if (!userrecord) {
-      return validationErrorResponse(res, "User not found", 404);
-    }
-
-    if (userrecord.deleted_at) {
-      userrecord.deleted_at = null;
-      userrecord.status = "active"
-
-      await userrecord.save();
-      return successResponse(res, "User restored successfully", 200);
-    }
-
-    userrecord.deleted_at = new Date();
-    userrecord.status = "inactive"
-  const record =   await userrecord.save();
-console.log("record"  ,record)
-    return successResponse(res, "User deleted successfully", 200);
-
-  } catch (error) {
-    return errorResponse(res, error.message || "Internal Server Error", 500);
-  }
-});
