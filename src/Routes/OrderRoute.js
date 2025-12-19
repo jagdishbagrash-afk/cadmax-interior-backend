@@ -3,7 +3,7 @@ const { addOrder, getAllOrders, getOrdersByUser, updateStatus } = require("../Co
 
 router.post("/order/add", addOrder); 
 router.get("/order/getAll", getAllOrders);  
-router.put("/order/status/update/:id", updateStatus);       
+router.post("/order/status/update/:id", updateStatus);       
 router.get("/order/getbyUser", getOrdersByUser);       
 
 module.exports = router;
