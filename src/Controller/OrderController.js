@@ -45,6 +45,41 @@ exports.getAllOrders = catchAsync(async (req, res) => {
   }
 });
 
+exports.updateStatus = catchAsync(async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!id) {
+      return validationErrorResponse(res, "Order ID is required");
+    }
+
+    if (!status) {
+      return validationErrorResponse(res, "Status is required");
+    }
+
+    const order = await Order.findByIdAndUpdate(
+      id,
+      { status },
+      { new: true }
+    );
+
+    if (!order) {
+      return errorResponse(res, "Order not found", 404);
+    }
+
+    return successResponse(
+      res,
+      "Order status updated successfully",
+      200,
+      order
+    );
+  } catch (error) {
+    console.error(error);
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});
+
 exports.getOrdersByUser = catchAsync(async (req, res) => {
   try {
     const userId = req.user?.id || "692dcfbd4816433146e11abd";

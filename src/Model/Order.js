@@ -46,6 +46,10 @@ const OrderSchema = new mongoose.Schema(
       type: [OrderProductSchema],
       required: [true, "Product is required"],
     },
+    status:{
+      type: String,
+      default: "pending"
+    },
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
