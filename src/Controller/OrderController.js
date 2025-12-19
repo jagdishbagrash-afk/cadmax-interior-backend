@@ -33,7 +33,11 @@ exports.addOrder = catchAsync(async (req, res) => {
 
 exports.getAllOrders = catchAsync(async (req, res) => {
   try {
-    const orders = await Order.find().sort({ createdAt: -1 });
+    const orders = await Order.find() .populate({
+        path: "product.id",
+        model: "Product",
+      })
+      .sort({ createdAt: -1 });
     return successResponse(res, "Orders fetched successfully", 200, orders);
   } catch (error) {
     console.error(error);
