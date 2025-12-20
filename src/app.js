@@ -36,6 +36,8 @@ app.use("/api", require("./Routes/ProductRoute"));
 app.use("/api", require("./Routes/ProjectRoute"));
 app.use("/api", require("./Routes/BookingRoute"));
 app.use("/api", require("./Routes/OrderRoute"));
+app.use("/api", require("./Routes/VendorRoute"));
+
 
 
 const server = app.listen(PORT, () => console.log("Server is running at port : " + PORT));

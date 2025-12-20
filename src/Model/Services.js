@@ -1,6 +1,14 @@
 const mongoose = require("mongoose");
 
 const ServicesSchema = mongoose.Schema({
+    desgin :{
+        type :String ,
+        required :true
+    },
+    categroy :{
+        type :String ,
+        required : true
+    },
     title: {
         type: String,
         required: true
