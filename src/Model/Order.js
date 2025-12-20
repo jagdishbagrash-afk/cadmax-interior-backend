@@ -46,6 +46,11 @@ const OrderSchema = new mongoose.Schema(
       type: [OrderProductSchema],
       required: [true, "Product is required"],
     },
+    status:{
+      type: String,
+      enum: ["pending", "confirmed", "shipped", "delivered", "cancelled"],
+      default: "pending"
+    },
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

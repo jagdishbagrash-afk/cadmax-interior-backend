@@ -33,8 +33,47 @@ exports.addOrder = catchAsync(async (req, res) => {
 
 exports.getAllOrders = catchAsync(async (req, res) => {
   try {
-    const orders = await Order.find().sort({ createdAt: -1 });
+    const orders = await Order.find() .populate({
+        path: "product.id",
+        model: "Product",
+      })
+      .sort({ createdAt: -1 });
     return successResponse(res, "Orders fetched successfully", 200, orders);
+  } catch (error) {
+    console.error(error);
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});
+
+exports.updateStatus = catchAsync(async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!id) {
+      return validationErrorResponse(res, "Order ID is required");
+    }
+
+    if (!status) {
+      return validationErrorResponse(res, "Status is required");
+    }
+
+    const order = await Order.findByIdAndUpdate(
+      id,
+      { status },
+      { new: true }
+    );
+
+    if (!order) {
+      return errorResponse(res, "Order not found", 404);
+    }
+
+    return successResponse(
+      res,
+      "Order status updated successfully",
+      200,
+      order
+    );
   } catch (error) {
     console.error(error);
     return errorResponse(res, error.message || "Internal Server Error", 500);
