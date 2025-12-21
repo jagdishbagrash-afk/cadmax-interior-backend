@@ -1,13 +1,17 @@
 const mongoose = require("mongoose");
 
 const ServicesSchema = mongoose.Schema({
-    desgin :{
-        type :String ,
-        required :true
+    desgin: {
+        type: String,
     },
-    categroy :{
-        type :String ,
-        required : true
+    ServicesType: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "ServicesType",
+        required: [true, "ServicesType is required"],
+    },
+    slug: {
+        type: String,
+        required: true
     },
     title: {
         type: String,
@@ -23,19 +27,23 @@ const ServicesSchema = mongoose.Schema({
     },
     scope: {
         type: Array,
-        required: true
+    
     },
     area: {
         type: Array,
-        required: true
+      
     },
     deletedAt: {
         type: Date,
         default: null
+    },
+    status: {
+        type: Boolean,
+        default: true
     }
 },
     {
         timestamps: true
     });
 
-mongoose.model("Services", ServicesSchema);
+module.exports = mongoose.model("Services", ServicesSchema);
