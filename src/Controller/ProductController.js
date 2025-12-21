@@ -331,14 +331,30 @@ exports.getProductByCategory = CatchAsync(async (req, res) => {
 exports.getProductBySubCategory = CatchAsync(async (req, res) => {
   try {
     const { id } = req.params;
-    const products = await Product.find({
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const skip = (page - 1) * limit;
+    const filter = {
       subcategory: id,
-      deletedAt: null
-    })
+      deletedAt: null,
+    };
+    const products = await Product.find(filter)
       .populate("subcategory")
       .populate("category")
-      .sort({ createdAt: -1 });
-    return successResponse(res, "Products fetched by category", 200, products);
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+    const totalRecords = await Product.countDocuments(filter);
+    const totalPages = Math.ceil(totalRecords / limit);
+    return successResponse(res, "Products fetched by category", 200, {
+      data: products,
+      pagination: {
+        page,
+        limit,
+        totalRecords,
+        totalPages,
+      },
+    });
   } catch (error) {
     return errorResponse(res, error.message || "Internal Server Error", 500);
   }
