@@ -1,6 +1,123 @@
 const Services = require("../Model/Services");
+const ServicesType = require("../Model/ServicesType");
+
 const CatchAsync = require("../Utill/catchAsync");
 const { errorResponse, successResponse, validationErrorResponse } = require("../Utill/ErrorHandling");
+
+exports.AddServiceType = CatchAsync(
+  async (req, res) => {
+    try {
+      const { title, TypeServices } = req.body;
+      let imageUrl = null;
+
+      if (req.file) {
+        imageUrl = req.file.location;  
+      }
+
+      if (!title || !TypeServices ) {
+        return validationErrorResponse(res, "All fields are required", 400,);
+      }
+
+      const service = new ServicesType({ title, TypeServices, Image: imageUrl });
+      const record = await service.save();
+      return successResponse(res, "Services created successfully.", 201, record);
+    } catch (error) {
+      return errorResponse(res, error.message || "Internal Server Error", 500);
+
+    }
+  }
+);
+
+exports.getAllServicesType = CatchAsync(
+  async (req, res) => {
+    try {
+      const services = await ServicesType.find().sort({ createdAt: -1 });
+      return successResponse(res, "Services Type list successfully.", 201, services);
+    } catch (error) {
+      return errorResponse(res, error.message || "Internal Server Error", 500);
+    }
+  }
+);
+
+exports.UpdateServicesType = CatchAsync(
+    async (req, res) => {
+        try {
+            const { title , TypeServices} = req.body;
+
+            const data = await ServicesType.findById(req.params.id);
+
+            if (!data) {
+                return validationErrorResponse(res, "Vendor Category not found.", 404);
+            }
+
+            // ✅ Update name if provided
+            if (title) data.title = title;
+            if (TypeServices) data.TypeServices = TypeServices;
+
+            // ✅ If new image uploaded → delete old image first
+            if (req.file && req.file.location) {
+
+                if (data.Image) {
+                    try {
+                        await deleteFile(data.Image);   // ✅ S3 old image delete
+                    } catch (err) {
+                        console.log("Error deleting old image:", err.message);
+                    }
+                }
+
+                // ✅ Store new S3 image URL
+                data.Image = req.file.location;
+            }
+
+            const updatedCategory = await data.save();
+            console.log("updatedCategory", updatedCategory)
+            return successResponse(res, "Services Type updated successfully.", 200, updatedCategory);
+
+        } catch (error) {
+            console.log(error);
+            return errorResponse(res, error.message || "Internal Server Error", 500);
+        }
+    }
+);
+
+exports.DeleteServicesType = CatchAsync(async (req, res) => {
+  try {
+    const id = req.params.id;
+    const servicedelete = await ServicesType.findById(id);
+
+    if (!servicedelete) {
+      return validationErrorResponse(res, "Services type not found", 404);
+    }
+
+    if (servicedelete.deletedAt) {
+      servicedelete.deletedAt = null;
+      servicedelete.status = true;
+      await servicedelete.save();
+      return successResponse(res, "Services type restored successfully", 200);
+    }
+
+    servicedelete.deletedAt = new Date();
+    servicedelete.status = false;
+    await servicedelete.save();
+
+    return successResponse(res, "Services type deleted successfully", 200);
+
+  } catch (error) {
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});
+
+/// Services  manageem,nt 
+
+
+
+
+
+
+
+
+
+
 
 
 exports.addService = CatchAsync(

@@ -43,7 +43,6 @@ exports.getAllVendorCategorys = CatchAsync(
     }
 );
 
-
 exports.updateCategory = CatchAsync(
     async (req, res) => {
         try {
@@ -84,8 +83,6 @@ exports.updateCategory = CatchAsync(
     }
 );
 
-
-
 exports.AddVendor = CatchAsync(async (req, res) => {
     try {
         const { name, experience, sepectailze, VendorCategory, phone } = req.body;
@@ -113,7 +110,6 @@ exports.AddVendor = CatchAsync(async (req, res) => {
     }
 });
 
-
 exports.getAllVendors = CatchAsync(
     async (req, res) => {
         try {
@@ -124,8 +120,6 @@ exports.getAllVendors = CatchAsync(
         }
     }
 );
-
-
 
 exports.updatevendor = CatchAsync(
     async (req, res) => {
@@ -196,8 +190,6 @@ exports.DeleteVendor = CatchAsync(async (req, res) => {
   }
 });
 
-
-
 exports.getVendors = CatchAsync(
     async (req, res) => {
         try {
@@ -208,3 +200,38 @@ exports.getVendors = CatchAsync(
         }
     }
 );
+
+exports.getVendorCategoryIds = CatchAsync(async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    if (!id) {
+      return errorResponse(res, "Category id is required", 400);
+    }
+
+    // Get Category
+    const category = await VendorCategory.findById(id);
+
+    if (!category) {
+      return errorResponse(res, "Vendor Category not found", 404);
+    }
+
+    // Get Vendors of this Category
+    const vendors = await Vendor.find({
+      deletedAt: null,
+      VendorCategory: id,
+    }).sort({ createdAt: -1 });
+
+    return successResponse(
+      res,
+      "Vendor Category details fetched successfully.",
+      200,
+      {
+        category,
+        vendors,
+      }
+    );
+  } catch (error) {
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});
