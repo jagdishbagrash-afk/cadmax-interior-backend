@@ -263,11 +263,27 @@ exports.gettypeservices = CatchAsync(
     try {
       const Residentialservices = await ServicesType.find({ TypeServices: "Residential" }).sort({ createdAt: -1 });
       const Commercialservices = await ServicesType.find({ TypeServices: "Commercial" }).sort({ createdAt: -1 });
+
       return successResponse(res, "Services Type list successfully.", 201, {
         Residentialservices, Commercialservices
       });
     } catch (error) {
       return errorResponse(res, error.message || "Internal Server Error", 500);
+    }
+  }
+);
+
+exports.GetServiceTypeId = CatchAsync(
+  async (req, res) => {
+    try {
+      const service = await Services.find({ServicesType : req.params.id});
+      if (!service) {
+        return validationErrorResponse(res, "Service not found.", 400, service);
+      }
+      return successResponse(res, "Services Details successfully.", 201, service);
+    } catch (error) {
+      return errorResponse(res, error.message || "Internal Server Error", 500);
+
     }
   }
 );

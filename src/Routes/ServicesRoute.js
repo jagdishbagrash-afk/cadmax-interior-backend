@@ -18,7 +18,10 @@ router.get("/services/delete/:id", servicesController.DeleteServices);
 
 // fronted 
 
-router.get("/services/type", servicesController.gettypeservices);   
+router.get("/services/type", servicesController.gettypeservices); 
+
+router.get("/type-services/:id", servicesController.GetServiceTypeId);   
+
 
 
 // router.get("/services/list/:id", servicesController.getServiceById);  
