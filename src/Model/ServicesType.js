@@ -5,6 +5,10 @@ const ServicesTypeSchema = mongoose.Schema({
         type: String,
         required: true
     },
+    slug: {
+        type: String,
+        required: true
+    },
     Image: {
         type: String,
         required: true
@@ -19,7 +23,7 @@ const ServicesTypeSchema = mongoose.Schema({
     },
     status: {
         type: Boolean,
-        default: false
+        default: true
     }
 },
     {
