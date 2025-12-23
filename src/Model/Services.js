@@ -25,6 +25,11 @@ const ServicesSchema = mongoose.Schema({
         type: String,
         required: true
     },
+    concept : {
+        type :String ,
+        required  : true
+
+    },
     scope: {
         type: Array,
     
