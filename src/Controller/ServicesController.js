@@ -138,7 +138,7 @@ exports.AddService = CatchAsync(
   async (req, res) => {
     try {
       console.log("servicesImage", req.body)
-      const { title, content, ServicesType } = req.body;
+      const { title, content, ServicesType , concept } = req.body;
       let imageUrl = null;
 
       if (req.file) {
@@ -149,7 +149,7 @@ exports.AddService = CatchAsync(
       if (!title || !content || !ServicesType) {
         return validationErrorResponse(res, "All fields are required", 400,);
       }
-      const service = new Services({ title, content, Image: imageUrl, ServicesType, slug: slug });
+      const service = new Services({ title, content, Image: imageUrl, ServicesType, slug: slug  ,concept});
       const record = await service.save();
       return successResponse(res, "Services created successfully.", 201, record);
     } catch (error) {
@@ -173,7 +173,7 @@ exports.getAllServices = CatchAsync(
 exports.UpdateServices = CatchAsync(
   async (req, res) => {
     try {
-      const { title, content, ServicesType } = req.body;
+      const { title, content, ServicesType ,concept} = req.body;
 
       const data = await Services.findById(req.params.id);
 
@@ -185,6 +185,7 @@ exports.UpdateServices = CatchAsync(
       if (title) data.title = title;
       if (content) data.content = content;
       if (ServicesType) data.ServicesType = ServicesType;
+      if (concept) data.concept = concept;
 
       // ✅ If new image uploaded → delete old image first
       if (req.file && req.file.location) {
@@ -263,11 +264,27 @@ exports.gettypeservices = CatchAsync(
     try {
       const Residentialservices = await ServicesType.find({ TypeServices: "Residential" }).sort({ createdAt: -1 });
       const Commercialservices = await ServicesType.find({ TypeServices: "Commercial" }).sort({ createdAt: -1 });
+
       return successResponse(res, "Services Type list successfully.", 201, {
         Residentialservices, Commercialservices
       });
     } catch (error) {
       return errorResponse(res, error.message || "Internal Server Error", 500);
+    }
+  }
+);
+
+exports.GetServiceTypeId = CatchAsync(
+  async (req, res) => {
+    try {
+      const service = await Services.find({ServicesType : req.params.id});
+      if (!service) {
+        return validationErrorResponse(res, "Service not found.", 400, service);
+      }
+      return successResponse(res, "Services Details successfully.", 201, service);
+    } catch (error) {
+      return errorResponse(res, error.message || "Internal Server Error", 500);
+
     }
   }
 );
