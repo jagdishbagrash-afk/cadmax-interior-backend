@@ -9,6 +9,9 @@ const VendorCategorySchema = new mongoose.Schema({
         type: String,   // icon url if needed
         default: null
     },
+    Slug: {
+        type: String,
+    },
     deletedAt: {
         type: Date,
         default: null

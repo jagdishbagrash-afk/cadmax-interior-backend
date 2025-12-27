@@ -1,10 +1,11 @@
 const jwt = require("jsonwebtoken");
 const catchAsync = require("../Utill/catchAsync");
 const User = require("../Model/User");
-const { promisify } = require("util");
-const bcrypt = require("bcrypt");
+const SubCategory = require("../Model/SubCategory");
+const Category =  require("../Model/Categroy")
 // const nodemailer = require("nodemailer");
 const { validationErrorResponse, errorResponse, successResponse } = require("../Utill/ErrorHandling");
+const Product = require("../Model/Product");
 // const logger = require("../utils/Logger");
 // const twilio = require("twilio");
 
@@ -148,8 +149,6 @@ exports.signup = catchAsync(async (req, res) => {
   }
 });
 
-
-
 exports.profilegettoken = catchAsync(async (req, res, next) => {
   try {
     const userId = req?.user?.id;
@@ -175,7 +174,6 @@ exports.profilegettoken = catchAsync(async (req, res, next) => {
     });
   }
 });
-
 
 exports.PhoneVerify = catchAsync(async (req, res) => {
   try {
@@ -207,7 +205,6 @@ exports.PhoneVerify = catchAsync(async (req, res) => {
   }
 });
 
-
 exports.OTPVerify = catchAsync(async (req, res) => {
   try {
     // console.log("req.body" ,req.body)
@@ -232,3 +229,149 @@ exports.OTPVerify = catchAsync(async (req, res) => {
 });
 
 
+exports.AppOrder = catchAsync(async (req, res) => {
+  try {
+    const { name, mobile, address, product, amount } = req.body;
+    const userId = req.user?.id || "692dcfbd4816433146e11abd";
+    if (!name || !mobile || !address || !product || !amount) {
+      return validationErrorResponse(
+        res,
+        "All fields (name, mobile, address, product, amount) are required"
+      );
+    }
+    const newOrder = await Order({
+      name,
+      mobile,
+      address,
+      product,
+      amount,
+      userId,
+    });
+    await newOrder.save();
+    return successResponse(res, "Order added successfully", 201, newOrder);
+  } catch (error) {
+    console.error(error);
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});
+
+exports.getAllCategorys = catchAsync(
+    async (req, res) => {
+        try {
+        const Categorys = await Category.find().sort({ createdAt: -1 });
+            return successResponse(res, "Categorys list successfully.", 201, Categorys);
+        } catch (error) {
+            return errorResponse(res, error.message || "Internal Server Error", 500);
+        }
+    }
+);
+
+exports.getSubCategoryByCategory = catchAsync(async (req, res) => {
+    try {
+        const categoryId = req.params.id;
+        console.log("categoryId0" , categoryId)
+        const subCategories = await SubCategory.find({
+            category: categoryId,
+            deletedAt: null
+        }).populate("category");
+
+        if (!subCategories || subCategories?.length === 0) {
+            return validationErrorResponse(res, "No Subcategories found for this category.", 404);
+        }
+        return successResponse(res, "Subcategories fetched successfully.", 200, subCategories);
+    } catch (error) {
+        return errorResponse(res, error.message || "Internal Server Error", 500);
+    }
+}
+);
+
+
+exports.getProductByCategory = catchAsync(async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return validationErrorResponse(res, "Id is required", 400);
+    }
+
+    const products = await Product.find({
+      category: id,
+      deletedAt: null
+    })
+      .populate("subcategory")
+      .populate("category")
+      .sort({ createdAt: -1 });
+
+    const subCategoryMap = new Map();
+    products.forEach(product => {
+      if (product.subcategory?._id) {
+        subCategoryMap.set(
+          product.subcategory._id.toString(),
+          {
+            _id: product.subcategory._id,
+            name: product.subcategory.name
+          }
+        );
+      }
+    });
+
+    const uniqueSubcategories = Array.from(subCategoryMap.values());
+
+    return successResponse(res, "Products and subcategories fetched", 200, {
+      products,
+      subcategories: uniqueSubcategories
+    });
+  } catch (error) {
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});
+
+exports.getProductBySubCategory = catchAsync(async (req, res) => {
+  try {
+    const { id } = req.params;
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const skip = (page - 1) * limit;
+    const filter = {
+      subcategory: id,
+      deletedAt: null,
+    };
+    const products = await Product.find(filter)
+      .populate("subcategory")
+      .populate("category")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+    const totalRecords = await Product.countDocuments(filter);
+    const totalPages = Math.ceil(totalRecords / limit);
+    return successResponse(res, "Products fetched by category", 200, {
+      data: products,
+      pagination: {
+        page,
+        limit,
+        totalRecords,
+        totalPages,
+      },
+    });
+  } catch (error) {
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});
+
+
+exports.getProductById = catchAsync(async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id)
+      .populate("subcategory")
+      .populate("category");
+
+    if (!product) {
+      return errorResponse(res, "Product not found", 404);
+    }
+
+    return successResponse(res, "Product fetched successfully", 200, product);
+
+  } catch (error) {
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});

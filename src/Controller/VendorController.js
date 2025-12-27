@@ -1,9 +1,35 @@
 const VendorCategory = require("../Model/VendorCategory");
 const Vendor = require("../Model/Vendor");
-
 const CatchAsync = require("../Utill/catchAsync");
 const { errorResponse, successResponse, validationErrorResponse } = require("../Utill/ErrorHandling");
 const { deleteFile } = require("../Utill/S3");
+
+
+const makeSlug = (text) => {
+    return text
+        .toString()
+        .toLowerCase()
+        .trim()
+        .replace(/[\s\_]+/g, "-")
+        .replace(/[^\w\-]+/g, "")
+        .replace(/\-\-+/g, "-");
+};
+
+const generateUniqueSlug = async (Model, title) => {
+    let baseSlug = makeSlug(title);
+    let slug = baseSlug;
+    let counter = 1;
+
+    while (await Model.findOne({ slug })) {
+        slug = `${baseSlug}-${counter}`;
+        counter++;
+    }
+
+    return slug;
+};
+
+
+
 
 exports.AddVendorCategory = CatchAsync(async (req, res) => {
     try {
@@ -17,9 +43,10 @@ exports.AddVendorCategory = CatchAsync(async (req, res) => {
         if (req.file) {
             imageUrl = req.file.location;   // ✅ S3 image URL
         }
+        const slug = await generateUniqueSlug(VendorCategory, req.body.title?.[0]);
 
         const Categorys = new VendorCategory({
-            name,
+            name, slug,
             Image: imageUrl
         });
 
@@ -125,7 +152,7 @@ exports.updatevendor = CatchAsync(
     async (req, res) => {
         try {
             console.log(req.body)
-            const { name ,phone, VendorCategory , sepectailze , experience } = req.body;
+            const { name, phone, VendorCategory, sepectailze, experience } = req.body;
 
             const data = await Vendor.findById(req.params.id);
 
@@ -166,34 +193,34 @@ exports.updatevendor = CatchAsync(
 );
 
 exports.DeleteVendor = CatchAsync(async (req, res) => {
-  try {
-    const id = req.params.id;
-    const Vendors = await Vendor.findById(id);
+    try {
+        const id = req.params.id;
+        const Vendors = await Vendor.findById(id);
 
-    if (!Vendors) {
-      return validationErrorResponse(res, "Vendor not found", 404);
+        if (!Vendors) {
+            return validationErrorResponse(res, "Vendor not found", 404);
+        }
+
+        if (Vendors.deletedAt) {
+            Vendors.deletedAt = null;
+            await Vendors.save();
+            return successResponse(res, "Vendor restored successfully", 200);
+        }
+
+        Vendors.deletedAt = new Date();
+        await Vendors.save();
+
+        return successResponse(res, "Vendor deleted successfully", 200);
+
+    } catch (error) {
+        return errorResponse(res, error.message || "Internal Server Error", 500);
     }
-
-    if (Vendors.deletedAt) {
-      Vendors.deletedAt = null;
-      await Vendors.save();
-      return successResponse(res, "Vendor restored successfully", 200);
-    }
-
-    Vendors.deletedAt = new Date();
-    await Vendors.save();
-
-    return successResponse(res, "Vendor deleted successfully", 200);
-
-  } catch (error) {
-    return errorResponse(res, error.message || "Internal Server Error", 500);
-  }
 });
 
 exports.getVendors = CatchAsync(
     async (req, res) => {
         try {
-            const Categorys = await Vendor.find({deletedAt :null }).sort({ createdAt: -1 }).populate("VendorCategory");
+            const Categorys = await Vendor.find({ deletedAt: null }).sort({ createdAt: -1 }).populate("VendorCategory");
             return successResponse(res, "Vendor Categorys list successfully.", 201, Categorys);
         } catch (error) {
             return errorResponse(res, error.message || "Internal Server Error", 500);
@@ -203,14 +230,16 @@ exports.getVendors = CatchAsync(
 
 exports.getVendorCategoryIds = CatchAsync(async (req, res) => {
   try {
-    const id = req.params.id;
+    const slug = req.params.slug;
 
-    if (!id) {
-      return errorResponse(res, "Category id is required", 400);
+    console.log("slug:", slug);
+
+    if (!slug) {
+      return errorResponse(res, "Category slug is required", 400);
     }
 
-    // Get Category
-    const category = await VendorCategory.findById(id);
+    const category = await VendorCategory.findOne({ slug });
+
 
     if (!category) {
       return errorResponse(res, "Vendor Category not found", 404);
@@ -219,19 +248,18 @@ exports.getVendorCategoryIds = CatchAsync(async (req, res) => {
     // Get Vendors of this Category
     const vendors = await Vendor.find({
       deletedAt: null,
-      VendorCategory: id,
+      VendorCategory: category._id,
     }).sort({ createdAt: -1 });
 
     return successResponse(
       res,
       "Vendor Category details fetched successfully.",
       200,
-      {
-        category,
-        vendors,
-      }
+      { category, vendors }
     );
+
   } catch (error) {
     return errorResponse(res, error.message || "Internal Server Error", 500);
   }
 });
+

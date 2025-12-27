@@ -12,7 +12,7 @@ router.post("/vendor/edit/:id", upload.single("Image"),   VendorController.updat
 router.get("/vendor/delete/:id", VendorController.DeleteVendor);
 router.get("/vendor/get", VendorController.getVendors);    
 
-router.get("/category/vendor/:id",    VendorController.getVendorCategoryIds);   
+router.get("/category/vendor/:slug",    VendorController.getVendorCategoryIds);   
 
 // router.get("/vendor/category/list/:id", VendorController.getServiceById);  
 // router.post("/vendor/category/delete/:id", VendorController.deleteService);

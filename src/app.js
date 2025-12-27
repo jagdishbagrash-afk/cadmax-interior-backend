@@ -16,15 +16,12 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '3000mb' }));
 app.use(express.urlencoded({ extended: true, limit: "3000mb" }));
-
-
 app.get("/", (req, res) => {
   res.json({
     msg: 'Hello World',
     status: 200,
   });
 });
-
 
 const PORT = process.env.REACT_APP_SERVER_DOMAIN || 5000;
  app.use("/api", require("./Routes/AuthRoute"));
@@ -37,8 +34,7 @@ app.use("/api", require("./Routes/ProjectRoute"));
 app.use("/api", require("./Routes/BookingRoute"));
 app.use("/api", require("./Routes/OrderRoute"));
 app.use("/api", require("./Routes/VendorRoute"));
-
-
+app.use("/api", require("./Routes/BannerRoute"));
 
 const server = app.listen(PORT, () => console.log("Server is running at port : " + PORT));
 server.timeout = 360000;
