@@ -329,9 +329,9 @@ exports.getProductByCategory = catchAsync(async (req, res) => {
 exports.getProductBySubCategory = catchAsync(async (req, res) => {
   try {
     const { id } = req.params;
-    const page = parseInt(req.query.page, 10) || 1;
-    const limit = parseInt(req.query.limit, 10) || 10;
-    const skip = (page - 1) * limit;
+    // const page = parseInt(req.query.page, 10) || 1;
+    // const limit = parseInt(req.query.limit, 10) || 10;
+    // const skip = (page - 1) * limit;
     const filter = {
       subcategory: id,
       deletedAt: null,
@@ -340,19 +340,20 @@ exports.getProductBySubCategory = catchAsync(async (req, res) => {
       .populate("subcategory")
       .populate("category")
       .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
-    const totalRecords = await Product.countDocuments(filter);
-    const totalPages = Math.ceil(totalRecords / limit);
-    return successResponse(res, "Products fetched by category", 200, {
-      data: products,
-      pagination: {
-        page,
-        limit,
-        totalRecords,
-        totalPages,
-      },
-    });
+    // const totalRecords = await Product.countDocuments(filter);
+    // const totalPages = Math.ceil(totalRecords / limit);
+    // return successResponse(res, "Products fetched by category", 200, {
+    //   data: products,
+    //   pagination: {
+    //     page,
+    //     limit,
+    //     totalRecords,
+    //     totalPages,
+    //   },
+    // });
+
+        return successResponse(res, "Products fetched by category", 200,
+       products);
   } catch (error) {
     return errorResponse(res, error.message || "Internal Server Error", 500);
   }
