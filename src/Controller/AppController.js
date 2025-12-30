@@ -6,6 +6,7 @@ const Category =  require("../Model/Categroy")
 // const nodemailer = require("nodemailer");
 const { validationErrorResponse, errorResponse, successResponse } = require("../Utill/ErrorHandling");
 const Product = require("../Model/Product");
+const Cart = require("../Model/Cart");
 // const logger = require("../utils/Logger");
 // const twilio = require("twilio");
 
@@ -372,6 +373,154 @@ exports.getProductById = catchAsync(async (req, res) => {
 
     return successResponse(res, "Product fetched successfully", 200, product);
 
+  } catch (error) {
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});
+
+exports.AddToCart = catchAsync(async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { product } = req.body;
+    if (!product || !product.id || !product.quantity || !product.variant) {
+      return errorResponse(res, "Invalid product payload", 400);
+    }
+    const { id: productId, quantity, variant } = product;
+    // Quantity validation
+    if (quantity < 1) {
+      return errorResponse(res, "Quantity must be at least 1", 400);
+    }
+    const dbProduct = await Product.findById(productId);
+    if (!dbProduct) {
+      return errorResponse(res, "Product not found", 404);
+    }
+    const normalizedVariant = variant.toLowerCase().trim();
+    const matchedVariant = dbProduct.variants.find(
+      v => v.color === normalizedVariant
+    );
+    if (!matchedVariant) {
+      return errorResponse(res, `Variant '${variant}' not available`, 400);
+    }
+    if (matchedVariant.stock < quantity) {
+      return errorResponse(
+        res,
+        `Only ${matchedVariant.stock} items left for ${variant}`,
+        400
+      );
+    }
+    // Find or create cart
+    let cart = await Cart.findOne({ user: userId });
+    if (!cart) {
+      cart = await Cart.create({
+        user: userId,
+        product: [
+          {
+            productId,
+            variant: normalizedVariant,
+            quantity
+          }
+        ]
+      });
+      return successResponse(res, "Item added to cart", cart);
+    }
+    // Check if product+variant already exists in cart
+    const existingItem = cart.product.find(
+      p =>
+        p.productId.toString() === productId &&
+        p.variant === normalizedVariant
+    );
+    if (existingItem) {
+      const newQuantity = existingItem.quantity + quantity;
+      if (newQuantity > matchedVariant.stock) {
+        return errorResponse(
+          res,
+          `Cannot add more than available stock (${matchedVariant.stock})`,
+          400
+        );
+      }
+      existingItem.quantity = newQuantity;
+    } else {
+      cart.product.push({
+        productId,
+        variant: normalizedVariant,
+        quantity
+      });
+    }
+    await cart.save();
+    return successResponse(res, "Item added to cart", cart);
+  } catch (error) {
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});
+
+exports.getCart = catchAsync(async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const cart = await Cart.findOne({ user: userId })
+      .populate({
+        path: "product.productId",
+        select: "title amount variants"
+      });
+
+    if (!cart || cart.product.length === 0) {
+      return successResponse(res, "Cart is empty", {
+        items: [],
+        summary: {
+          subtotal: 0,
+          discountPercent: cart?.discount || 0,
+          discountAmount: 0,
+          taxPercent: cart?.tax || 0,
+          taxAmount: 0,
+          finalAmount: 0
+        }
+      }, 200);
+    }
+
+    let subtotal = 0;
+
+    const items = cart.product.map(item => {
+      const product = item.productId;
+
+      if (!product) return null; // safety guard
+
+      const itemTotal = item.quantity * product.amount;
+      subtotal += itemTotal;
+
+      return {
+        productId: product._id,
+        title: product.title,
+        variant: item.variant,
+        quantity: item.quantity,
+        unitPrice: product.amount,
+        itemTotal
+      };
+    }).filter(Boolean);
+
+    // Discount calculation
+    const discountPercent = cart.discount || 0;
+    const discountAmount = +(subtotal * (discountPercent / 100)).toFixed(2);
+
+    const afterDiscount = subtotal - discountAmount;
+
+    // Tax calculation
+    const taxPercent = cart.tax || 0;
+    const taxAmount = +(afterDiscount * (taxPercent / 100)).toFixed(2);
+
+    // Final amount
+    const finalAmount = +(afterDiscount + taxAmount).toFixed(2);
+
+    return successResponse(res, "Cart fetched successfully", {
+      items,
+      summary: {
+        subtotal,
+        discountPercent,
+        discountAmount,
+        taxPercent,
+        taxAmount,
+        finalAmount
+      }
+    });
   } catch (error) {
     return errorResponse(res, error.message || "Internal Server Error", 500);
   }

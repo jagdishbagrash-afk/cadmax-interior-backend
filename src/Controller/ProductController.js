@@ -331,21 +331,52 @@ exports.getProductByCategory = CatchAsync(async (req, res) => {
 exports.getProductBySubCategory = CatchAsync(async (req, res) => {
   try {
     const { id } = req.params;
+
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 10;
     const skip = (page - 1) * limit;
+
+    const { color, lowPrice, highPrice } = req.query;
+
+    // base filter
     const filter = {
       subcategory: id,
       deletedAt: null,
     };
+
+    /* -------------------- COLOR FILTER -------------------- */
+    if (color) {
+      const colorsArray = color
+        .split(",")
+        .map(c => c.trim().toLowerCase());
+
+      filter["variants.color"] = { $in: colorsArray };
+    }
+
+    /* -------------------- PRICE FILTER -------------------- */
+    if (lowPrice || highPrice) {
+      filter.amount = {};
+
+      if (lowPrice) {
+        filter.amount.$gte = Number(lowPrice);
+      }
+
+      if (highPrice) {
+        filter.amount.$lte = Number(highPrice);
+      }
+    }
+
+    /* -------------------- QUERY -------------------- */
     const products = await Product.find(filter)
       .populate("subcategory")
       .populate("category")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
+
     const totalRecords = await Product.countDocuments(filter);
     const totalPages = Math.ceil(totalRecords / limit);
+
     return successResponse(res, "Products fetched by category", 200, {
       data: products,
       pagination: {
