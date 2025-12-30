@@ -14,8 +14,8 @@ const corsOptions = {
 }
 
 app.use(cors(corsOptions));
-app.use(express.json({ limit: '3000mb' }));
-app.use(express.urlencoded({ extended: true, limit: "3000mb" }));
+app.use(express.json({ limit: '10000mb' }));
+app.use(express.urlencoded({ extended: true, limit: "10000mb" }));
 app.get("/", (req, res) => {
   res.json({
     msg: 'Hello World',
@@ -24,7 +24,7 @@ app.get("/", (req, res) => {
 });
 
 const PORT = process.env.REACT_APP_SERVER_DOMAIN || 5000;
- app.use("/api", require("./Routes/AuthRoute"));
+app.use("/api", require("./Routes/AuthRoute"));
 app.use("/api", require("./Routes/ContactRoute"));
 app.use("/api", require("./Routes/ServicesRoute"));
 app.use("/api", require("./Routes/AppRoute"));

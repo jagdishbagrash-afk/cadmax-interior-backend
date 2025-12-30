@@ -30,13 +30,20 @@ const ServicesSchema = mongoose.Schema({
         required  : true
 
     },
-    scope: {
-        type: Array,
-    
+    timeline: {
+        type: String,
+    },
+    cost :{
+        type :String
     },
     area: {
-        type: Array,
-      
+        type: String,
+    },
+    material_details: {
+        type: String,
+    },
+    multiple_images :{
+        type :Array
     },
     deletedAt: {
         type: Date,

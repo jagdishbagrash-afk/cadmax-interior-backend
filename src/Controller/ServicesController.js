@@ -138,18 +138,19 @@ exports.AddService = CatchAsync(
   async (req, res) => {
     try {
       console.log("servicesImage", req.body)
-      const { title, content, ServicesType , concept } = req.body;
-      let imageUrl = null;
+      const { title, content, ServicesType, concept, material_details, timeline, cost } = req.body;
 
-      if (req.file) {
-        imageUrl = req.file.location;   // ✅ S3 image URL
-      }
+
+      const imageUrls = req.files["images[]"]?.map((f) => f.location) || [];
+      const list_image = req.files["Image"]?.[0]?.location || "";
+
+      console.log("imageUrls", imageUrls)
       const slug = await generateUniqueSlug(Services, req.body.title);
-      console.log("slug", slug)
+
       if (!title || !content || !ServicesType) {
         return validationErrorResponse(res, "All fields are required", 400,);
       }
-      const service = new Services({ title, content, Image: imageUrl, ServicesType, slug: slug  ,concept});
+      const service = new Services({ title, content, multiple_images: imageUrls, ServicesType, slug: slug, concept, Image: list_image, material_details, timeline, cost });
       const record = await service.save();
       return successResponse(res, "Services created successfully.", 201, record);
     } catch (error) {
@@ -173,8 +174,13 @@ exports.getAllServices = CatchAsync(
 exports.UpdateServices = CatchAsync(
   async (req, res) => {
     try {
-      const { title, content, ServicesType ,concept} = req.body;
+       const { title, content, ServicesType, concept, material_details, timeline, cost } = req.body;
 
+      // Get files (if any new ones uploaded)
+      const imageUrls = req.files?.["images[]"]?.map((f) => f.location) || [];
+      const Image = req.files?.["Image"]?.[0]?.location;
+
+      console.log("Updating project with ID:", imageUrls);
       const data = await Services.findById(req.params.id);
 
       if (!data) {
@@ -186,22 +192,15 @@ exports.UpdateServices = CatchAsync(
       if (content) data.content = content;
       if (ServicesType) data.ServicesType = ServicesType;
       if (concept) data.concept = concept;
+      if (material_details) data.material_details = material_details;
+      if (timeline) data.timeline = timeline;
+      if (cost) data.cost = cost;
 
-      // ✅ If new image uploaded → delete old image first
-      if (req.file && req.file.location) {
 
-        if (data.Image) {
-          try {
-            await deleteFile(data.Image);   // ✅ S3 old image delete
-          } catch (err) {
-            console.log("Error deleting old image:", err.message);
-          }
-        }
-
-        // ✅ Store new S3 image URL
-        data.Image = req.file.location;
+      if (Image) data.Image = Image;
+      if (imageUrls.length > 0) {
+        data.multiple_images = [...data.multiple_images, ...imageUrls]; // append new images
       }
-
       const updatedCategory = await data.save();
       console.log("updatedCategory", updatedCategory)
       return successResponse(res, "Services updated successfully.", 200, updatedCategory);
@@ -277,7 +276,7 @@ exports.gettypeservices = CatchAsync(
 exports.GetServiceTypeId = CatchAsync(
   async (req, res) => {
     try {
-      const service = await Services.find({ServicesType : req.params.id});
+      const service = await Services.find({ ServicesType: req.params.id });
       if (!service) {
         return validationErrorResponse(res, "Service not found.", 400, service);
       }
@@ -288,3 +287,28 @@ exports.GetServiceTypeId = CatchAsync(
     }
   }
 );
+
+
+exports.GetServiceDataTypeId = CatchAsync(async (req, res) => {
+  try {
+    const { slug } = req.params;
+
+    if (!slug) {
+      return validationErrorResponse(res, "Slug is required", 400);
+    }
+
+    const service = await Services
+      .findOne({ slug })
+      .populate("ServicesType");
+
+    if (!service) {
+      return validationErrorResponse(res, "Service not found", 404);
+    }
+
+    return successResponse(res, "Service details fetched successfully.", 200, service);
+
+  } catch (error) {
+    console.error("Get Service Error:", error);
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});
