@@ -4,6 +4,16 @@ const CatchAsync = require("../Utill/catchAsync");
 const { errorResponse, successResponse, validationErrorResponse } = require("../Utill/ErrorHandling");
 
 
+const { S3Client, DeleteObjectCommand } = require("@aws-sdk/client-s3");
+
+const s3Client = new S3Client({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  },
+});
+
 const makeSlug = (text) => {
   return text
     .toString()
@@ -174,7 +184,7 @@ exports.getAllServices = CatchAsync(
 exports.UpdateServices = CatchAsync(
   async (req, res) => {
     try {
-       const { title, content, ServicesType, concept, material_details, timeline, cost } = req.body;
+      const { title, content, ServicesType, concept, material_details, timeline, cost } = req.body;
 
       // Get files (if any new ones uploaded)
       const imageUrls = req.files?.["images[]"]?.map((f) => f.location) || [];
@@ -310,5 +320,66 @@ exports.GetServiceDataTypeId = CatchAsync(async (req, res) => {
   } catch (error) {
     console.error("Get Service Error:", error);
     return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});
+
+
+exports.DeleteAWSImages = CatchAsync(async (req, res) => {
+  try {
+    console.log("v", req.params)
+    let { projectId, images } = req.params;
+
+    if (!projectId) return res.status(400).json({ status: false, message: "projectId required" });
+    if (!images) return res.status(400).json({ status: false, message: "images required" });
+
+    // ensure array
+    if (!Array.isArray(images)) images = [images];
+
+    // extract keys
+    const keys = images.map(url => url.split(".com/")[1]);
+
+    // 🔥 Delete from S3
+    for (const key of keys) {
+      await s3Client.send(
+        new DeleteObjectCommand({
+          Bucket: process.env.S3_BUCKET_NAME,
+          Key: key
+        })
+      );
+    }
+
+    // 🔥 DB se Array se URLs remove karo
+    await Services.updateOne(
+      { _id: projectId },
+      {
+        $pull: {
+          multiple_images: { $in: images }
+        }
+      }
+    );
+
+
+    //  // 🔥 banner / list image ho to null kar do
+    // await Project.updateOne(
+    //   { _id: projectId, banner_image: { $in: images } },
+    //   { $set: { banner_image: null } }
+    // );
+
+    // await Project.updateOne(
+    //   { _id: projectId, list_image: { $in: images } },
+    //   { $set: { list_image: null } }
+    // );
+
+    return res.status(200).json({
+      status: true,
+      message: "Images deleted successfully & removed from Services array"
+    });
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      status: false,
+      error: err.message
+    });
   }
 });

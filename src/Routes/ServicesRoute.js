@@ -20,6 +20,9 @@ router.post("/services/edit/:id",  upload.fields([
     { name: "images[]", maxCount: 10 },
 ]), servicesController.UpdateServices);
 router.get("/services/delete/:id", servicesController.DeleteServices);
+
+router.get("/services/images/delete/:projectId/:images" ,servicesController.DeleteAWSImages)
+
 //
 
 // fronted 

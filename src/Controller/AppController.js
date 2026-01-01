@@ -447,7 +447,7 @@ exports.AddToCart = catchAsync(async (req, res) => {
       });
     }
     await cart.save();
-    return successResponse(res, "Item added to cart", cart);
+    return successResponse(res, "Item added to cart", 200, cart);
   } catch (error) {
     return errorResponse(res, error.message || "Internal Server Error", 500);
   }
@@ -510,7 +510,7 @@ exports.getCart = catchAsync(async (req, res) => {
     // Final amount
     const finalAmount = +(afterDiscount + taxAmount).toFixed(2);
 
-    return successResponse(res, "Cart fetched successfully", {
+    return successResponse(res, "Cart fetched successfully", 200, {
       items,
       summary: {
         subtotal,
