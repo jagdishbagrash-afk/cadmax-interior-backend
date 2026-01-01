@@ -15,13 +15,13 @@ router.post("/services/add", upload.fields([
 
 
 router.get("/services/list", servicesController.getAllServices);
-router.post("/services/edit/:id",  upload.fields([
+router.post("/services/edit/:id", upload.fields([
     { name: "Image", maxCount: 1 },
     { name: "images[]", maxCount: 10 },
 ]), servicesController.UpdateServices);
 router.get("/services/delete/:id", servicesController.DeleteServices);
 
-router.get("/services/images/delete/:projectId/:images" ,servicesController.DeleteAWSImages)
+router.get("/services/images/delete/:projectId/:images", servicesController.DeleteAWSImages)
 
 //
 
