@@ -36,4 +36,10 @@ router.get("/services/details/:slug", servicesController.GetServiceDataTypeId);
 // router.get("/services/list/:id", servicesController.getServiceById);  
 // router.post("/services/edit/:id", upload.single("image"), servicesController.updateService);   
 // router.post("/services/delete/:id", servicesController.deleteService);
+
+router.post("/services/contact-add", servicesController.ServicesUserPost);
+
+router.get("/services/contact-get", servicesController.ServciesUserGet);
+
+
 module.exports = router;

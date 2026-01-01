@@ -1,5 +1,6 @@
 const Services = require("../Model/Services");
 const ServicesType = require("../Model/ServicesType");
+const ServicesUser = require("../Model/ServicesUser");
 const CatchAsync = require("../Utill/catchAsync");
 const { errorResponse, successResponse, validationErrorResponse } = require("../Utill/ErrorHandling");
 
@@ -380,6 +381,92 @@ exports.DeleteAWSImages = CatchAsync(async (req, res) => {
     return res.status(500).json({
       status: false,
       error: err.message
+    });
+  }
+});
+
+
+exports.ServicesUserPost = CatchAsync(async (req, res) => {
+  try {
+    console.log("req.body", req.body);
+
+    const { User, TypeServices, Services, concept } = req.body;
+
+    if (!User || !TypeServices || !Services) {
+      return res.status(400).json({
+        status: false,
+        message: "All fields (services, user, typeservices) are required.",
+      });
+    }
+
+    const record = new ServicesUser({
+      User,
+      ServicesType: TypeServices,
+      Services,
+      concept,
+    });
+
+    const result = await record.save();
+
+    if (!result) {
+      return res.status(500).json({
+        status: false,
+        message: "Failed to save contact details.",
+      });
+    }
+
+    res.json({
+      status: true,
+      message: "Request submitted & emails sent successfully.",
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      status: false,
+      message: "❌ Failed to send contact request.",
+      error: error.message,
+    });
+  }
+});
+
+
+exports.ServciesUserGet = CatchAsync(async (req, res) => {
+  try {
+    const page = Math.max(parseInt(req.query.page) || 1, 1);
+    const limit = Math.max(parseInt(req.query.limit) || 50, 1);
+    const skip = (page - 1) * limit;
+
+    let query = {};
+
+    const totalServicesUser = await ServicesUser.countDocuments(query);
+
+    const contactget = await ServicesUser.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate("User")
+      .populate("Services")
+      .populate("ServicesType");
+
+    const totalPages = Math.ceil(totalServicesUser / limit);
+
+    res.status(200).json({
+      data: {
+        contactget,
+        totalServicesUser,
+        totalPages,
+        currentPage: page,
+        perPage: limit,
+        nextPage: page < totalPages ? page + 1 : null,
+        previousPage: page > 1 ? page - 1 : null,
+      },
+      msg: "Contact Get",
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      msg: "Failed to fetch Contact get",
+      error: error.message,
     });
   }
 });
