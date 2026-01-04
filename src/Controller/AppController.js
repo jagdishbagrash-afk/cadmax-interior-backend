@@ -2,11 +2,16 @@ const jwt = require("jsonwebtoken");
 const catchAsync = require("../Utill/catchAsync");
 const User = require("../Model/User");
 const SubCategory = require("../Model/SubCategory");
-const Category =  require("../Model/Categroy")
+const Category = require("../Model/Categroy")
 // const nodemailer = require("nodemailer");
 const { validationErrorResponse, errorResponse, successResponse } = require("../Utill/ErrorHandling");
 const Product = require("../Model/Product");
 const Cart = require("../Model/Cart");
+const Project = require("../Model/Project");
+const ServicesType = require("../Model/ServicesType");
+const Services = require("../Model/Services");
+const { mongoose } = require("mongoose");
+const ServicesUser = require("../Model/ServicesUser");
 // const logger = require("../utils/Logger");
 // const twilio = require("twilio");
 
@@ -37,7 +42,7 @@ exports.SendOtp = catchAsync(async (req, res) => {
     }
 
     return successResponse(res, "OTP sent successfully", 200, {
-      otp: 123456,      
+      otp: 123456,
       isNewUser: false
     });
 
@@ -95,8 +100,8 @@ exports.Login = catchAsync(async (req, res) => {
 
 exports.signup = catchAsync(async (req, res) => {
   try {
-    const { email, name, profileImage, role, phone ,gender } = req.body;
-    console.log(" req.body" , req.body)
+    const { email, name, profileImage, role, phone, gender } = req.body;
+    console.log(" req.body", req.body)
     // Check if user already exists
     const existingUser = await User.find({
       $or: [{ email }, { phone }],
@@ -125,7 +130,7 @@ exports.signup = catchAsync(async (req, res) => {
       email,
       phone,
       profileImage,
-      role,gender
+      role, gender
     });
 
     const result = await record.save();
@@ -187,8 +192,8 @@ exports.PhoneVerify = catchAsync(async (req, res) => {
         401
       );
     }
-    return successResponse(res, "OTP Send successfully", 200, 
-       123456,
+    return successResponse(res, "OTP Send successfully", 200,
+      123456,
     );
 
     // Verify OTP with Twilio
@@ -222,7 +227,7 @@ exports.OTPVerify = catchAsync(async (req, res) => {
     }
     return successResponse(res, "OTP verified successfully", 200, 123456);
 
-   
+
   } catch (error) {
     console.error("VerifyOtp error:", error);
     return errorResponse(res, error.message || "Internal Server Error", 500);
@@ -257,32 +262,32 @@ exports.AppOrder = catchAsync(async (req, res) => {
 });
 
 exports.getAllCategorys = catchAsync(
-    async (req, res) => {
-        try {
-        const Categorys = await Category.find().sort({ createdAt: -1 });
-            return successResponse(res, "Categorys list successfully.", 201, Categorys);
-        } catch (error) {
-            return errorResponse(res, error.message || "Internal Server Error", 500);
-        }
+  async (req, res) => {
+    try {
+      const Categorys = await Category.find().sort({ createdAt: -1 });
+      return successResponse(res, "Categorys list successfully.", 201, Categorys);
+    } catch (error) {
+      return errorResponse(res, error.message || "Internal Server Error", 500);
     }
+  }
 );
 
 exports.getSubCategoryByCategory = catchAsync(async (req, res) => {
-    try {
-        const categoryId = req.params.id;
-        console.log("categoryId0" , categoryId)
-        const subCategories = await SubCategory.find({
-            category: categoryId,
-            deletedAt: null
-        }).populate("category");
+  try {
+    const categoryId = req.params.id;
+    console.log("categoryId0", categoryId)
+    const subCategories = await SubCategory.find({
+      category: categoryId,
+      deletedAt: null
+    }).populate("category");
 
-        if (!subCategories || subCategories?.length === 0) {
-            return validationErrorResponse(res, "No Subcategories found for this category.", 404);
-        }
-        return successResponse(res, "Subcategories fetched successfully.", 200, subCategories);
-    } catch (error) {
-        return errorResponse(res, error.message || "Internal Server Error", 500);
+    if (!subCategories || subCategories?.length === 0) {
+      return validationErrorResponse(res, "No Subcategories found for this category.", 404);
     }
+    return successResponse(res, "Subcategories fetched successfully.", 200, subCategories);
+  } catch (error) {
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
 }
 );
 
@@ -353,8 +358,8 @@ exports.getProductBySubCategory = catchAsync(async (req, res) => {
     //   },
     // });
 
-        return successResponse(res, "Products fetched by category", 200,
-       products);
+    return successResponse(res, "Products fetched by category", 200,
+      products);
   } catch (error) {
     return errorResponse(res, error.message || "Internal Server Error", 500);
   }
@@ -521,6 +526,240 @@ exports.getCart = catchAsync(async (req, res) => {
         finalAmount
       }
     });
+  } catch (error) {
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});
+
+
+exports.removeProductVariantFromCart = catchAsync(async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { productId, variant } = req.params;
+
+    const cart = await Cart.findOne({ user: userId });
+
+    if (!cart) {
+      return errorResponse(res, "Cart not found", 404);
+    }
+
+    const initialLength = cart.product.length;
+
+    cart.product = cart.product.filter(
+      (item) =>
+        !(
+          item.productId.toString() === productId &&
+          item.variant === variant
+        )
+    );
+
+    if (cart.product.length === initialLength) {
+      return errorResponse(res, "Product variant not found in cart", 404);
+    }
+
+    await cart.save();
+
+    return successResponse(
+      res,
+      "Product variant removed from cart",
+      200,
+      cart
+    );
+  } catch (error) {
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});
+
+exports.GetAllProject = catchAsync(
+  async (req, res) => {
+    try {
+      const projects = await Project.find().sort({ createdAt: -1 });
+      return successResponse(res, "Project list successfully.", 201, projects);
+    } catch (error) {
+      return errorResponse(res, error.message || "Internal Server Error", 500);
+    }
+  }
+);
+
+
+exports.GetServicesType = catchAsync(
+  async (req, res) => {
+    try {
+      const Residentialservices = await ServicesType.find({ TypeServices: "Residential" }).sort({ createdAt: -1 });
+      const Commercialservices = await ServicesType.find({ TypeServices: "Commercial" }).sort({ createdAt: -1 });
+      return successResponse(res, "Services Type list successfully.", 201, {
+        Residentialservices, Commercialservices
+      });
+    } catch (error) {
+      return errorResponse(res, error.message || "Internal Server Error", 500);
+    }
+  }
+);
+
+
+exports.GetServiceTypeId = catchAsync(async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const services = await Services.aggregate([
+      {
+        $match: {
+          ServicesType: new mongoose.Types.ObjectId(id),
+          status: true
+        }
+      },
+      {
+        $group: {
+          _id: "$concept",
+          services: { $push: "$$ROOT" }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          k: "$_id",
+          v: "$services"
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          data: { $push: { k: "$k", v: "$v" } }
+        }
+      },
+      {
+        $replaceRoot: {
+          newRoot: { $arrayToObject: "$data" }
+        }
+      }
+    ]);
+
+    return successResponse(
+      res,
+      "Services grouped by concept.",
+      200,
+      services[0] || {}
+    );
+  } catch (error) {
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});
+
+
+
+exports.GetServicesDetails = catchAsync(async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log("at", id)
+
+    if (!id) {
+      return validationErrorResponse(res, "id is required", 400);
+    }
+
+    const service = await Services
+      .findById({ _id: id })
+      .populate("ServicesType");
+
+    if (!service) {
+      return validationErrorResponse(res, "Service not found", 404);
+    }
+
+    return successResponse(res, "Service details fetched successfully.", 200, service);
+
+  } catch (error) {
+    console.error("Get Service Error:", error);
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});
+
+
+exports.ConceptUserPost = catchAsync(async (req, res) => {
+  try {
+    console.log("req.body", req.body);
+    // const userId = req?.user?.id;
+    const { User, ServicesType, Services, concept } = req.body;
+
+    if (!User || !ServicesType || !Services) {
+      return validationErrorResponse(res, "All fields (services, user, typeservices) are required.", 401);
+    }
+
+    const record = new ServicesUser({
+      User,
+      ServicesType: ServicesType,
+      Services,
+      concept,
+    });
+
+    const result = await record.save();
+
+    if (!result) {
+      return validationErrorResponse(res, "Failed to save contact details.", 401);
+    }
+
+    return successResponse(res, "Request submitted & emails sent successfully.", 200, result);
+
+  } catch (error) {
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});
+
+
+exports.EditProfile = catchAsync(async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const { name, email, phone,  } = req.body;
+
+    const existingUser = await User.findOne({
+      _id: { $ne: userId },
+      $or: [{ email }, { phone }],
+    });
+
+
+    if (!existingUser) {
+      return validationErrorResponse(res, "User not found.", 404);
+    }
+
+    if (email) existingUser.email = email;
+    if(gender) existingUser.gender =  gender;
+    if (
+      phone
+    ) existingUser.
+      phone
+      =
+      phone
+        ;
+    if (
+      name
+    ) existingUser.
+      name
+      =
+      name
+        ;
+
+    if (req.file && req.file.location) {
+
+      if (existingUser.
+        profileImage
+      ) {
+        try {
+          await deleteFile(existingUser.
+            profileImage
+          );
+        } catch (err) {
+          console.log("Error deleting old image:", err.message);
+        }
+      }
+      existingUser.
+        profileImage
+        = req.file.location;
+    }
+
+    const updatedUser = await existingUser.save();
+    if (!updatedUser) {
+      return errorResponse(res, "User not found", 404);
+    }
+    return successResponse(res, "Profile updated successfully.", 200, updatedUser);
   } catch (error) {
     return errorResponse(res, error.message || "Internal Server Error", 500);
   }
