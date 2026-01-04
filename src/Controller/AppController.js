@@ -387,10 +387,10 @@ exports.AddToCart = catchAsync(async (req, res) => {
   try {
     const userId = req.user.id;
     const { product } = req.body;
-    if (!product || !product.id || !product.quantity || !product.variant) {
+    if (!product || !product.id || !product.quantity || !product.variant || !product.images) {
       return errorResponse(res, "Invalid product payload", 400);
     }
-    const { id: productId, quantity, variant } = product;
+    const { id: productId, quantity, variant , images } = product;
     // Quantity validation
     if (quantity < 1) {
       return errorResponse(res, "Quantity must be at least 1", 400);
@@ -422,7 +422,8 @@ exports.AddToCart = catchAsync(async (req, res) => {
           {
             productId,
             variant: normalizedVariant,
-            quantity
+            quantity,
+            images
           }
         ]
       });
@@ -722,6 +723,7 @@ exports.EditProfile = catchAsync(async (req, res) => {
 
     if (email) existingUser.email = email;
     if(gender) existingUser.gender =  gender;
+    if(address) existingUser.address = address;
     if (
       phone
     ) existingUser.

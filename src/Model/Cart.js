@@ -17,6 +17,10 @@ const ProductSchema = new mongoose.Schema(
       min: 1,
       required: true,
     },
+     images: {
+      type: [String], // array of image URLs
+      validate: v => v.length > 0
+    },
   },{ _id: false }
 );
 

@@ -59,6 +59,9 @@ const UserSchema = new mongoose.Schema({
   gender :{
     type :String ,
   },
+   address :{
+    type :String ,
+  },
   deleted_at: {
     type: Date,
     default: null
