@@ -387,10 +387,11 @@ exports.AddToCart = catchAsync(async (req, res) => {
   try {
     const userId = req.user.id;
     const { product } = req.body;
-    if (!product || !product.id || !product.quantity || !product.variant || !product.images) {
+    console.log(product)
+    if (!product || !product.id || !product.quantity || !product.variant ) {
       return errorResponse(res, "Invalid product payload", 400);
     }
-    const { id: productId, quantity, variant , images } = product;
+    const { id: productId, quantity, variant  } = product;
     // Quantity validation
     if (quantity < 1) {
       return errorResponse(res, "Quantity must be at least 1", 400);
@@ -422,8 +423,7 @@ exports.AddToCart = catchAsync(async (req, res) => {
           {
             productId,
             variant: normalizedVariant,
-            quantity,
-            images
+            quantity
           }
         ]
       });
@@ -437,6 +437,8 @@ exports.AddToCart = catchAsync(async (req, res) => {
     );
     if (existingItem) {
       const newQuantity = existingItem.quantity + quantity;
+      console.log("newQuantity" ,newQuantity)
+      console.log("ss" ,matchedVariant.stock)
       if (newQuantity > matchedVariant.stock) {
         return errorResponse(
           res,
@@ -455,6 +457,7 @@ exports.AddToCart = catchAsync(async (req, res) => {
     await cart.save();
     return successResponse(res, "Item added to cart", 200, cart);
   } catch (error) {
+    console.log("error" ,error)
     return errorResponse(res, error.message || "Internal Server Error", 500);
   }
 });
@@ -463,57 +466,69 @@ exports.getCart = catchAsync(async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const cart = await Cart.findOne({ user: userId })
-      .populate({
-        path: "product.productId",
-        select: "title amount variants"
-      });
+    const cart = await Cart.findOne({ user: userId }).populate({
+      path: "product.productId",
+      select: "title amount images variants"
+    });
 
     if (!cart || cart.product.length === 0) {
-      return successResponse(res, "Cart is empty", {
-        items: [],
-        summary: {
-          subtotal: 0,
-          discountPercent: cart?.discount || 0,
-          discountAmount: 0,
-          taxPercent: cart?.tax || 0,
-          taxAmount: 0,
-          finalAmount: 0
-        }
-      }, 200);
+      return successResponse(
+        res,
+        "Cart is empty",
+        {
+          items: [],
+          summary: {
+            subtotal: 0,
+            discountPercent: cart?.discount || 0,
+            discountAmount: 0,
+            taxPercent: cart?.tax || 0,
+            taxAmount: 0,
+            finalAmount: 0
+          }
+        },
+        200
+      );
     }
 
     let subtotal = 0;
 
-    const items = cart.product.map(item => {
-      const product = item.productId;
+const items = cart.product
+  .map(item => {
+    const product = item.productId;
+    if (!product) return null;
 
-      if (!product) return null; // safety guard
+    const selectedVariant = product.variants.find(
+      v => v.color === item.variant
+    );
 
-      const itemTotal = item.quantity * product.amount;
-      subtotal += itemTotal;
+    const variantImages = selectedVariant?.images || [];
 
-      return {
-        productId: product._id,
-        title: product.title,
-        variant: item.variant,
-        quantity: item.quantity,
-        unitPrice: product.amount,
-        itemTotal
-      };
-    }).filter(Boolean);
+    const itemTotal = item.quantity * product.amount;
+    subtotal += itemTotal;
 
-    // Discount calculation
+    return {
+      productId: product._id,
+      title: product.title,
+      images: variantImages,     
+      variant: item.variant,
+      quantity: item.quantity,
+      unitPrice: product.amount,
+      itemTotal
+    };
+  })
+  .filter(Boolean);
+
+
+    // Discount
     const discountPercent = cart.discount || 0;
     const discountAmount = +(subtotal * (discountPercent / 100)).toFixed(2);
-
     const afterDiscount = subtotal - discountAmount;
 
-    // Tax calculation
+    // Tax
     const taxPercent = cart.tax || 0;
     const taxAmount = +(afterDiscount * (taxPercent / 100)).toFixed(2);
 
-    // Final amount
+    // Final
     const finalAmount = +(afterDiscount + taxAmount).toFixed(2);
 
     return successResponse(res, "Cart fetched successfully", 200, {
@@ -527,15 +542,21 @@ exports.getCart = catchAsync(async (req, res) => {
         finalAmount
       }
     });
+
   } catch (error) {
-    return errorResponse(res, error.message || "Internal Server Error", 500);
+    return errorResponse(
+      res,
+      error.message || "Internal Server Error",
+      500
+    );
   }
 });
 
 
+
 exports.removeProductVariantFromCart = catchAsync(async (req, res) => {
   try {
-    const userId = req.user._id;
+    const userId = req.user.id;
     const { productId, variant } = req.params;
 
     const cart = await Cart.findOne({ user: userId });
