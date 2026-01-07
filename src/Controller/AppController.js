@@ -12,6 +12,7 @@ const ServicesType = require("../Model/ServicesType");
 const Services = require("../Model/Services");
 const { mongoose } = require("mongoose");
 const ServicesUser = require("../Model/ServicesUser");
+const BookingModel = require("../Model/Booking")
 // const logger = require("../utils/Logger");
 // const twilio = require("twilio");
 
@@ -365,7 +366,6 @@ exports.getProductBySubCategory = catchAsync(async (req, res) => {
   }
 });
 
-
 exports.getProductById = catchAsync(async (req, res) => {
   try {
     const product = await Product.findById(req.params.id)
@@ -388,10 +388,10 @@ exports.AddToCart = catchAsync(async (req, res) => {
     const userId = req.user.id;
     const { product } = req.body;
     console.log(product)
-    if (!product || !product.id || !product.quantity || !product.variant ) {
+    if (!product || !product.id || !product.quantity || !product.variant) {
       return errorResponse(res, "Invalid product payload", 400);
     }
-    const { id: productId, quantity, variant  } = product;
+    const { id: productId, quantity, variant } = product;
     // Quantity validation
     if (quantity < 1) {
       return errorResponse(res, "Quantity must be at least 1", 400);
@@ -437,8 +437,8 @@ exports.AddToCart = catchAsync(async (req, res) => {
     );
     if (existingItem) {
       const newQuantity = existingItem.quantity + quantity;
-      console.log("newQuantity" ,newQuantity)
-      console.log("ss" ,matchedVariant.stock)
+      console.log("newQuantity", newQuantity)
+      console.log("ss", matchedVariant.stock)
       if (newQuantity > matchedVariant.stock) {
         return errorResponse(
           res,
@@ -457,7 +457,7 @@ exports.AddToCart = catchAsync(async (req, res) => {
     await cart.save();
     return successResponse(res, "Item added to cart", 200, cart);
   } catch (error) {
-    console.log("error" ,error)
+    console.log("error", error)
     return errorResponse(res, error.message || "Internal Server Error", 500);
   }
 });
@@ -492,31 +492,31 @@ exports.getCart = catchAsync(async (req, res) => {
 
     let subtotal = 0;
 
-const items = cart.product
-  .map(item => {
-    const product = item.productId;
-    if (!product) return null;
+    const items = cart.product
+      .map(item => {
+        const product = item.productId;
+        if (!product) return null;
 
-    const selectedVariant = product.variants.find(
-      v => v.color === item.variant
-    );
+        const selectedVariant = product.variants.find(
+          v => v.color === item.variant
+        );
 
-    const variantImages = selectedVariant?.images || [];
+        const variantImages = selectedVariant?.images || [];
 
-    const itemTotal = item.quantity * product.amount;
-    subtotal += itemTotal;
+        const itemTotal = item.quantity * product.amount;
+        subtotal += itemTotal;
 
-    return {
-      productId: product._id,
-      title: product.title,
-      images: variantImages,     
-      variant: item.variant,
-      quantity: item.quantity,
-      unitPrice: product.amount,
-      itemTotal
-    };
-  })
-  .filter(Boolean);
+        return {
+          productId: product._id,
+          title: product.title,
+          images: variantImages,
+          variant: item.variant,
+          quantity: item.quantity,
+          unitPrice: product.amount,
+          itemTotal
+        };
+      })
+      .filter(Boolean);
 
 
     // Discount
@@ -551,8 +551,6 @@ const items = cart.product
     );
   }
 });
-
-
 
 exports.removeProductVariantFromCart = catchAsync(async (req, res) => {
   try {
@@ -603,7 +601,6 @@ exports.GetAllProject = catchAsync(
   }
 );
 
-
 exports.GetServicesType = catchAsync(
   async (req, res) => {
     try {
@@ -617,7 +614,6 @@ exports.GetServicesType = catchAsync(
     }
   }
 );
-
 
 exports.GetServiceTypeId = catchAsync(async (req, res) => {
   try {
@@ -667,8 +663,6 @@ exports.GetServiceTypeId = catchAsync(async (req, res) => {
   }
 });
 
-
-
 exports.GetServicesDetails = catchAsync(async (req, res) => {
   try {
     const { id } = req.params;
@@ -693,7 +687,6 @@ exports.GetServicesDetails = catchAsync(async (req, res) => {
     return errorResponse(res, error.message || "Internal Server Error", 500);
   }
 });
-
 
 exports.ConceptUserPost = catchAsync(async (req, res) => {
   try {
@@ -725,12 +718,11 @@ exports.ConceptUserPost = catchAsync(async (req, res) => {
   }
 });
 
-
 exports.EditProfile = catchAsync(async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const { name, email, phone,  } = req.body;
+    const { name, email, phone, } = req.body;
 
     const existingUser = await User.findOne({
       _id: { $ne: userId },
@@ -743,8 +735,8 @@ exports.EditProfile = catchAsync(async (req, res) => {
     }
 
     if (email) existingUser.email = email;
-    if(gender) existingUser.gender =  gender;
-    if(address) existingUser.address = address;
+    if (gender) existingUser.gender = gender;
+    if (address) existingUser.address = address;
     if (
       phone
     ) existingUser.
@@ -787,3 +779,39 @@ exports.EditProfile = catchAsync(async (req, res) => {
     return errorResponse(res, error.message || "Internal Server Error", 500);
   }
 });
+
+exports.BookingAppAdd = catchAsync(async (req, res) => {
+    try {
+        const {
+            project_type, servcies_model, area, budget_range, finish_level,
+            name, email, phone_number, city, phone_mode, timeLine,
+            rate, subtotal, taxes, total_amount ,scope
+        } = req.body;
+
+        const booking = await BookingModel.create({
+            project_type,
+            servcies_model,
+            area,
+            budget_range,
+            finish_level,
+            name,
+            email,
+            phone_number,
+            city,
+            phone_mode,
+            timeLine,
+            rate,
+            subtotal,
+            taxes,
+            total_amount ,
+            scope
+        });
+
+        return successResponse(res, "Booking Success", 201, booking)
+
+    } catch (error) {
+        return errorResponse(res, error.message || "Internal Server Error", 500);
+
+
+    }
+})
