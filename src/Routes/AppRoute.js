@@ -1,4 +1,4 @@
-const { signup, Login, SendOtp, profilegettoken, PhoneVerify, OTPVerify, AppOrder, getAllCategorys, getSubCategoryByCategory, getProductBySubCategory, getProductById, AddToCart, getCart, GetAllProject, GetServicesType, GetServiceTypeId, GetServicesDetails, ConceptUserPost, removeProductVariantFromCart, EditProfile, BookingAppAdd } = require("../Controller/AppController");
+const { signup, Login, SendOtp, profilegettoken, PhoneVerify, OTPVerify, AppOrder, getAllCategorys, getSubCategoryByCategory, getProductBySubCategory, getProductById, AddToCart, getCart, GetAllProject, GetServicesType, GetServiceTypeId, GetServicesDetails, ConceptUserPost, removeProductVariantFromCart, EditProfile, BookingAppAdd, GetVendorCatApp, GetAllVendor, GetVendorCategory } = require("../Controller/AppController");
 const {  GetAllBanner  } = require("../Controller/BannerController");
 const { upload } = require("../Utill/S3");
 const { verifyToken } = require("../Utill/tokenVerify");
@@ -35,6 +35,11 @@ AppRoute.post("/app/concept/user", ConceptUserPost);
 
 AppRoute.post("/app/booking/add", BookingAppAdd);
 
+
+AppRoute.get("/app/vendor/category", GetVendorCatApp);
+
+
+AppRoute.get("/app/vendor/:slug",   GetVendorCategory);   
 
 
 AppRoute.post("/app/user/edit-profile" , verifyToken , upload.single("profileImage"),  EditProfile)

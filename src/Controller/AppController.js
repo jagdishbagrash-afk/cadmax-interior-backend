@@ -12,7 +12,9 @@ const ServicesType = require("../Model/ServicesType");
 const Services = require("../Model/Services");
 const { mongoose } = require("mongoose");
 const ServicesUser = require("../Model/ServicesUser");
-const BookingModel = require("../Model/Booking")
+const BookingModel = require("../Model/Booking");
+const VendorCategory = require("../Model/VendorCategory");
+const Vendor = require("../Model/Vendor");
 // const logger = require("../utils/Logger");
 // const twilio = require("twilio");
 
@@ -815,3 +817,39 @@ exports.BookingAppAdd = catchAsync(async (req, res) => {
 
     }
 })
+
+
+exports.GetVendorCatApp = catchAsync(
+    async (req, res) => {
+        try {
+            const Categorys = await VendorCategory.find().sort({ createdAt: -1 });
+            return successResponse(res, "Vendor Categorys list successfully.", 201, Categorys);
+        } catch (error) {
+            return errorResponse(res, error.message || "Internal Server Error", 500);
+        }
+    }
+);
+
+exports.GetVendorCategory = catchAsync(async (req, res) => {
+  try {
+    const slug = req.params.slug;
+    console.log("slug:", slug);
+    if (!slug) {
+      return errorResponse(res, "Category slug is required", 400);
+    }
+    // Get Vendors of this Category
+    const vendors = await Vendor.find({
+      deletedAt: null,
+      VendorCategory: slug,
+    }).sort({ createdAt: -1 }).populate("VendorCategory");
+    return successResponse(
+      res,
+      "Vendor Category details fetched successfully.",
+      200,
+      { vendors }
+    );
+
+  } catch (error) {
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});

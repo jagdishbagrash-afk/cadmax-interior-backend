@@ -14,6 +14,8 @@ router.get("/vendor/get", VendorController.getVendors);
 
 router.get("/category/vendor/:slug",    VendorController.getVendorCategoryIds);   
 
+
+
 // router.get("/vendor/category/list/:id", VendorController.getServiceById);  
 // router.post("/vendor/category/delete/:id", VendorController.deleteService);
 module.exports = router;
