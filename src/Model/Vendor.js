@@ -26,6 +26,8 @@ const vendorSchema = new mongoose.Schema({
         required: true
     },
 
+
+
     phone: {
         type: String,
         required: true

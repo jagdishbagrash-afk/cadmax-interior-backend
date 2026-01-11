@@ -85,7 +85,6 @@ exports.updateCategory = CatchAsync(
             }
 
             const updatedCategory = await data.save();
-            console.log("updatedCategory", updatedCategory)
             return successResponse(res, "Category updated successfully.", 200, updatedCategory);
 
         } catch (error) {

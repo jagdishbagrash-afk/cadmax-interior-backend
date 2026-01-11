@@ -1,11 +1,14 @@
 const Services = require("../Model/Services");
 const ServicesType = require("../Model/ServicesType");
 const ServicesUser = require("../Model/ServicesUser");
+const VendorSubCategory = require("../Model/ServicesSubCategory");
 const CatchAsync = require("../Utill/catchAsync");
 const { errorResponse, successResponse, validationErrorResponse } = require("../Utill/ErrorHandling");
 
 
 const { S3Client, DeleteObjectCommand } = require("@aws-sdk/client-s3");
+const ServicesSubCategory = require("../Model/ServicesSubCategory");
+const { default: mongoose } = require("mongoose");
 
 const s3Client = new S3Client({
   region: process.env.AWS_REGION,
@@ -44,7 +47,6 @@ exports.AddServiceType = CatchAsync(
     try {
       const { title, TypeServices } = req.body;
       const slug = await generateUniqueSlug(ServicesType, req.body.title);
-      console.log("slug", slug)
       let imageUrl = null;
 
       if (req.file) {
@@ -107,7 +109,6 @@ exports.UpdateServicesType = CatchAsync(
       }
 
       const updatedCategory = await data.save();
-      console.log("updatedCategory", updatedCategory)
       return successResponse(res, "Services Type updated successfully.", 200, updatedCategory);
 
     } catch (error) {
@@ -148,20 +149,16 @@ exports.DeleteServicesType = CatchAsync(async (req, res) => {
 exports.AddService = CatchAsync(
   async (req, res) => {
     try {
-      console.log("servicesImage", req.body)
-      const { title, content, ServicesType, concept, material_details, timeline, cost } = req.body;
-
-
+      const { title, content, ServicesType, concept, material_details, timeline, cost, ServicesSubCategory } = req.body;
       const imageUrls = req.files["images[]"]?.map((f) => f.location) || [];
       const list_image = req.files["Image"]?.[0]?.location || "";
 
-      console.log("imageUrls", imageUrls)
       const slug = await generateUniqueSlug(Services, req.body.title);
 
       if (!title || !content || !ServicesType) {
         return validationErrorResponse(res, "All fields are required", 400,);
       }
-      const service = new Services({ title, content, multiple_images: imageUrls, ServicesType, slug: slug, concept, Image: list_image, material_details, timeline, cost });
+      const service = new Services({ title, content, multiple_images: imageUrls, ServicesType, slug: slug, concept, Image: list_image, material_details, timeline, cost, ServicesSubCategory });
       const record = await service.save();
       return successResponse(res, "Services created successfully.", 201, record);
     } catch (error) {
@@ -182,16 +179,46 @@ exports.getAllServices = CatchAsync(
   }
 );
 
+
+exports.GetAllConcept = CatchAsync(async (req, res) => {
+  const { slug } = req.params;
+
+  // Step 1: Find sub-category
+  const record = await ServicesSubCategory.findOne({ slug });
+
+  if (!record) {
+    return errorResponse(res, "Sub category not found", 404);
+  }
+
+  const  Id =  record?._id;
+
+  // Step 2: Find services
+const services = await Services.find({
+  ServicesSubCategory: new mongoose.Types.ObjectId(Id)
+})
+  .sort({ createdAt: -1 })
+  .populate("ServicesSubCategory");
+
+  console.log("services" ,services)
+  return successResponse(
+    res,
+    "Services list fetched successfully.",
+    200,
+    { services, record }
+  );
+});
+
+
 exports.UpdateServices = CatchAsync(
   async (req, res) => {
     try {
-      const { title, content, ServicesType, concept, material_details, timeline, cost } = req.body;
+      const { title, content, ServicesType, concept, material_details, timeline, cost,
+        ServicesSubCategory } = req.body;
 
       // Get files (if any new ones uploaded)
       const imageUrls = req.files?.["images[]"]?.map((f) => f.location) || [];
       const Image = req.files?.["Image"]?.[0]?.location;
 
-      console.log("Updating project with ID:", imageUrls);
       const data = await Services.findById(req.params.id);
 
       if (!data) {
@@ -200,6 +227,7 @@ exports.UpdateServices = CatchAsync(
 
       // ✅ Update name if provided
       if (title) data.title = title;
+      if (ServicesSubCategory) data.ServicesSubCategory = ServicesSubCategory;
       if (content) data.content = content;
       if (ServicesType) data.ServicesType = ServicesType;
       if (concept) data.concept = concept;
@@ -213,7 +241,6 @@ exports.UpdateServices = CatchAsync(
         data.multiple_images = [...data.multiple_images, ...imageUrls]; // append new images
       }
       const updatedCategory = await data.save();
-      console.log("updatedCategory", updatedCategory)
       return successResponse(res, "Services updated successfully.", 200, updatedCategory);
 
     } catch (error) {
@@ -327,7 +354,6 @@ exports.GetServiceDataTypeId = CatchAsync(async (req, res) => {
 
 exports.DeleteAWSImages = CatchAsync(async (req, res) => {
   try {
-    console.log("v", req.params)
     let { projectId, images } = req.params;
 
     if (!projectId) return res.status(400).json({ status: false, message: "projectId required" });
@@ -388,7 +414,6 @@ exports.DeleteAWSImages = CatchAsync(async (req, res) => {
 
 exports.ServicesUserPost = CatchAsync(async (req, res) => {
   try {
-    console.log("req.body", req.body);
 
     const { User, TypeServices, Services, concept } = req.body;
 

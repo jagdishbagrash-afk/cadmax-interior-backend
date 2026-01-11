@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const servicesController = require("../Controller/ServicesController.js");
 const { upload } = require("../Utill/S3.js");
+const ServciesSubCategoryController = require("../Controller/ServciesSubCategoryController.js");
 
 router.post("/services/type/add", upload.single("Image"), servicesController.AddServiceType);
 router.get("/services/type/list", servicesController.getAllServicesType);
@@ -15,6 +16,13 @@ router.post("/services/add", upload.fields([
 
 
 router.get("/services/list", servicesController.getAllServices);
+
+router.get("/services/type-concept/:slug", servicesController.GetAllConcept);
+
+
+
+
+
 router.post("/services/edit/:id", upload.fields([
     { name: "Image", maxCount: 1 },
     { name: "images[]", maxCount: 10 },
@@ -40,6 +48,13 @@ router.get("/services/details/:slug", servicesController.GetServiceDataTypeId);
 router.post("/services/contact-add", servicesController.ServicesUserPost);
 
 router.get("/services/contact-get", servicesController.ServciesUserGet);
+
+
+
+router.post("/services/subcategory/add", upload.single("Image"),  ServciesSubCategoryController.AddServicesSubCategory);        
+router.get("/services/subcategory/list", ServciesSubCategoryController.GetAllServicesSubCategorys);    
+router.post("/services/subcategory/edit/:id", upload.single("Image"),   ServciesSubCategoryController.UpdateServicesSubCategory);  
+
 
 
 module.exports = router;

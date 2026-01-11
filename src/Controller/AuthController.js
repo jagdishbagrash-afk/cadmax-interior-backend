@@ -325,7 +325,6 @@ exports.DeleteUser = catchAsync(async (req, res) => {
   try {
     const id = req.params.id;
     const userrecord = await User.findById(id);
-console.log("userrecord" ,userrecord)
     if (!userrecord) {
       return validationErrorResponse(res, "User not found", 404);
     }

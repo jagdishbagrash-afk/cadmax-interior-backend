@@ -65,7 +65,6 @@ exports.UpdateBanner = CatchAsync(
             }
 
             const updatedBanner = await data.save();
-            console.log("updatedCategory", updatedBanner)
             return successResponse(res, "Banner updated successfully.", 200, updatedBanner);
 
         } catch (error) {
@@ -79,7 +78,6 @@ exports.BannerDelete  = CatchAsync(async (req, res) => {
   try {
     const id = req.params.id;
     const userrecord = await Banner.findById(id);
-console.log("userrecord" ,userrecord)
     if (!userrecord) {
       return validationErrorResponse(res, "Banner not found", 404);
     }
@@ -92,7 +90,6 @@ console.log("userrecord" ,userrecord)
 
     userrecord.deleted_at = new Date();
   const record =   await userrecord.save();
-console.log("record"  ,record)
     return successResponse(res, "Banner deleted successfully", 200);
 
   } catch (error) {

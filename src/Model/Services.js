@@ -9,6 +9,11 @@ const ServicesSchema = mongoose.Schema({
         ref: "ServicesType",
         required: [true, "ServicesType is required"],
     },
+     ServicesSubCategory: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "ServicesSubCategory",
+        required: true
+    },
     slug: {
         type: String,
         required: true

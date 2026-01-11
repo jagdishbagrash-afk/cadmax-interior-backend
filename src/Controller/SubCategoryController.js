@@ -62,7 +62,6 @@ exports.GetSubCategoryById = CatchAsync(
 exports.getSubCategoryByCategory = CatchAsync(async (req, res) => {
     try {
         const categoryId = req.params.id;
-        console.log("categoryId0" , categoryId)
         const subCategories = await SubCategory.find({
             category: categoryId,
             deletedAt: null
@@ -106,7 +105,6 @@ exports.UpdateSubCategory = CatchAsync(
             }
 
             const updatedCategory = await data.save();
-            console.log("updatedCategory", updatedCategory)
             return successResponse(res, "Category updated successfully.", 200, updatedCategory);
 
         } catch (error) {
@@ -154,10 +152,7 @@ exports.GetAllSubCategoryStatus = CatchAsync(
 
 exports.GetSubCategoryByNameCategory = CatchAsync(async (req, res) => {
     try {
-        console.log("hello")
         const { name } = req.params;
-        console.log("req.params", req.params)
-        console.log("name", name)
         const cleanName = name.replaceAll("-", " ");
 
         const category = await Category.findOne({ name: cleanName });

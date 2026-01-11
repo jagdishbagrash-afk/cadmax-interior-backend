@@ -34,7 +34,6 @@ const generateUniqueSlug = async (Model, title) => {
 exports.AddVendorCategory = CatchAsync(async (req, res) => {
     try {
         const { name } = req.body;
-        console.log("vendorcategory", req.body)
         if (!name) {
             return validationErrorResponse(res, "Category name is required", 400);
         }
@@ -100,7 +99,6 @@ exports.updateCategory = CatchAsync(
             }
 
             const updatedCategory = await data.save();
-            console.log("updatedCategory", updatedCategory)
             return successResponse(res, "Category updated successfully.", 200, updatedCategory);
 
         } catch (error) {
@@ -112,8 +110,7 @@ exports.updateCategory = CatchAsync(
 
 exports.AddVendor = CatchAsync(async (req, res) => {
     try {
-        const { name, experience, sepectailze, VendorCategory, phone } = req.body;
-        console.log("vendorcategory", req.body)
+        const { name, experience, sepectailze, VendorCategory, phone  , VendorSubCategory } = req.body;
         if (!name) {
             return validationErrorResponse(res, "Category name is required", 400);
         }
@@ -125,7 +122,7 @@ exports.AddVendor = CatchAsync(async (req, res) => {
 
         const Categorys = new Vendor({
             Image: imageUrl,
-            name, experience, sepectailze, VendorCategory, phone
+            name, experience, sepectailze, VendorCategory, phone , VendorSubCategory
         });
 
         const record = await Categorys.save();
@@ -151,8 +148,7 @@ exports.getAllVendors = CatchAsync(
 exports.updatevendor = CatchAsync(
     async (req, res) => {
         try {
-            console.log(req.body)
-            const { name, phone, VendorCategory, sepectailze, experience } = req.body;
+            const { name, phone, VendorCategory, sepectailze, experience , VendorSubCategory } = req.body;
 
             const data = await Vendor.findById(req.params.id);
 
@@ -163,6 +159,7 @@ exports.updatevendor = CatchAsync(
             if (name) data.name = name;
             if (phone) data.phone = phone;
             if (VendorCategory) data.VendorCategory = VendorCategory;
+            if(VendorSubCategory) data.VendorSubCategory  =VendorSubCategory ;
             if (sepectailze) data.sepectailze = sepectailze;
             if (experience) data.experience = experience;
 
@@ -182,7 +179,6 @@ exports.updatevendor = CatchAsync(
             }
 
             const updatedCategory = await data.save();
-            console.log("updatedCategory", updatedCategory)
             return successResponse(res, "Vendor updated successfully.", 200, updatedCategory);
 
         } catch (error) {
@@ -231,8 +227,6 @@ exports.getVendors = CatchAsync(
 exports.getVendorCategoryIds = CatchAsync(async (req, res) => {
   try {
     const slug = req.params.slug;
-
-    console.log("slug:", slug);
 
     if (!slug) {
       return errorResponse(res, "Category slug is required", 400);

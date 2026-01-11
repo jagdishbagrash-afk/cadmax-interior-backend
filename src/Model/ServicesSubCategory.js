@@ -1,0 +1,25 @@
+const mongoose = require("mongoose");
+
+const ServicesSubCategoryScheam = new mongoose.Schema({
+    name: {
+        type: String,
+        required: true
+    },
+    Image: {
+        type: String,   // icon url if needed
+        default: null
+    },
+    slug: {
+        type: String,
+    },
+    deletedAt: {
+        type: Date,
+        default: null
+    },
+    status: {
+        type: Boolean,
+        default: false
+    },
+}, { timestamps: true });
+
+module.exports = mongoose.model("ServicesSubCategory", ServicesSubCategoryScheam);

@@ -46,7 +46,6 @@ exports.GetProjectById = CatchAsync(
     async (req, res) => {
         try {
             const projects = await Project.findById(req.params.id);
-            console.log("projects", projects)
             if (!projects) {
                 return validationErrorResponse(res, "Project not found.", 400, projects);
             }
@@ -86,7 +85,6 @@ exports.UpdateProject = CatchAsync(
             }
 
             const updatedprojects = await data.save();
-            console.log("updatedprojects", updatedprojects)
             return successResponse(res, "PROJECT updated successfully.", 200, updatedprojects);
 
         } catch (error) {
@@ -113,7 +111,6 @@ exports.ProjectDelete = CatchAsync(async (req, res) => {
     try {
         const id = req.params.id;
         const userrecord = await Project.findById(id);
-        console.log("userrecord", userrecord)
         if (!userrecord) {
             return validationErrorResponse(res, "Project not found", 404);
         }
@@ -125,7 +122,6 @@ exports.ProjectDelete = CatchAsync(async (req, res) => {
 
         userrecord.deletedAt = new Date();
         const record = await userrecord.save();
-        console.log("record", record)
         return successResponse(res, "Project deleted successfully", 200);
 
     } catch (error) {
