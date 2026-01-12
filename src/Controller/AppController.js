@@ -400,7 +400,7 @@ exports.AddToCart = catchAsync(async (req, res) => {
     }
     const dbProduct = await Product.findById(productId);
     if (!dbProduct) {
-      return errorResponse(res, "Product not found", 404);
+      return errorResponse(res, "Product not found", 400);
     }
     const normalizedVariant = variant.toLowerCase().trim();
     const matchedVariant = dbProduct.variants.find(
@@ -429,7 +429,7 @@ exports.AddToCart = catchAsync(async (req, res) => {
           }
         ]
       });
-      return successResponse(res, "Item added to cart", cart);
+      return successResponse(res, "Item added to cart", 200, cart);
     }
     // Check if product+variant already exists in cart
     const existingItem = cart.product.find(
@@ -464,6 +464,67 @@ exports.AddToCart = catchAsync(async (req, res) => {
   }
 });
 
+exports.updateCart = catchAsync(async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { product } = req.body;
+
+    if (!product || !product.id || !product.variant || product.quantity === undefined) {
+      return errorResponse(res, "Invalid product payload", 400);
+    }
+
+    const { id: productId, quantity, variant } = product;
+
+    if (quantity < 0) {
+      return errorResponse(res, "Quantity cannot be negative", 400);
+    }
+
+    const cart = await Cart.findOne({ user: userId });
+    if (!cart || cart.product.length === 0) {
+      return errorResponse(res, "Cart is empty", 400);
+    }
+
+    const dbProduct = await Product.findById(productId);
+    if (!dbProduct) {
+      return errorResponse(res, "Product not found", 400);
+    }
+
+    const normalizedVariant = variant.toLowerCase().trim();
+
+    const matchedVariant = dbProduct.variants.find(
+      v => v.color === normalizedVariant
+    );
+
+    if (!matchedVariant) {
+      return errorResponse(res, `Variant '${variant}' not available`, 400);
+    }
+
+    const cartItemIndex = cart.product.findIndex(
+      p =>
+        p.productId.toString() === productId &&
+        p.variant === normalizedVariant
+    );
+
+    if (cartItemIndex === -1) {
+      return errorResponse(res, "Item not found in cart", 400);
+    }
+
+    // Remove item if quantity = 0
+    if (quantity === 0) {
+      cart.product.splice(cartItemIndex, 1);
+    } else {
+      if (quantity > matchedVariant.stock) {
+        return errorResponse(res, `Only ${matchedVariant.stock} items left for ${variant}`,400);
+      }
+      cart.product[cartItemIndex].quantity = quantity;
+    }
+    await cart.save();
+    return successResponse(res, "Cart updated successfully", 200, cart);
+  } catch (error) {
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});
+
 exports.getCart = catchAsync(async (req, res) => {
   try {
     const userId = req.user.id;
@@ -473,10 +534,10 @@ exports.getCart = catchAsync(async (req, res) => {
       select: "title amount images variants"
     });
 
+    // console.log("cart", cart);
+
     if (!cart || cart.product.length === 0) {
-      return successResponse(
-        res,
-        "Cart is empty",
+      return successResponse(res, "Cart is empty", 200,
         {
           items: [],
           summary: {
@@ -487,9 +548,7 @@ exports.getCart = catchAsync(async (req, res) => {
             taxAmount: 0,
             finalAmount: 0
           }
-        },
-        200
-      );
+        });
     }
 
     let subtotal = 0;
@@ -523,12 +582,12 @@ exports.getCart = catchAsync(async (req, res) => {
 
     // Discount
     const discountPercent = cart.discount || 0;
-    const discountAmount = +(subtotal * (discountPercent / 100)).toFixed(2);
+    const discountAmount = +(subtotal * (discountPercent / 100));
     const afterDiscount = subtotal - discountAmount;
 
     // Tax
     const taxPercent = cart.tax || 0;
-    const taxAmount = +(afterDiscount * (taxPercent / 100)).toFixed(2);
+    const taxAmount = +(subtotal * (taxPercent / 100)).toFixed(2);
 
     // Final
     const finalAmount = +(afterDiscount + taxAmount).toFixed(2);
@@ -551,6 +610,19 @@ exports.getCart = catchAsync(async (req, res) => {
       error.message || "Internal Server Error",
       500
     );
+  }
+});
+
+exports.clearCart = catchAsync(async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const cart = await Cart.findOneAndDelete({ user: userId });
+    if (!cart) {
+      return successResponse(res, "Cart already empty", 200);
+    }
+    return successResponse(res, "Cart cleared successfully", 200);
+  } catch (error) {
+    return errorResponse(res, error.message || "Internal Server Error", 500);
   }
 });
 

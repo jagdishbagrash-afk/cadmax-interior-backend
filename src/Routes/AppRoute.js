@@ -1,4 +1,4 @@
-const { signup, Login, SendOtp, profilegettoken, PhoneVerify, OTPVerify, AppOrder, getAllCategorys, getSubCategoryByCategory, getProductBySubCategory, getProductById, AddToCart, getCart, GetAllProject, GetServicesType, GetServiceTypeId, GetServicesDetails, ConceptUserPost, removeProductVariantFromCart, EditProfile, BookingAppAdd, GetVendorCatApp, GetAllVendor, GetVendorCategory } = require("../Controller/AppController");
+const { signup, Login, SendOtp, profilegettoken, PhoneVerify, OTPVerify, AppOrder, getAllCategorys, getSubCategoryByCategory, getProductBySubCategory, getProductById, AddToCart, getCart, GetAllProject, GetServicesType, GetServiceTypeId, GetServicesDetails, ConceptUserPost, removeProductVariantFromCart, EditProfile, BookingAppAdd, GetVendorCatApp, GetAllVendor, GetVendorCategory, updateCart, clearCart } = require("../Controller/AppController");
 const {  GetAllBanner  } = require("../Controller/BannerController");
 const { upload } = require("../Utill/S3");
 const { verifyToken } = require("../Utill/tokenVerify");
@@ -16,7 +16,9 @@ AppRoute.get("/app/product/:id", getProductById);
 AppRoute.get("/app/banner/get", GetAllBanner);
 
 AppRoute.post("/app/cart/add", verifyToken, AddToCart); 
+AppRoute.post("/app/cart/update", verifyToken, updateCart); 
 AppRoute.get("/app/cart/get", verifyToken, getCart);
+AppRoute.get("/app/cart/clear", verifyToken, clearCart); 
 AppRoute.get("/app/cart/remove/:productId/:variant" , verifyToken , removeProductVariantFromCart)
 
 AppRoute.post("/app/order/add", verifyToken ,  AppOrder); 
