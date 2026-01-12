@@ -22,8 +22,8 @@ exports.addOrder = catchAsync(async (req, res) => {
       userId,
     });
 
-    await newOrder.save();
-
+ const record =    await newOrder.save();
+cosole.log("record" ,record)
     return successResponse(res, "Order added successfully", 201, newOrder);
   } catch (error) {
     console.error(error);
