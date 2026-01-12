@@ -242,7 +242,8 @@ exports.OTPVerify = catchAsync(async (req, res) => {
 exports.AppOrder = catchAsync(async (req, res) => {
   try {
     const { name, mobile, address, product, amount } = req.body;
-    const userId = req.user?.id || "692dcfbd4816433146e11abd";
+    const userId = req.user?.id || "692f0eeebc9b6fd6cc3a5709";
+    console.log("userId" ,userId)
     if (!name || !mobile || !address || !product || !amount) {
       return validationErrorResponse(
         res,
@@ -264,6 +265,36 @@ exports.AppOrder = catchAsync(async (req, res) => {
     return errorResponse(res, error.message || "Internal Server Error", 500);
   }
 });
+
+
+exports.OrderList = catchAsync(async (req, res) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return errorResponse(res, "Unauthorized user", 401);
+    }
+
+    const orders = await Order.find({ userId })
+      .sort({ createdAt: -1 });
+
+    return successResponse(
+      res,
+      "Order list fetched successfully.",
+      200,
+      orders
+    );
+  } catch (error) {
+    return errorResponse(
+      res,
+      error.message || "Internal Server Error",
+      500
+    );
+  }
+});
+
+
+
 
 exports.getAllCategorys = catchAsync(
   async (req, res) => {
