@@ -3,8 +3,9 @@ const { addOrder, getAllOrders, getOrdersByUser, updateStatus } = require("../Co
 const { verifyToken } = require("../Utill/tokenVerify");
 
 router.post("/order/add", verifyToken,  addOrder);
-router.get("/order/getAll", getAllOrders);  
-router.post("/order/status/update/:id", updateStatus);       
-router.get("/order/getbyUser", getOrdersByUser);       
+router.get("/order/getAll", verifyToken, getAllOrders);  
+router.post("/order/status/update/:id", verifyToken, updateStatus);
+// This api is used on the user side for showing order history to him.
+router.get("/order/getbyUser", verifyToken, getOrdersByUser);       
 
 module.exports = router;

@@ -33,7 +33,7 @@ cosole.log("record" ,record)
 
 exports.getAllOrders = catchAsync(async (req, res) => {
   try {
-    const orders = await Order.find() .populate({
+    const orders = await Order.find().populate({
         path: "product.id",
         model: "Product",
       })
@@ -82,11 +82,15 @@ exports.updateStatus = catchAsync(async (req, res) => {
 
 exports.getOrdersByUser = catchAsync(async (req, res) => {
   try {
-    const userId = req.user?.id || "692dcfbd4816433146e11abd";
+    const userId = req.user?.id;
     if (!userId) {
       return errorResponse(res, "Please provide userId", 401);
     }
-    const orders = await Order.find({ userId }).sort({ createdAt: -1 });
+    const orders = await Order.find({ userId }).populate({
+        path: "product.id",
+        model: "Product",
+      })
+      .sort({ createdAt: -1 });
     return successResponse(res, "User orders fetched successfully", 200, orders);
   } catch (error) {
     console.error(error);
