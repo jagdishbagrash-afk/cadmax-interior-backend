@@ -31,76 +31,59 @@ exports.addOrder = catchAsync(async (req, res) => {
 });
 
 exports.getAllOrders = catchAsync(async (req, res) => {
-  try {
-    const orders = await Order.find()
-      .populate({
-        path: "product.id",
-        model: "Product"
-      })
-      .sort({ createdAt: -1 });
+  const orders = await Order.find()
+    .populate("product.id")
+    .sort({ createdAt: -1 });
 
-    const formattedOrders = orders.map(order => {
-      const formattedProducts = order.product.map(p => {
-        const product = p.id;
+  const formattedOrders = orders.map(order => ({
+    _id: order._id,
+    name: order.name,
+    mobile: order.mobile,
+    address: order.address,
+    status: order.status,
+    amount: order.amount,
+    createdAt: order.createdAt,
+    updatedAt: order.updatedAt,
 
-        if (!product) return null;
-
-        return {
-          _id: product._id,
-          title: product.title,
-          description: product.description,
-          slug: product.slug,
-          amount: product.amount,
-          variants: product.variants,
-          category: product.category,
-          subcategory: product.subcategory,
-          dimensions: product.dimensions,
-          material: product.material,
-          type: product.type,
-          terms: product.terms,
-          deletedAt: product.deletedAt,
-          createdAt: product.createdAt,
-          updatedAt: product.updatedAt,
-          __v: product.__v,
-
-          // Order specific fields
-          price: p.price,
-          quantity: p.quantity,
-          total: p.total,
-          variant: p.variant
-        };
-      }).filter(Boolean);
+    product: order.product.map(p => {
+      const product = p.id;
 
       return {
-        _id: order._id,
-        name: order.name,
-        mobile: order.mobile,
-        address: order.address,
-        status: order.status,
-        userId: order.userId,
-        amount: order.amount,
-        product: formattedProducts,
-        createdAt: order.createdAt,
-        updatedAt: order.updatedAt,
-        __v: order.__v
-      };
-    });
+        // product fields
+        _id: product._id,
+        title: product.title,
+        description: product.description,
+        amount: product.amount,
+        variants: product.variants,
+        category: product.category,
+        subcategory: product.subcategory,
+        dimensions: product.dimensions,
+        material: product.material,
+        type: product.type,
+        terms: product.terms,
+        deletedAt: product.deletedAt,
+        createdAt: product.createdAt,
+        updatedAt: product.updatedAt,
+        __v: product.__v,
+        slug: product.slug,
 
-    return successResponse(
-      res,
-      "Orders fetched successfully",
-      200,
-      formattedOrders
-    );
-  } catch (error) {
-    console.error(error);
-    return errorResponse(
-      res,
-      error.message || "Internal Server Error",
-      500
-    );
-  }
+        // order fields
+        price: p.price,
+        quantity: p.quantity,
+        total: p.total,
+        variant: p.variant
+      };
+    })
+  }));
+
+  return successResponse(
+    res,
+    "Orders fetched successfully",
+    200,
+    formattedOrders
+  );
 });
+
 
 
 exports.updateStatus = catchAsync(async (req, res) => {
