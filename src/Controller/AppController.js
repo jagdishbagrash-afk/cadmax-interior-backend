@@ -338,36 +338,6 @@ exports.AppOrder = catchAsync(async (req, res) => {
   }
 });
 
-
-exports.OrderList = catchAsync(async (req, res) => {
-  try {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      return errorResponse(res, "Unauthorized user", 401);
-    }
-
-    const orders = await Order.find({ userId }).populate({
-      path: "product.id",
-      model: "Product",
-    }).sort({ createdAt: -1 });
-
-    return successResponse(
-      res,
-      "Order list fetched successfully.",
-      200,
-      orders
-    );
-  } catch (error) {
-    return errorResponse(
-      res,
-      error.message || "Internal Server Error",
-      500
-    );
-  }
-});
-
-
 exports.OrderList = catchAsync(async (req, res) => {
   const orders = await Order.find()
     .populate("product.id")
