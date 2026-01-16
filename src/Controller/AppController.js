@@ -23,6 +23,78 @@ const Order = require("../Model/Order");
 //   process.env.TWILIO_ACCOUNT_SID,
 //   process.env.TWILIO_AUTH_TOKEN
 // );
+const buildCartResponse = async (cart) => {
+  await cart.populate({
+    path: "product.productId",
+    select: "title amount images variants"
+  });
+
+  if (!cart || cart.product.length === 0) {
+    return {
+      items: [],
+      summary: {
+        subtotal: 0,
+        discountPercent: cart?.discount || 0,
+        discountAmount: 0,
+        taxPercent: cart?.tax || 0,
+        taxAmount: 0,
+        finalAmount: 0
+      }
+    };
+  }
+
+  let subtotal = 0;
+
+  const items = cart.product
+    .map(item => {
+      const product = item.productId;
+      if (!product) return null;
+
+      const selectedVariant = product.variants.find(
+        v => v.color === item.variant
+      );
+
+      const variantImages = selectedVariant?.images || [];
+      const itemTotal = item.quantity * product.amount;
+      subtotal += itemTotal;
+
+      return {
+        productId: product._id,
+        title: product.title,
+        images: variantImages,
+        variant: item.variant,
+        quantity: item.quantity,
+        unitPrice: product.amount,
+        itemTotal
+      };
+    })
+    .filter(Boolean);
+
+  // Discount
+  const discountPercent = cart.discount || 0;
+  const discountAmount = +(subtotal * (discountPercent / 100)).toFixed(2);
+  const afterDiscount = subtotal - discountAmount;
+
+  // Tax
+  const taxPercent = cart.tax || 0;
+  const taxAmount = +(subtotal * (taxPercent / 100)).toFixed(2);
+
+  // Final
+  const finalAmount = +(afterDiscount + taxAmount).toFixed(2);
+
+  return {
+    items,
+    summary: {
+      subtotal,
+      discountPercent,
+      discountAmount,
+      taxPercent,
+      taxAmount,
+      finalAmount
+    }
+  };
+};
+
 
 exports.SendOtp = catchAsync(async (req, res) => {
   try {
@@ -243,7 +315,7 @@ exports.AppOrder = catchAsync(async (req, res) => {
   try {
     const { name, mobile, address, product, amount } = req.body;
     const userId = req.user?.id || "692f0eeebc9b6fd6cc3a5709";
-    console.log("userId" ,userId)
+    console.log("userId", userId)
     if (!name || !mobile || !address || !product || !amount) {
       return validationErrorResponse(
         res,
@@ -276,9 +348,9 @@ exports.OrderList = catchAsync(async (req, res) => {
     }
 
     const orders = await Order.find({ userId }).populate({
-        path: "product.id",
-        model: "Product",
-      }).sort({ createdAt: -1 });
+      path: "product.id",
+      model: "Product",
+    }).sort({ createdAt: -1 });
 
     return successResponse(
       res,
@@ -498,6 +570,69 @@ exports.AddToCart = catchAsync(async (req, res) => {
   }
 });
 
+// exports.updateCart = catchAsync(async (req, res) => {
+//   try {
+//     const userId = req.user.id;
+//     const { product } = req.body;
+
+//     if (!product || !product.id || !product.variant || product.quantity === undefined) {
+//       return errorResponse(res, "Invalid product payload", 400);
+//     }
+
+//     const { id: productId, quantity, variant } = product;
+
+//     if (quantity < 0) {
+//       return errorResponse(res, "Quantity cannot be negative", 400);
+//     }
+
+//     const cart = await Cart.findOne({ user: userId });
+//     if (!cart || cart.product.length === 0) {
+//       return errorResponse(res, "Cart is empty", 400);
+//     }
+
+//     const dbProduct = await Product.findById(productId);
+//     if (!dbProduct) {
+//       return errorResponse(res, "Product not found", 400);
+//     }
+
+//     const normalizedVariant = variant.toLowerCase().trim();
+
+//     const matchedVariant = dbProduct.variants.find(
+//       v => v.color === normalizedVariant
+//     );
+
+//     if (!matchedVariant) {
+//       return errorResponse(res, `Variant '${variant}' not available`, 400);
+//     }
+
+//     const cartItemIndex = cart.product.findIndex(
+//       p =>
+//         p.productId.toString() === productId &&
+//         p.variant === normalizedVariant
+//     );
+
+//     if (cartItemIndex === -1) {
+//       return errorResponse(res, "Item not found in cart", 400);
+//     }
+
+//     // Remove item if quantity = 0
+//     if (quantity === 0) {
+//       cart.product.splice(cartItemIndex, 1);
+//     } else {
+//       if (quantity > matchedVariant.stock) {
+//         return errorResponse(res, `Only ${matchedVariant.stock} items left for ${variant}`,400);
+//       }
+//       cart.product[cartItemIndex].quantity = quantity;
+//     }
+//     await cart.save();
+//     return successResponse(res, "Cart updated successfully", 200, cart);
+//   } catch (error) {
+//     return errorResponse(res, error.message || "Internal Server Error", 500);
+//   }
+// });
+
+
+
 exports.updateCart = catchAsync(async (req, res) => {
   try {
     const userId = req.user.id;
@@ -543,17 +678,26 @@ exports.updateCart = catchAsync(async (req, res) => {
       return errorResponse(res, "Item not found in cart", 400);
     }
 
-    // Remove item if quantity = 0
+    // Remove item
     if (quantity === 0) {
       cart.product.splice(cartItemIndex, 1);
     } else {
       if (quantity > matchedVariant.stock) {
-        return errorResponse(res, `Only ${matchedVariant.stock} items left for ${variant}`,400);
+        return errorResponse(
+          res,
+          `Only ${matchedVariant.stock} items left for ${variant}`,
+          400
+        );
       }
       cart.product[cartItemIndex].quantity = quantity;
     }
+
     await cart.save();
-    return successResponse(res, "Cart updated successfully", 200, cart);
+
+    // 🔥 SAME RESPONSE AS GET CART
+    const response = await buildCartResponse(cart);
+
+    return successResponse(res, "Cart updated successfully", 200, response);
   } catch (error) {
     return errorResponse(res, error.message || "Internal Server Error", 500);
   }
@@ -889,51 +1033,51 @@ exports.EditProfile = catchAsync(async (req, res) => {
 });
 
 exports.BookingAppAdd = catchAsync(async (req, res) => {
-    try {
-        const {
-            project_type, servcies_model, area, budget_range, finish_level,
-            name, email, phone_number, city, phone_mode, timeLine,
-            rate, subtotal, taxes, total_amount ,scope
-        } = req.body;
+  try {
+    const {
+      project_type, servcies_model, area, budget_range, finish_level,
+      name, email, phone_number, city, phone_mode, timeLine,
+      rate, subtotal, taxes, total_amount, scope
+    } = req.body;
 
-        const booking = await BookingModel.create({
-            project_type,
-            servcies_model,
-            area,
-            budget_range,
-            finish_level,
-            name,
-            email,
-            phone_number,
-            city,
-            phone_mode,
-            timeLine,
-            rate,
-            subtotal,
-            taxes,
-            total_amount ,
-            scope
-        });
+    const booking = await BookingModel.create({
+      project_type,
+      servcies_model,
+      area,
+      budget_range,
+      finish_level,
+      name,
+      email,
+      phone_number,
+      city,
+      phone_mode,
+      timeLine,
+      rate,
+      subtotal,
+      taxes,
+      total_amount,
+      scope
+    });
 
-        return successResponse(res, "Booking Success", 201, booking)
+    return successResponse(res, "Booking Success", 201, booking)
 
-    } catch (error) {
-        return errorResponse(res, error.message || "Internal Server Error", 500);
+  } catch (error) {
+    return errorResponse(res, error.message || "Internal Server Error", 500);
 
 
-    }
+  }
 })
 
 
 exports.GetVendorCatApp = catchAsync(
-    async (req, res) => {
-        try {
-            const Categorys = await VendorCategory.find().sort({ createdAt: -1 });
-            return successResponse(res, "Vendor Categorys list successfully.", 201, Categorys);
-        } catch (error) {
-            return errorResponse(res, error.message || "Internal Server Error", 500);
-        }
+  async (req, res) => {
+    try {
+      const Categorys = await VendorCategory.find().sort({ createdAt: -1 });
+      return successResponse(res, "Vendor Categorys list successfully.", 201, Categorys);
+    } catch (error) {
+      return errorResponse(res, error.message || "Internal Server Error", 500);
     }
+  }
 );
 
 exports.GetVendorCategory = catchAsync(async (req, res) => {
