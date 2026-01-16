@@ -89,7 +89,7 @@ exports.getOrdersByUser = catchAsync(async (req, res) => {
     const orders = await Order.find({ userId }).populate({
         path: "product.id",
         model: "Product",
-      })  .sort({ createdAt: -1 });
+      }).sort({ createdAt: -1 });
     return successResponse(res, "User orders fetched successfully", 200, orders);
   } catch (error) {
     console.error(error);

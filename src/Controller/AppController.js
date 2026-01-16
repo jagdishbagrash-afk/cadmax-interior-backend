@@ -275,8 +275,10 @@ exports.OrderList = catchAsync(async (req, res) => {
       return errorResponse(res, "Unauthorized user", 401);
     }
 
-    const orders = await Order.find({ userId })
-      .sort({ createdAt: -1 });
+    const orders = await Order.find({ userId }).populate({
+        path: "product.id",
+        model: "Product",
+      }).sort({ createdAt: -1 });
 
     return successResponse(
       res,
