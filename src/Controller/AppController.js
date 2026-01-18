@@ -340,7 +340,13 @@ exports.AppOrder = catchAsync(async (req, res) => {
 
 exports.OrderList = catchAsync(async (req, res) => {
   const orders = await Order.find()
-    .populate("product.id")
+    .populate({
+      path: "product.id",
+      populate: [
+        { path: "category", model: "Category" },
+        { path: "subcategory", model: "SubCategory" }
+      ]
+    })
     .sort({ createdAt: -1 });
 
   const formattedOrders = orders.map(order => ({
@@ -363,8 +369,11 @@ exports.OrderList = catchAsync(async (req, res) => {
         description: product.description,
         amount: product.amount,
         variants: product.variants,
+
+        // 👇 FULL DATA FROM OTHER TABLES
         category: product.category,
         subcategory: product.subcategory,
+
         dimensions: product.dimensions,
         material: product.material,
         type: product.type,
@@ -372,10 +381,9 @@ exports.OrderList = catchAsync(async (req, res) => {
         deletedAt: product.deletedAt,
         createdAt: product.createdAt,
         updatedAt: product.updatedAt,
-        __v: product.__v,
         slug: product.slug,
 
-        // order fields
+        // order-product fields
         price: p.price,
         quantity: p.quantity,
         total: p.total,
@@ -391,6 +399,7 @@ exports.OrderList = catchAsync(async (req, res) => {
     formattedOrders
   );
 });
+
 
 
 
