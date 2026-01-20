@@ -401,8 +401,6 @@ exports.OrderList = catchAsync(async (req, res) => {
 });
 
 
-
-
 exports.getAllCategorys = catchAsync(
   async (req, res) => {
     try {
