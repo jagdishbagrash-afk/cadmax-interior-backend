@@ -342,10 +342,10 @@ exports.OrderList = catchAsync(async (req, res) => {
   const orders = await Order.find()
     .populate({
       path: "product.id",
-      populate: [
-        { path: "category", model: "Category" },
-        { path: "subcategory", model: "SubCategory" }
-      ]
+        populate: [
+      { path: "category" },
+      { path: "subcategory" }
+    ]
     })
     .sort({ createdAt: -1 });
 
