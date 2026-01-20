@@ -33,23 +33,12 @@ exports.addOrder = catchAsync(async (req, res) => {
 
 exports.getAllOrders = catchAsync(async (req, res) => {
   try {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      return errorResponse(res, "Unauthorized user", 401);
-    }
-
-    const orders = await Order.find({ userId }).populate({
-      path: "product.id",
-      model: "Product",
-    }).sort({ createdAt: -1 });
-
-    return successResponse(
-      res,
-      "Order list fetched successfully.",
-      200,
-      orders
-    );
+    const orders = await Order.find().populate({
+        path: "product.id",
+        model: "Product",
+      })
+      .sort({ createdAt: -1 });
+    return successResponse(res, "Orders fetched successfully", 200, orders);
   } catch (error) {
     return errorResponse(
       res,
@@ -98,14 +87,15 @@ exports.updateStatus = catchAsync(async (req, res) => {
 
 exports.getOrdersByUser = catchAsync(async (req, res) => {
   try {
-    const userId = req.user?.id || "692dcfbd4816433146e11abd";
+    const userId = req.user?.id;
     if (!userId) {
       return errorResponse(res, "Please provide userId", 401);
     }
     const orders = await Order.find({ userId }).populate({
         path: "product.id",
         model: "Product",
-      }).sort({ createdAt: -1 });
+      })
+      .sort({ createdAt: -1 });
     return successResponse(res, "User orders fetched successfully", 200, orders);
   } catch (error) {
     console.error(error);
