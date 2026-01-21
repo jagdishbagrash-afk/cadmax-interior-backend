@@ -1,7 +1,7 @@
 const jwt = require("jsonwebtoken");
 const catchAsync = require("../Utill/catchAsync");
 const bcrypt = require("bcrypt");
-const { errorResponse, successResponse } = require("../Utill/ErrorHandling");
+const { errorResponse, successResponse, validationErrorResponse } = require("../Utill/ErrorHandling");
 const User = require("../Model/User");
 
 const signToken = async (id) => {
@@ -15,8 +15,8 @@ exports.isValidEmail = (email) => { const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]
 
 exports.signup = catchAsync(async (req, res) => {
   try {
-    const { email, name, profileImage, role, phone ,gender } = req.body;
-    console.log(" req.body" , req.body)
+    const { email, name, profileImage, role, phone, gender } = req.body;
+    console.log(" req.body", req.body)
     // Check if user already exists
     const existingUser = await User.find({
       $or: [{ email }, { phone }],
@@ -45,7 +45,7 @@ exports.signup = catchAsync(async (req, res) => {
       email,
       phone,
       profileImage,
-      role,gender
+      role, gender
     });
 
     const result = await record.save();
@@ -87,7 +87,7 @@ exports.OTPVerify = catchAsync(async (req, res) => {
     }
     return successResponse(res, "OTP verified successfully", 200, 123456);
 
-   
+
   } catch (error) {
     console.error("VerifyOtp error:", error);
     return errorResponse(res, error.message || "Internal Server Error", 500);
@@ -152,7 +152,7 @@ exports.SendUserOtp = catchAsync(async (req, res) => {
     }
 
     return successResponse(res, "OTP sent successfully", 200, {
-      otp: 123456,      
+      otp: 123456,
     });
 
   } catch (error) {
@@ -262,8 +262,8 @@ exports.UserPhoneVerify = catchAsync(async (req, res) => {
         401
       );
     }
-    return successResponse(res, "OTP Send successfully", 200, 
-       123456,
+    return successResponse(res, "OTP Send successfully", 200,
+      123456,
     );
 
     // Verify OTP with Twilio
@@ -339,10 +339,73 @@ exports.DeleteUser = catchAsync(async (req, res) => {
 
     userrecord.deleted_at = new Date();
     userrecord.status = "inactive"
-  const record =   await userrecord.save();
-console.log("record"  ,record)
+    const record = await userrecord.save();
+    console.log("record", record)
     return successResponse(res, "User deleted successfully", 200);
 
+  } catch (error) {
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});
+
+
+exports.EditProfileData = catchAsync(async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { name, email, phone, gender, address } = req.body;
+    const existingUser = await User.findById(userId);
+
+    if (!existingUser) {
+      return res.status(404).json({
+        status: false,
+        message: "User not found"
+      });
+    }
+    if (!existingUser) {
+      return validationErrorResponse(res, "User not found.", 404);
+    }
+
+    if (email) existingUser.email = email;
+    if (gender) existingUser.gender = gender;
+    if (address) existingUser.address = address;
+    if (
+      phone
+    ) existingUser.
+      phone
+      =
+      phone
+        ;
+    if (
+      name
+    ) existingUser.
+      name
+      =
+      name
+        ;
+
+    if (req.file && req.file.location) {
+
+      if (existingUser.
+        profileImage
+      ) {
+        try {
+          await deleteFile(existingUser.
+            profileImage
+          );
+        } catch (err) {
+          console.log("Error deleting old image:", err.message);
+        }
+      }
+      existingUser.
+        profileImage
+        = req.file.location;
+    }
+
+    const updatedUser = await existingUser.save();
+    if (!updatedUser) {
+      return errorResponse(res, "User not found", 404);
+    }
+    return successResponse(res, "Profile updated successfully.", 200, updatedUser);
   } catch (error) {
     return errorResponse(res, error.message || "Internal Server Error", 500);
   }
