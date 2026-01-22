@@ -7,6 +7,7 @@ const OrderProductSchema = new mongoose.Schema(
       ref: "Product",
       required: true,
     },
+
     price: {
       type: Number,
       required: true,
@@ -38,6 +39,13 @@ const OrderSchema = new mongoose.Schema(
       type: String,
       required: [true, "Mobile number is required"],
     },
+      orderId: {
+  type: String,
+  unique: true,
+  index: true,
+  required: true
+}
+,
     address: {
       type: String,
       required: [true, "Address is required"],

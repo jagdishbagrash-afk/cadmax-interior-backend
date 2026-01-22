@@ -3,6 +3,8 @@ const catchAsync = require("../Utill/catchAsync");
 const User = require("../Model/User");
 const SubCategory = require("../Model/SubCategory");
 const Category = require("../Model/Categroy")
+const { v4: uuidv4 } = require("uuid");
+
 // const nodemailer = require("nodemailer");
 const { validationErrorResponse, errorResponse, successResponse } = require("../Utill/ErrorHandling");
 const Product = require("../Model/Product");
@@ -322,6 +324,8 @@ exports.AppOrder = catchAsync(async (req, res) => {
         "All fields (name, mobile, address, product, amount) are required"
       );
     }
+       const orderId = `ORD-${uuidv4().slice(0, 8).toUpperCase()}`;
+    
     const newOrder = await Order({
       name,
       mobile,
@@ -329,6 +333,7 @@ exports.AppOrder = catchAsync(async (req, res) => {
       product,
       amount,
       userId,
+      orderId
     });
     await newOrder.save();
     return successResponse(res, "Order added successfully", 201, newOrder);

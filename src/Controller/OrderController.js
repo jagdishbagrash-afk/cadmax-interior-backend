@@ -1,11 +1,16 @@
 const Order = require("../Model/Order");
 const catchAsync = require("../Utill/catchAsync");
+const { v4: uuidv4 } = require("uuid");
+
 const {successResponse, errorResponse, validationErrorResponse} = require("../Utill/ErrorHandling");
 
 exports.addOrder = catchAsync(async (req, res) => {
   try {
     const { name, mobile, address, product, amount } = req.body;
     const userId = req.user?.id || "692dcfbd4816433146e11abd";
+
+        const orderId = `ORD-${uuidv4().slice(0, 8).toUpperCase()}`;
+
     if (!name || !mobile || !address || !product || !amount) {
       return validationErrorResponse(
         res,
@@ -20,6 +25,7 @@ exports.addOrder = catchAsync(async (req, res) => {
       product,
       amount,
       userId,
+      orderId
     });
 
  const record =    await newOrder.save();
