@@ -41,6 +41,8 @@ exports.bestSellerProducts = catchAsync(async (req, res) => {
     },
   ]);
 
+  
+
   res.status(200).json({
     success: true,
     message: "Best seller products fetched successfully",

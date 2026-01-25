@@ -38,6 +38,7 @@ exports.GetAllBanner = CatchAsync(
         }
     }
 );
+
 exports.UpdateBanner = CatchAsync(
     async (req, res) => {
         try {
@@ -71,27 +72,27 @@ exports.UpdateBanner = CatchAsync(
             return errorResponse(res, error.message || "Internal Server Error", 500);
         }
     }
-);  
+);
 
-exports.BannerDelete  = CatchAsync(async (req, res) => {
-  try {
-    const id = req.params.id;
-    const userrecord = await Banner.findById(id);
-    if (!userrecord) {
-      return validationErrorResponse(res, "Banner not found", 404);
+exports.BannerDelete = CatchAsync(async (req, res) => {
+    try {
+        const id = req.params.id;
+        const userrecord = await Banner.findById(id);
+        if (!userrecord) {
+            return validationErrorResponse(res, "Banner not found", 404);
+        }
+
+        if (userrecord.deleted_at) {
+            userrecord.deleted_at = null;
+            await userrecord.save();
+            return successResponse(res, "Banner restored successfully", 200);
+        }
+
+        userrecord.deleted_at = new Date();
+        const record = await userrecord.save();
+        return successResponse(res, "Banner deleted successfully", 200);
+
+    } catch (error) {
+        return errorResponse(res, error.message || "Internal Server Error", 500);
     }
-
-    if (userrecord.deleted_at) {
-      userrecord.deleted_at = null;
-      await userrecord.save();
-      return successResponse(res, "Banner restored successfully", 200);
-    }
-
-    userrecord.deleted_at = new Date();
-  const record =   await userrecord.save();
-    return successResponse(res, "Banner deleted successfully", 200);
-
-  } catch (error) {
-    return errorResponse(res, error.message || "Internal Server Error", 500);
-  }
 });
