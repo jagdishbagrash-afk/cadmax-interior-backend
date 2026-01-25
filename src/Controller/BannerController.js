@@ -38,7 +38,6 @@ exports.GetAllBanner = CatchAsync(
         }
     }
 );
-
 exports.UpdateBanner = CatchAsync(
     async (req, res) => {
         try {
