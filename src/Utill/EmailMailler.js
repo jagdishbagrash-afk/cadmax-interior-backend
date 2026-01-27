@@ -1,6 +1,5 @@
 const nodemailer = require('nodemailer');
 const logger = require('./Logger');
-
 const sendEmail = async (data) => {
     const { email, subject, emailHtml } = data;
 
