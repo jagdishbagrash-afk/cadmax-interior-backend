@@ -4,7 +4,6 @@ const User = require("../Model/User");
 const SubCategory = require("../Model/SubCategory");
 const Category = require("../Model/Categroy")
 const { v4: uuidv4 } = require("uuid");
-
 // const nodemailer = require("nodemailer");
 const { validationErrorResponse, errorResponse, successResponse } = require("../Utill/ErrorHandling");
 const Product = require("../Model/Product");
@@ -18,7 +17,7 @@ const BookingModel = require("../Model/Booking");
 const VendorCategory = require("../Model/VendorCategory");
 const Vendor = require("../Model/Vendor");
 const Order = require("../Model/Order");
-// const logger = require("../utils/Logger");
+const logger = require("../utils/Logger");
 // const twilio = require("twilio");
 
 // const client = twilio(
@@ -336,7 +335,11 @@ exports.AppOrder = catchAsync(async (req, res) => {
       orderId
     });
     await newOrder.save();
-    return successResponse(res, "Order added successfully", 201, newOrder);
+    const cart = await Cart.findOneAndDelete({ user: userId });
+    if (!cart) {
+      logger.error("Unable to clear cart after order placement for user:", userId);
+    }
+    return successResponse(res, "Order placed successfully", 201, newOrder);
   } catch (error) {
     console.error(error);
     return errorResponse(res, error.message || "Internal Server Error", 500);
