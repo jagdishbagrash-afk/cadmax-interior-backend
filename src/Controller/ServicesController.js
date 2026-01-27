@@ -4,7 +4,9 @@ const ServicesUser = require("../Model/ServicesUser");
 const VendorSubCategory = require("../Model/ServicesSubCategory");
 const CatchAsync = require("../Utill/catchAsync");
 const { errorResponse, successResponse, validationErrorResponse } = require("../Utill/ErrorHandling");
-
+const sendEmail = require("../Utill/EmailMailler");
+const userEmailTemplate = require("../EmailTemplate/servicesUserEmail");
+const adminEmailTemplate = require("../EmailTemplate/servicesAdminEmail");
 
 const { S3Client, DeleteObjectCommand } = require("@aws-sdk/client-s3");
 const ServicesSubCategory = require("../Model/ServicesSubCategory");
@@ -431,6 +433,36 @@ exports.ServicesUserPost = CatchAsync(async (req, res) => {
       concept,
     });
 
+      // Populate for email
+  const populated = await record.populate([
+    { path: "User", select: "name email" },
+    { path: "ServicesType", select: "title" },
+    { path: "Services", select: "title" },
+  ]);
+
+  console.log("populated" ,populated)
+
+  const emailData = {
+    userName: populated.User.name,
+    userEmail: populated.User.email,
+    serviceType: populated.ServicesType.title,
+    serviceName: populated.Services.title,
+    concept: populated.concept,
+  };
+
+  // User Email
+  await sendEmail({
+    email: emailData.userEmail,
+    subject: "Service Request Received - Cadmax",
+    emailHtml: userEmailTemplate(emailData),
+  });
+
+  // Admin Email
+  await sendEmail({
+    email: "ankitkumarjain0748@gmail.com",
+    subject: "New Service Request - Cadmax",
+    emailHtml: adminEmailTemplate(emailData),
+  });
     const result = await record.save();
 
     if (!result) {
