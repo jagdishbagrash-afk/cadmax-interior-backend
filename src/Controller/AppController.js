@@ -17,6 +17,9 @@ const BookingModel = require("../Model/Booking");
 const VendorCategory = require("../Model/VendorCategory");
 const Vendor = require("../Model/Vendor");
 const Order = require("../Model/Order");
+const sendEmail = require("../Utill/EmailMailler");
+const userEmailTemplate = require("../EmailTemplate/bookingUserEmail");
+const adminEmailTemplate = require("../EmailTemplate/bookingAdminEmail");
 // const twilio = require("twilio");
 
 // const client = twilio(
@@ -322,8 +325,8 @@ exports.AppOrder = catchAsync(async (req, res) => {
         "All fields (name, mobile, address, product, amount) are required"
       );
     }
-       const orderId = `ORD-${uuidv4().slice(0, 8).toUpperCase()}`;
-    
+    const orderId = `ORD-${uuidv4().slice(0, 8).toUpperCase()}`;
+
     const newOrder = await Order({
       name,
       mobile,
@@ -349,10 +352,10 @@ exports.OrderList = catchAsync(async (req, res) => {
   const orders = await Order.find()
     .populate({
       path: "product.id",
-        populate: [
-      { path: "category" },
-      { path: "subcategory" }
-    ]
+      populate: [
+        { path: "category" },
+        { path: "subcategory" }
+      ]
     })
     .sort({ createdAt: -1 });
 
@@ -1096,6 +1099,21 @@ exports.BookingAppAdd = catchAsync(async (req, res) => {
       scope
     });
 
+    // User Email
+    await sendEmail({
+      email: booking.email, // ✅ REAL EMAIL
+      subject: "Booking Confirmed - Cadmax",
+      emailHtml: userEmailTemplate(emailData),
+    });
+
+
+    // Admin Email
+    await sendEmail({
+      email: "ankitkumarjain0748@gmail.com",
+      subject: "New Booking Received - Cadmax",
+      emailHtml: adminEmailTemplate(emailData),
+    });
+    console.log("BOOKING EMAIL =>", booking.email);
     return successResponse(res, "Booking Success", 201, booking)
 
   } catch (error) {
