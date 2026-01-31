@@ -3,6 +3,8 @@ const catchAsync = require("../Utill/catchAsync");
 const bcrypt = require("bcrypt");
 const { errorResponse, successResponse, validationErrorResponse } = require("../Utill/ErrorHandling");
 const User = require("../Model/User");
+const sendEmail = require("../Utill/EmailMailler");
+const Welcome = require("../EmailTemplate/Welcome");
 
 const signToken = async (id) => {
   const token = jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -16,7 +18,7 @@ exports.isValidEmail = (email) => { const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]
 exports.signup = catchAsync(async (req, res) => {
   try {
     const { email, name, profileImage, role, phone, gender } = req.body;
-    console.log(" req.body", req.body)
+    // console.log(" req.body", req.body)
     // Check if user already exists
     const existingUser = await User.find({
       $or: [{ email }, { phone }],
@@ -49,7 +51,16 @@ exports.signup = catchAsync(async (req, res) => {
     });
 
     const result = await record.save();
-    console.log("result", result)
+
+    const subject = `Welcome to Cadmax!🎉`;
+    const emailHtml = Welcome(result?.name);
+    await sendEmail({
+      email: result?.email,
+      subject: subject,
+      emailHtml: emailHtml,
+    });
+
+    // console.log("result", result)
     const token = jwt.sign(
       { id: result._id, role: result.role, email: result.email },
       process.env.JWT_SECRET,

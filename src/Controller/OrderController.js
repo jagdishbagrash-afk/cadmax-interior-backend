@@ -1,8 +1,9 @@
 const Order = require("../Model/Order");
 const catchAsync = require("../Utill/catchAsync");
 const { v4: uuidv4 } = require("uuid");
-
 const {successResponse, errorResponse, validationErrorResponse} = require("../Utill/ErrorHandling");
+const sendEmail = require("../Utill/EmailMailler");
+const OrderEmail = require("../EmailTemplate/Order");
 
 exports.addOrder = catchAsync(async (req, res) => {
   try {
@@ -28,7 +29,15 @@ exports.addOrder = catchAsync(async (req, res) => {
       orderId
     });
 
- const record =    await newOrder.save();
+    const record = await newOrder.save();
+    const subject = `Welcome to Cadmax!🎉`;
+    const emailHtml = OrderEmail(record?.name, record);
+    await sendEmail({
+      email: req?.user?.email,
+      subject: subject,
+      emailHtml: emailHtml,
+    });
+
     return successResponse(res, "Order added successfully", 201, newOrder);
   } catch (error) {
     console.error(error);
