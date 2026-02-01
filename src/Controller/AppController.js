@@ -20,6 +20,9 @@ const Order = require("../Model/Order");
 const sendEmail = require("../Utill/EmailMailler");
 const userEmailTemplate = require("../EmailTemplate/bookingUserEmail");
 const adminEmailTemplate = require("../EmailTemplate/bookingAdminEmail");
+const Welcome = require("../EmailTemplate/Welcome");
+const OrderEmail = require("../EmailTemplate/Order");
+
 // const twilio = require("twilio");
 
 // const client = twilio(
@@ -219,6 +222,14 @@ exports.signup = catchAsync(async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || "365d" }
     );
+
+      const subject = `Welcome to Cadmax!🎉`;
+        const emailHtml = Welcome(result?.name);
+        await sendEmail({
+          email: result?.email,
+          subject: subject,
+          emailHtml: emailHtml,
+        });
     return successResponse(
       res,
       "You have been registered successfully !!",
@@ -336,11 +347,19 @@ exports.AppOrder = catchAsync(async (req, res) => {
       userId,
       orderId
     });
-    await newOrder.save();
+ const record =    await newOrder.save();
     const cart = await Cart.findOneAndDelete({ user: userId });
     if (!cart) {
       logger.error("Unable to clear cart after order placement for user:", userId);
     }
+
+     const subject = `Welcome to Cadmax!🎉`;
+        const emailHtml = OrderEmail(req?.body?.name, record);
+        await sendEmail({
+          email: req?.body.email,
+          subject: subject,
+          emailHtml: emailHtml,
+        });
     return successResponse(res, "Order placed successfully", 201, newOrder);
   } catch (error) {
     console.error(error);
