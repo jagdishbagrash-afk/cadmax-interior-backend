@@ -963,16 +963,30 @@ exports.GetServiceTypeId = catchAsync(async (req, res) => {
       }
     ]);
 
+    // 👇 FIXED CONCEPT KEYS
+    const defaultConcepts = {
+      contemporary: [],
+      modern: [],
+      classic: []
+    };
+
+    const finalData = {
+      ...defaultConcepts,
+      ...(services[0] || {})
+    };
+
     return successResponse(
       res,
       "Services grouped by concept.",
       200,
-      services[0] || {}
+      finalData
     );
+
   } catch (error) {
     return errorResponse(res, error.message || "Internal Server Error", 500);
   }
 });
+
 
 exports.GetServicesDetails = catchAsync(async (req, res) => {
   try {
