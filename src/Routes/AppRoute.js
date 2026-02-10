@@ -1,4 +1,4 @@
-const { signup, Login, SendOtp, profilegettoken, PhoneVerify, OTPVerify, AppOrder, getAllCategorys, getSubCategoryByCategory, getProductBySubCategory, getProductById, AddToCart, getCart, GetAllProject, GetServicesType, GetServiceTypeId, GetServicesDetails, ConceptUserPost, removeProductVariantFromCart, EditProfile, BookingAppAdd, GetVendorCatApp, GetAllVendor, GetVendorCategory, updateCart, clearCart, OrderList } = require("../Controller/AppController");
+const { signup, Login, SendOtp, profilegettoken, PhoneVerify, OTPVerify, AppOrder, getAllCategorys, getSubCategoryByCategory, getProductBySubCategory, getProductById, AddToCart, getCart, GetAllProject, GetServicesType, GetServiceTypeId, GetServicesDetails, ConceptUserPost, removeProductVariantFromCart, EditProfile, BookingAppAdd, GetVendorCatApp, GetAllVendor, GetVendorCategory, updateCart, clearCart, OrderList, bestSellerProducts, latestProducts, GetAllServicesSubCategorys } = require("../Controller/AppController");
 const {  GetAllBanner  } = require("../Controller/BannerController");
 const { upload } = require("../Utill/S3");
 const { verifyToken } = require("../Utill/tokenVerify");
@@ -35,7 +35,7 @@ AppRoute.get("/app/concept/:id", GetServiceTypeId);
 
 AppRoute.get("/app/concept/details/:id", GetServicesDetails);
 
-AppRoute.post("/app/concept/user", ConceptUserPost);
+AppRoute.post("/app/concept/user", verifyToken, ConceptUserPost);
 
 AppRoute.post("/app/booking/add", BookingAppAdd);
 
@@ -48,5 +48,11 @@ AppRoute.get("/app/vendor/:slug",   GetVendorCategory);
 
 AppRoute.post("/app/user/edit-profile" , verifyToken , upload.single("profileImage"),  EditProfile)
 
+
+AppRoute.get("/app/bestseller", bestSellerProducts);
+
+AppRoute.get("/app/latest-product", latestProducts);
+
+AppRoute.get("/app/desgin-concept", GetAllServicesSubCategorys);    
 
 module.exports = AppRoute;

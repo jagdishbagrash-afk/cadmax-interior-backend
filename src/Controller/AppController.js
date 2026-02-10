@@ -22,6 +22,7 @@ const userEmailTemplate = require("../EmailTemplate/bookingUserEmail");
 const adminEmailTemplate = require("../EmailTemplate/bookingAdminEmail");
 const Welcome = require("../EmailTemplate/Welcome");
 const OrderEmail = require("../EmailTemplate/Order");
+const ServicesSubCategory = require("../Model/ServicesSubCategory");
 
 // const twilio = require("twilio");
 
@@ -1016,7 +1017,7 @@ exports.GetServicesDetails = catchAsync(async (req, res) => {
 exports.ConceptUserPost = catchAsync(async (req, res) => {
   try {
     console.log("req.body", req.body);
-    // const userId = req?.user?.id;
+    const userId = req?.user?.id;
     const { User, ServicesType, Services, concept } = req.body;
 
     if (!User || !ServicesType || !Services) {
@@ -1024,7 +1025,7 @@ exports.ConceptUserPost = catchAsync(async (req, res) => {
     }
 
     const record = new ServicesUser({
-      User,
+      User :  userId,
       ServicesType: ServicesType,
       Services,
       concept,
@@ -1191,3 +1192,84 @@ exports.GetVendorCategory = catchAsync(async (req, res) => {
     return errorResponse(res, error.message || "Internal Server Error", 500);
   }
 });
+
+
+exports.bestSellerProducts = catchAsync(async (req, res) => {
+  const limit = parseInt(req.query.limit) || 10;
+
+  const bestSellers = await Order.aggregate([
+    { $unwind: "$product" },
+    {
+      $group: {
+        _id: "$product.id",
+        totalQuantity: { $sum: "$product.quantity" },
+        totalOrders: { $sum: 1 },
+      },
+    },
+
+    {
+      $match: {
+        totalOrders: { $gt: 1 },
+      },
+    },
+
+    { $sort: { totalQuantity: -1 } },
+    { $limit: limit },
+    {
+      $lookup: {
+        from: "products",
+        localField: "_id",
+        foreignField: "_id",
+        as: "product",
+      },
+    },
+    { $unwind: "$product" },
+    {
+      $project: {
+        product: "$product",  
+      },
+    },
+  ]);
+
+  
+
+  res.status(200).json({
+    success: true,
+    message: "Best seller products fetched successfully",
+    data: bestSellers,
+  });
+});
+
+
+
+
+
+exports.latestProducts = catchAsync(async (req, res) => {
+  const limit = parseInt(req.query.limit) || 10;
+
+  const products = await Product.find({
+    deletedAt: null,
+  })
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .populate("category")
+    .populate("subcategory");
+
+  res.status(200).json({
+    success: true,
+    message: "Latest products fetched successfully",
+    data: products,
+  });
+});
+
+
+exports.GetAllServicesSubCategorys = catchAsync(
+    async (req, res) => {
+        try {
+            const SubCategorys = await ServicesSubCategory.find().sort({ createdAt: -1 });
+            return successResponse(res, "SubCategorys list successfully.", 201, SubCategorys);
+        } catch (error) {
+            return errorResponse(res, error.message || "Internal Server Error", 500);
+        }
+    }
+);
