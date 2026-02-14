@@ -331,29 +331,42 @@ exports.getProductByCategory = CatchAsync(async (req, res) => {
 exports.getProductBySubCategory = CatchAsync(async (req, res) => {
   try {
     const { id } = req.params;
-
+console.log("req.query" ,req.query)
+    /* -------------------- PAGINATION -------------------- */
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 10;
     const skip = (page - 1) * limit;
 
     const { color, lowPrice, highPrice } = req.query;
 
-    // base filter
+    console.log("color" , req.query.color)
+    console.log("color" , req.query.lowPrice)
+    console.log("color" , req.query.highPrice)
+
+
+    /* -------------------- BASE FILTER -------------------- */
     const filter = {
       subcategory: id,
       deletedAt: null,
     };
 
-    /* -------------------- COLOR FILTER -------------------- */
-    if (color) {
+    /* ==================== COLOR FILTER ==================== */
+    // variants example:
+    // variants: [{ color: "Black" }, { color: "Red" }]
+
+    if (color && color !== "") {
       const colorsArray = color
         .split(",")
-        .map(c => c.trim().toLowerCase());
+        .map((c) => new RegExp(`^${c.trim()}$`, "i")); // case insensitive
 
-      filter["variants.color"] = { $in: colorsArray };
+      filter.variants = {
+        $elemMatch: {
+          color: { $in: colorsArray },
+        },
+      };
     }
 
-    /* -------------------- PRICE FILTER -------------------- */
+    /* ==================== PRICE FILTER ==================== */
     if (lowPrice || highPrice) {
       filter.amount = {};
 
@@ -366,19 +379,25 @@ exports.getProductBySubCategory = CatchAsync(async (req, res) => {
       }
     }
 
-    /* -------------------- QUERY -------------------- */
+    /* -------------------- DEBUG (OPTIONAL) -------------------- */
+    // console.log("Applied Filter:", filter);
+
+    /* ==================== QUERY ==================== */
     const products = await Product.find(filter)
       .populate("subcategory")
       .populate("category")
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .lean();
 
+    /* -------------------- COUNT -------------------- */
     const totalRecords = await Product.countDocuments(filter);
     const totalPages = Math.ceil(totalRecords / limit);
 
-    return successResponse(res, "Products fetched by category", 200, {
-      data: products,
+    /* -------------------- RESPONSE -------------------- */
+    return successResponse(res, "Products fetched successfully", 200, {
+      data: products || [],
       pagination: {
         page,
         limit,
@@ -386,10 +405,17 @@ exports.getProductBySubCategory = CatchAsync(async (req, res) => {
         totalPages,
       },
     });
+
   } catch (error) {
-    return errorResponse(res, error.message || "Internal Server Error", 500);
+    console.error(error);
+    return errorResponse(
+      res,
+      error.message || "Internal Server Error",
+      500
+    );
   }
 });
+
 
 exports.getProductByName = CatchAsync(async (req, res) => {
   try {
