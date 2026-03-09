@@ -231,9 +231,21 @@ exports.updateProduct = CatchAsync(async (req, res) => {
       v => v.color === incoming.color
     );
 
-    const existingImages = existing?.images || [];
-    const keptImages = incoming.images || [];
-    const newImages = uploadedImagesByColor[incoming.color] || [];
+  const existingImages = existing?.images || [];
+
+const keptImages = (incoming.images || []).filter(Boolean);
+
+const newImages = uploadedImagesByColor[incoming.color] || [];
+
+const finalImages = [...keptImages, ...newImages].filter(Boolean);
+
+if (!finalImages.length) {
+  return validationErrorResponse(
+    res,
+    `Images required for color ${incoming.color}`,
+    400
+  );
+}
 
     // delete removed images
     await Promise.all(
@@ -331,7 +343,6 @@ exports.getProductByCategory = CatchAsync(async (req, res) => {
 exports.getProductBySubCategory = CatchAsync(async (req, res) => {
   try {
     const { id } = req.params;
-console.log("req.query" ,req.query)
     /* -------------------- PAGINATION -------------------- */
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 10;
@@ -427,6 +438,52 @@ exports.getProductByName = CatchAsync(async (req, res) => {
     }
 
     return successResponse(res, "Product fetched successfully", 200, product);
+  } catch (error) {
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});
+
+
+
+exports.productcolor = CatchAsync(async (req, res) => {
+  try {
+
+    const products = await Product.find().select("variants amount");
+
+    if (!products || products.length === 0) {
+      return errorResponse(res, "Product not found", 404);
+    }
+
+    const uniqueColors = new Set();
+    const prices = [];
+
+    products.forEach((product) => {
+
+      // price collect
+      if (product.amount || product.amount === 0) {
+        prices.push(product.amount);
+      }
+
+      // color collect
+      product.variants.forEach((variant) => {
+        if (variant.stock > 1 && variant.color) {
+          uniqueColors.add(variant.color);
+        }
+      });
+
+    });
+
+    const colors = [...uniqueColors];
+
+    const highestPrice = prices.length ? Math.max(...prices) : 0;
+    const lowestPrice = prices.length ? Math.min(...prices) : 0;
+
+    return successResponse(res, "Data fetched successfully", 200, {
+      colors,
+      highestPrice,
+      lowestPrice
+    });
+
   } catch (error) {
     return errorResponse(res, error.message || "Internal Server Error", 500);
   }
