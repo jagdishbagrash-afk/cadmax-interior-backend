@@ -36,6 +36,8 @@ app.use("/api", require("./Routes/OrderRoute"));
 app.use("/api", require("./Routes/VendorRoute"));
 app.use("/api", require("./Routes/BannerRoute"));
 app.use("/api", require("./Routes/CommonRoute"));
+app.use("/api", require("./Routes/MutipleAddressRoute"));
+
 
 
 const server = app.listen(PORT, () => console.log("Server is running at port : " + PORT));

@@ -24,6 +24,9 @@ const addressSchema = new mongoose.Schema({
   addressLine2: {
     type: String,
   },
+    addressType: {
+    type: String,
+  },
   isDefault: {
     type: Boolean,
     default: false
