@@ -16,6 +16,7 @@ const makeSlug = (text) => {
 };
 
 const generateUniqueSlug = async (Model, title) => {
+    console.log(title)
     let baseSlug = makeSlug(title);
     let slug = baseSlug;
     let counter = 1;
@@ -42,10 +43,10 @@ exports.AddVendorCategory = CatchAsync(async (req, res) => {
         if (req.file) {
             imageUrl = req.file.location;   // ✅ S3 image URL
         }
-        const slug = await generateUniqueSlug(VendorCategory, req.body.title?.[0]);
+        const slug = await generateUniqueSlug(VendorCategory, name);
 
         const Categorys = new VendorCategory({
-            name, slug,
+            name, slug: slug,
             Image: imageUrl
         });
 
@@ -69,48 +70,75 @@ exports.getAllVendorCategorys = CatchAsync(
     }
 );
 
-exports.updateCategory = CatchAsync(
-    async (req, res) => {
-        try {
-            const { name } = req.body;
+exports.updateCategory = CatchAsync(async (req, res) => {
 
-            const data = await VendorCategory.findById(req.params.id);
+    try {
 
-            if (!data) {
-                return validationErrorResponse(res, "Vendor Category not found.", 404);
-            }
+        const { name } = req.body;
 
-            // ✅ Update name if provided
-            if (name) data.name = name;
+        const data = await VendorCategory.findById(req.params.id);
 
-            // ✅ If new image uploaded → delete old image first
-            if (req.file && req.file.location) {
+        if (!data) {
+            return validationErrorResponse(res, "Vendor Category not found.", 404);
+        }
 
-                if (data.Image) {
-                    try {
-                        await deleteFile(data.Image);   // ✅ S3 old image delete
-                    } catch (err) {
-                        console.log("Error deleting old image:", err.message);
-                    }
+        /* -------- Update Name + Slug -------- */
+
+        if (name && name !== data.name) {
+
+            data.name = name;
+
+            const slug = await generateUniqueSlug(VendorCategory, name);
+
+            data.slug = slug;
+
+        }
+
+        /* -------- Image Update -------- */
+
+        if (req.file && req.file.location) {
+
+            if (data.Image) {
+
+                try {
+
+                    await deleteFile(data.Image);   // delete old S3 image
+
+                } catch (err) {
+
+                    console.log("Error deleting old image:", err.message);
+
                 }
 
-                // ✅ Store new S3 image URL
-                data.Image = req.file.location;
             }
 
-            const updatedCategory = await data.save();
-            return successResponse(res, "Category updated successfully.", 200, updatedCategory);
+            data.Image = req.file.location;
 
-        } catch (error) {
-            console.log(error);
-            return errorResponse(res, error.message || "Internal Server Error", 500);
         }
+
+        const updatedCategory = await data.save();
+
+        return successResponse(
+            res,
+            "Category updated successfully.",
+            200,
+            updatedCategory
+        );
+
+    } catch (error) {
+
+        console.log(error);
+
+        return errorResponse(res, error.message || "Internal Server Error", 500);
+
     }
-);
+
+});
 
 exports.AddVendor = CatchAsync(async (req, res) => {
     try {
-        const { name, experience, sepectailze, VendorCategory, phone  , VendorSubCategory } = req.body;
+        console.log("req.body" ,req.body)
+        const { name, experience, sepectailze, VendorCategory, phone, VendorSubCategory } = req.body;
         if (!name) {
             return validationErrorResponse(res, "Category name is required", 400);
         }
@@ -122,7 +150,7 @@ exports.AddVendor = CatchAsync(async (req, res) => {
 
         const Categorys = new Vendor({
             Image: imageUrl,
-            name, experience, sepectailze, VendorCategory, phone , VendorSubCategory
+            name, experience, sepectailze, VendorCategory, phone, VendorSubCategory
         });
 
         const record = await Categorys.save();
@@ -148,7 +176,7 @@ exports.getAllVendors = CatchAsync(
 exports.updatevendor = CatchAsync(
     async (req, res) => {
         try {
-            const { name, phone, VendorCategory, sepectailze, experience , VendorSubCategory } = req.body;
+            const { name, phone, VendorCategory, sepectailze, experience, VendorSubCategory } = req.body;
 
             const data = await Vendor.findById(req.params.id);
 
@@ -159,7 +187,7 @@ exports.updatevendor = CatchAsync(
             if (name) data.name = name;
             if (phone) data.phone = phone;
             if (VendorCategory) data.VendorCategory = VendorCategory;
-            if(VendorSubCategory) data.VendorSubCategory  =VendorSubCategory ;
+            if (VendorSubCategory) data.VendorSubCategory = VendorSubCategory;
             if (sepectailze) data.sepectailze = sepectailze;
             if (experience) data.experience = experience;
 
@@ -225,35 +253,36 @@ exports.getVendors = CatchAsync(
 );
 
 exports.getVendorCategoryIds = CatchAsync(async (req, res) => {
-  try {
-    const slug = req.params.slug;
+    try {
+        const slug = req.params.slug;
+        console.log('slug', slug)
 
-    if (!slug) {
-      return errorResponse(res, "Category slug is required", 400);
+        if (!slug) {
+            return errorResponse(res, "Category slug is required", 400);
+        }
+
+        const category = await VendorCategory.findOne({  slug });
+
+        console.log("category", category)
+        if (!category) {
+            return errorResponse(res, "Vendor Category not found", 404);
+        }
+
+        // Get Vendors of this Category
+        const vendors = await Vendor.find({
+            deletedAt: null,
+            VendorCategory: category._id,
+        }).sort({ createdAt: -1 });
+
+        return successResponse(
+            res,
+            "Vendor Category details fetched successfully.",
+            200,
+            { category, vendors }
+        );
+
+    } catch (error) {
+        return errorResponse(res, error.message || "Internal Server Error", 500);
     }
-
-    const category = await VendorCategory.findOne({ slug });
-
-
-    if (!category) {
-      return errorResponse(res, "Vendor Category not found", 404);
-    }
-
-    // Get Vendors of this Category
-    const vendors = await Vendor.find({
-      deletedAt: null,
-      VendorCategory: category._id,
-    }).sort({ createdAt: -1 });
-
-    return successResponse(
-      res,
-      "Vendor Category details fetched successfully.",
-      200,
-      { category, vendors }
-    );
-
-  } catch (error) {
-    return errorResponse(res, error.message || "Internal Server Error", 500);
-  }
 });
 

@@ -5,9 +5,8 @@ const vendorSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-
     experience: {
-        type: Number,
+        type: String,
         required: true
     },
     sepectailze: {
