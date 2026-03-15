@@ -224,13 +224,13 @@ exports.signup = catchAsync(async (req, res) => {
       { expiresIn: process.env.JWT_EXPIRES_IN || "365d" }
     );
 
-      const subject = `Welcome to Cadmax!🎉`;
-        const emailHtml = Welcome(result?.name);
-        await sendEmail({
-          email: result?.email,
-          subject: subject,
-          emailHtml: emailHtml,
-        });
+    const subject = `Welcome to Cadmax!🎉`;
+    const emailHtml = Welcome(result?.name);
+    await sendEmail({
+      email: result?.email,
+      subject: subject,
+      emailHtml: emailHtml,
+    });
     return successResponse(
       res,
       "You have been registered successfully !!",
@@ -348,19 +348,19 @@ exports.AppOrder = catchAsync(async (req, res) => {
       userId,
       orderId
     });
- const record =    await newOrder.save();
+    const record = await newOrder.save();
     const cart = await Cart.findOneAndDelete({ user: userId });
     if (!cart) {
       logger.error("Unable to clear cart after order placement for user:", userId);
     }
 
-     const subject = `Welcome to Cadmax!🎉`;
-        const emailHtml = OrderEmail(req?.body?.name, record);
-        await sendEmail({
-          email: req?.body.email,
-          subject: subject,
-          emailHtml: emailHtml,
-        });
+    const subject = `Welcome to Cadmax!🎉`;
+    const emailHtml = OrderEmail(req?.body?.name, record);
+    await sendEmail({
+      email: req?.body.email,
+      subject: subject,
+      emailHtml: emailHtml,
+    });
     return successResponse(res, "Order placed successfully", 201, newOrder);
   } catch (error) {
     console.error(error);
@@ -1025,7 +1025,7 @@ exports.ConceptUserPost = catchAsync(async (req, res) => {
     }
 
     const record = new ServicesUser({
-      User :  userId,
+      User: userId,
       ServicesType: ServicesType,
       Services,
       concept,
@@ -1226,12 +1226,12 @@ exports.bestSellerProducts = catchAsync(async (req, res) => {
     { $unwind: "$product" },
     {
       $project: {
-        product: "$product",  
+        product: "$product",
       },
     },
   ]);
 
-  
+
 
   res.status(200).json({
     success: true,
@@ -1264,12 +1264,12 @@ exports.latestProducts = catchAsync(async (req, res) => {
 
 
 exports.GetAllServicesSubCategorys = catchAsync(
-    async (req, res) => {
-        try {
-            const SubCategorys = await ServicesSubCategory.find().sort({ createdAt: -1 });
-            return successResponse(res, "SubCategorys list successfully.", 201, SubCategorys);
-        } catch (error) {
-            return errorResponse(res, error.message || "Internal Server Error", 500);
-        }
+  async (req, res) => {
+    try {
+      const SubCategorys = await ServicesSubCategory.find().sort({ createdAt: -1 });
+      return successResponse(res, "SubCategorys list successfully.", 201, SubCategorys);
+    } catch (error) {
+      return errorResponse(res, error.message || "Internal Server Error", 500);
     }
+  }
 );

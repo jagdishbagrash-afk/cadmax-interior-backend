@@ -18,19 +18,20 @@ const addressSchema = new mongoose.Schema({
   country: {
     type: String,
   },
-  addressLine1: {
+  street_address: {
     type: String,
   },
-  addressLine2: {
-    type: String,
-  },
-    addressType: {
+  addressType: {
     type: String,
   },
   isDefault: {
     type: Boolean,
     default: false
-  }
+  },
+  deletedAt: {
+    type: Date,
+    default: null,
+  },
 }, {
   timestamps: true
 });

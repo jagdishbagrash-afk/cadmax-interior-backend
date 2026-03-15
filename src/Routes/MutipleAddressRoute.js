@@ -1,18 +1,23 @@
 const express = require("express");
 const router = express.Router();
+const { verifyToken } = require("../Utill/tokenVerify");
 
-const MultipleAddressController = require("../Controller/MultipleMultipleAddressController");
+const MultipleAddressController = require("../Controller/MultipleAddressController");
 
-router.post("/address/add", MultipleAddressController.addAddress);
+router.post("/address/add", verifyToken , MultipleAddressController.addAddress);
 
-router.get("/address/user/:userId", MultipleAddressController.getAddresses);
+router.get("/address/list", verifyToken, MultipleAddressController.getAddresses);
 
 router.get("/address/:id", MultipleAddressController.getAddressById);
 
-router.put("/address/update/:id", MultipleAddressController.updateAddress);
+router.post("/address/update/:id",verifyToken, MultipleAddressController.updateAddress);
 
-router.put("/address/default/:id", MultipleAddressController.setDefaultAddress);
+router.get("/address/default/:id",  verifyToken, MultipleAddressController.setDefaultAddress);
 
-router.delete("/address/delete/:id", MultipleAddressController.deleteAddress);
+router.get("/address/delete/:id", MultipleAddressController.DeleteAddress);
+
+
+router.get("/address/user-list/:id",  MultipleAddressController.UserListingAddress);
+
 
 module.exports = router;

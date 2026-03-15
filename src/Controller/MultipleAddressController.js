@@ -1,13 +1,17 @@
-const Address = require("../models/addressModel");
+const Address = require("../Model/MultipleAddress");
 const catchAsync = require("../Utill/catchAsync");
+const { successResponse, errorResponse } = require("../Utill/ErrorHandling");
 
 exports.addAddress = catchAsync(
   async (req, res) => {
     try {
+      const userId = req.user.id;
+      if (!userId) {
+        return errorResponse(res, "This Address is Not Found", 403);
+      }
+      const { pincode, city, state, country, street_address, addressType } = req.body;
 
-      const { pincode, userId, city, state, country, addressLine1, addressLine2 ,addressType } = req.body;
-
-      const record = new Address({ pincode, userId, city, state, country,addressType , addressLine1, addressLine2 });
+      const record = new Address({ pincode, userId, city, state, country, addressType, street_address });
       const result = await record.save();
 
       return successResponse(res, "Address added successfully", 200, {
@@ -20,19 +24,20 @@ exports.addAddress = catchAsync(
   }
 );
 
-exports.getAddresses = catchAsync(
-  async (req, res) => {
-    try {
-      const userId = req.params.userId;
-      const addresses = await Address.find({ userId });
-      return successResponse(res, "Address Get By User successfully", 200, {
-        addresses
-      });
-    } catch (error) {
-      return errorResponse(res, error.message || "Internal Server Error", 500);
-    }
-  }
-);
+exports.getAddresses = catchAsync(async (req, res) => {
+
+  const userId = req.user.id;
+
+  const addresses = await Address.find({ userId });
+
+  return successResponse(
+    res,
+    "Addresses fetched successfully",
+    200,
+    { addresses }
+  );
+
+});
 
 exports.getAddressById = catchAsync(
   async (req, res) => {
@@ -57,12 +62,28 @@ exports.getAddressById = catchAsync(
 
 exports.updateAddress = async (req, res) => {
   try {
-    const { pincode, userId, city, state, country, addressLine1, addressLine2 ,addressType } = req.body;
+
+    const userId = req.user.id;
+    const id = req.params.id;
+
+    const { pincode, city, state, country, street_address, addressType } = req.body;
+
+    console.log("req.body", req.body);
+
     const address = await Address.findByIdAndUpdate(
-      req.params.id,
-      pincode, userId, city, state, country, addressLine1, addressLine2,addressType,
+      id,
+      {
+        pincode,
+        city,
+        state,
+        country,
+        street_address,
+        addressType,
+        userId
+      },
       { new: true }
     );
+
     if (!address) {
       return errorResponse(res, "This Address is Not Found", 403);
     }
@@ -70,7 +91,6 @@ exports.updateAddress = async (req, res) => {
     return successResponse(res, "Address Update successfully", 200, {
       address
     });
-
 
   } catch (error) {
     return errorResponse(res, error.message || "Internal Server Error", 500);
@@ -105,22 +125,40 @@ exports.setDefaultAddress = async (req, res) => {
   }
 };
 
-exports.deleteAddress = async (req, res) => {
+exports.DeleteAddress = catchAsync(async (req, res) => {
   try {
-
-    const address = await Address.findByIdAndDelete(req.params.id);
-
-    if (!address) {
-      return errorResponse(res, "This Address is Not Found", 403);
+    const id = req.params.id;
+    const userrecord = await Address.findById(id);
+    if (!userrecord) {
+      return validationErrorResponse(res, "Address not found", 404);
+    }
+    if (userrecord.deletedAt) {
+      userrecord.deletedAt = null;
+      await userrecord.save();
+      return successResponse(res, "Address restored successfully", 200);
     }
 
-
-    return successResponse(res, " Address Deleted successfully", 200, {
-      address
-    });
+    userrecord.deletedAt = new Date();
+    const record = await userrecord.save();
+    return successResponse(res, "Address deleted successfully", 200);
 
   } catch (error) {
     return errorResponse(res, error.message || "Internal Server Error", 500);
-
   }
-};
+});
+
+
+exports.UserListingAddress = catchAsync(async (req, res) => {
+
+  const userId = req.params.id;
+
+  const addresses = await Address.find({ userId }).populate("userId");
+
+  return successResponse(
+    res,
+    "Addresses User fetched successfully",
+    200,
+    addresses
+  );
+
+});
