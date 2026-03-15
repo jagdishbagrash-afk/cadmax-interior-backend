@@ -1,5 +1,7 @@
 const { signup, Login, SendOtp, profilegettoken, PhoneVerify, OTPVerify, AppOrder, getAllCategorys, getSubCategoryByCategory, getProductBySubCategory, getProductById, AddToCart, getCart, GetAllProject, GetServicesType, GetServiceTypeId, GetServicesDetails, ConceptUserPost, removeProductVariantFromCart, EditProfile, BookingAppAdd, GetVendorCatApp, GetAllVendor, GetVendorCategory, updateCart, clearCart, OrderList, bestSellerProducts, latestProducts, GetAllServicesSubCategorys } = require("../Controller/AppController");
 const {  GetAllBanner  } = require("../Controller/BannerController");
+const ServciesSubCategoryController = require("../Controller/ServciesSubCategoryController.js");
+
 const { upload } = require("../Utill/S3");
 const { verifyToken } = require("../Utill/tokenVerify");
 const AppRoute = require("express").Router();
@@ -54,5 +56,7 @@ AppRoute.get("/app/bestseller", bestSellerProducts);
 AppRoute.get("/app/latest-product", latestProducts);
 
 AppRoute.get("/app/desgin-concept", GetAllServicesSubCategorys);    
+
+AppRoute.get("/app/services/subcategory/list", ServciesSubCategoryController.GetAllServicesSubCategorys);    
 
 module.exports = AppRoute;
