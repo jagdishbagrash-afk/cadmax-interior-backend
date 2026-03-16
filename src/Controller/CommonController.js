@@ -1,5 +1,6 @@
 const Order = require("../Model/Order");
 const Product = require("../Model/Product");
+const Project = require("../Model/Project");
 const { errorResponse, successResponse, validationErrorResponse } = require("../Utill/ErrorHandling");
 const { deleteFile } = require("../Utill/S3");
 const catchAsync = require("../Utill/catchAsync");
@@ -70,4 +71,17 @@ exports.latestProducts = catchAsync(async (req, res) => {
     message: "Latest products fetched successfully",
     data: products,
   });
+});
+
+
+exports.GetAllCommonProject = catchAsync(async (req, res) => {
+  try {
+    const projects = await Project
+      .find({}, { Image: 1, _id: 0 }) // only image
+      .sort({ createdAt: -1 });
+
+    return successResponse(res, "Project list successfully.", 200, projects);
+  } catch (error) {
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
 });

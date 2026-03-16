@@ -1231,12 +1231,14 @@ exports.bestSellerProducts = catchAsync(async (req, res) => {
     },
   ]);
 
+    const record = bestSellers.map(item => item.product);
 
 
+console.log("record" ,record)
   res.status(200).json({
     success: true,
     message: "Best seller products fetched successfully",
-    data: bestSellers,
+    data: record,
   });
 });
 

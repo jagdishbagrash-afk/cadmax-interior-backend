@@ -1,5 +1,6 @@
 const { signup, Login, SendOtp, profilegettoken, PhoneVerify, OTPVerify, AppOrder, getAllCategorys, getSubCategoryByCategory, getProductBySubCategory, getProductById, AddToCart, getCart, GetAllProject, GetServicesType, GetServiceTypeId, GetServicesDetails, ConceptUserPost, removeProductVariantFromCart, EditProfile, BookingAppAdd, GetVendorCatApp, GetAllVendor, GetVendorCategory, updateCart, clearCart, OrderList, bestSellerProducts, latestProducts, GetAllServicesSubCategorys } = require("../Controller/AppController");
 const {  GetAllBanner  } = require("../Controller/BannerController");
+const { GetAllCommonProject } = require("../Controller/CommonController.js");
 const ServciesSubCategoryController = require("../Controller/ServciesSubCategoryController.js");
 
 const { upload } = require("../Utill/S3");
@@ -57,6 +58,20 @@ AppRoute.get("/app/latest-product", latestProducts);
 
 AppRoute.get("/app/desgin-concept", GetAllServicesSubCategorys);    
 
-AppRoute.get("/app/services/subcategory/list", ServciesSubCategoryController.GetAllServicesSubCategorys);    
+AppRoute.get("/app/services/subcategory/list", ServciesSubCategoryController.GetAllServicesSubCategorys);
+
+AppRoute.post("/app/address/add", verifyToken , MultipleAddressController.addAddress);
+
+AppRoute.get("/app/address/list", verifyToken, MultipleAddressController.getAddresses);
+
+AppRoute.get("/app/address/:id", MultipleAddressController.getAddressById);
+
+AppRoute.post("/app/address/update/:id",verifyToken, MultipleAddressController.updateAddress);
+
+AppRoute.get("/app/address/default/:id",  verifyToken, MultipleAddressController.setDefaultAddress);
+
+AppRoute.get("/app/address/delete/:id", MultipleAddressController.DeleteAddress);
+
+AppRoute.get("/app/common/project", GetAllCommonProject);
 
 module.exports = AppRoute;
