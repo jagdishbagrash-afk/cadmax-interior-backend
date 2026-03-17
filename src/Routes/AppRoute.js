@@ -1,7 +1,7 @@
 const { signup, Login, SendOtp, profilegettoken, PhoneVerify, OTPVerify, AppOrder, getAllCategorys, getSubCategoryByCategory, getProductBySubCategory, getProductById, AddToCart, getCart, GetAllProject, GetServicesType, GetServiceTypeId, GetServicesDetails, ConceptUserPost, removeProductVariantFromCart, EditProfile, BookingAppAdd, GetVendorCatApp, GetAllVendor, GetVendorCategory, updateCart, clearCart, OrderList, bestSellerProducts, latestProducts, GetAllServicesSubCategorys } = require("../Controller/AppController");
 const {  GetAllBanner  } = require("../Controller/BannerController");
-const { GetAllCommonProject } = require("../Controller/CommonController.js");
 const ServciesSubCategoryController = require("../Controller/ServciesSubCategoryController.js");
+const MultipleAddressController = require("../Controller/MultipleAddressController");
 
 const { upload } = require("../Utill/S3");
 const { verifyToken } = require("../Utill/tokenVerify");
@@ -46,7 +46,7 @@ AppRoute.post("/app/booking/add", BookingAppAdd);
 AppRoute.get("/app/vendor/category", GetVendorCatApp);
 
 
-AppRoute.get("/app/vendor/:slug",   GetVendorCategory);   
+AppRoute.get("/app/vendor/:id",   GetVendorCategory);   
 
 
 AppRoute.post("/app/user/edit-profile" , verifyToken , upload.single("profileImage"),  EditProfile)
@@ -72,6 +72,6 @@ AppRoute.get("/app/address/default/:id",  verifyToken, MultipleAddressController
 
 AppRoute.get("/app/address/delete/:id", MultipleAddressController.DeleteAddress);
 
-AppRoute.get("/app/common/project", GetAllCommonProject);
+
 
 module.exports = AppRoute;

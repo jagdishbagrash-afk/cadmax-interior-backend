@@ -1171,15 +1171,15 @@ exports.GetVendorCatApp = catchAsync(
 
 exports.GetVendorCategory = catchAsync(async (req, res) => {
   try {
-    const slug = req.params.slug;
-    console.log("slug:", slug);
-    if (!slug) {
-      return errorResponse(res, "Category slug is required", 400);
+    const id = req.params.id;
+    console.log("slug:", id);
+    if (!id) {
+      return errorResponse(res, "Category id is required", 400);
     }
     // Get Vendors of this Category
     const vendors = await Vendor.find({
       deletedAt: null,
-      VendorCategory: slug,
+      VendorCategory: id,
     }).sort({ createdAt: -1 }).populate("VendorCategory");
     return successResponse(
       res,
