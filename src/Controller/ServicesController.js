@@ -11,6 +11,8 @@ const adminEmailTemplate = require("../EmailTemplate/servicesAdminEmail");
 const { S3Client, DeleteObjectCommand } = require("@aws-sdk/client-s3");
 const ServicesSubCategory = require("../Model/ServicesSubCategory");
 const { default: mongoose } = require("mongoose");
+const User = require("../Model/User");
+const sendNotification = require("./sendNotification");
 
 const s3Client = new S3Client({
   region: process.env.AWS_REGION,
@@ -162,6 +164,24 @@ exports.AddService = CatchAsync(
       }
       const service = new Services({ title, content, multiple_images: imageUrls, ServicesType, slug: slug, concept, Image: list_image, material_details, timeline, cost, ServicesSubCategory });
       const record = await service.save();
+      const users = await User.find({
+        role: "customer",
+        status: "active",
+        deleted_at: null,
+      });
+
+      await Promise.all(
+        users.map(user =>
+          sendNotification({
+            senderId: req.user.id,
+            receiverId: user._id,
+            referenceId: record._id,
+            referenceType: "Services",
+            text: `New Services added: ${record.title}`,
+          })
+        )
+      );
+
       return successResponse(res, "Services created successfully.", 201, record);
     } catch (error) {
       return errorResponse(res, error.message || "Internal Server Error", 500);
@@ -192,16 +212,16 @@ exports.GetAllConcept = CatchAsync(async (req, res) => {
     return errorResponse(res, "Sub category not found", 404);
   }
 
-  const  Id =  record?._id;
+  const Id = record?._id;
 
   // Step 2: Find services
-const services = await Services.find({
-  ServicesSubCategory: new mongoose.Types.ObjectId(Id)
-})
-  .sort({ createdAt: -1 })
-  .populate("ServicesSubCategory");
+  const services = await Services.find({
+    ServicesSubCategory: new mongoose.Types.ObjectId(Id)
+  })
+    .sort({ createdAt: -1 })
+    .populate("ServicesSubCategory");
 
-  console.log("services" ,services)
+  console.log("services", services)
   return successResponse(
     res,
     "Services list fetched successfully.",
@@ -433,36 +453,36 @@ exports.ServicesUserPost = CatchAsync(async (req, res) => {
       concept,
     });
 
-      // Populate for email
-  const populated = await record.populate([
-    { path: "User", select: "name email" },
-    { path: "ServicesType", select: "title" },
-    { path: "Services", select: "title" },
-  ]);
+    // Populate for email
+    const populated = await record.populate([
+      { path: "User", select: "name email" },
+      { path: "ServicesType", select: "title" },
+      { path: "Services", select: "title" },
+    ]);
 
-  console.log("populated" ,populated)
+    console.log("populated", populated)
 
-  const emailData = {
-    userName: populated.User.name,
-    userEmail: populated.User.email,
-    serviceType: populated.ServicesType.title,
-    serviceName: populated.Services.title,
-    concept: populated.concept,
-  };
+    const emailData = {
+      userName: populated.User.name,
+      userEmail: populated.User.email,
+      serviceType: populated.ServicesType.title,
+      serviceName: populated.Services.title,
+      concept: populated.concept,
+    };
 
-  // User Email
-  await sendEmail({
-    email: emailData.userEmail,
-    subject: "Service Request Received - Cadmax",
-    emailHtml: userEmailTemplate(emailData),
-  });
+    // User Email
+    await sendEmail({
+      email: emailData.userEmail,
+      subject: "Service Request Received - Cadmax",
+      emailHtml: userEmailTemplate(emailData),
+    });
 
-  // Admin Email
-  await sendEmail({
-    email: "ankitkumarjain0748@gmail.com",
-    subject: "New Service Request - Cadmax",
-    emailHtml: adminEmailTemplate(emailData),
-  });
+    // Admin Email
+    await sendEmail({
+      email: "ankitkumarjain0748@gmail.com",
+      subject: "New Service Request - Cadmax",
+      emailHtml: adminEmailTemplate(emailData),
+    });
     const result = await record.save();
 
     if (!result) {

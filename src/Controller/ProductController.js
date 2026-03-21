@@ -2,7 +2,8 @@ const Product = require("../Model/Product");
 const CatchAsync = require("../Utill/catchAsync");
 const { successResponse, errorResponse, validationErrorResponse } = require("../Utill/ErrorHandling");
 const { deleteFile } = require("../Utill/S3");
-
+const User = require("../Model/User");
+const sendNotification = require("./sendNotification");
 
 
 const makeSlug = (text) => {
@@ -93,13 +94,31 @@ exports.addProduct = CatchAsync(async (req, res) => {
       variants: finalVariants
     });
 
-    await newProduct.save();
+    const record = await newProduct.save();
+
+    const users = await User.find({
+      role: "customer",
+      status: "active",
+      deleted_at: null,
+    });
+
+    await Promise.all(
+      users.map(user =>
+        sendNotification({
+          senderId: req.user.id,
+          receiverId: user._id,
+          referenceId: record._id,
+          referenceType: "Product",
+          text: `New Product added: ${record.title}`,
+        })
+      )
+    );
 
     return successResponse(
       res,
       "Product added successfully",
       201,
-      newProduct
+      record
     );
 
   } catch (error) {
@@ -231,21 +250,21 @@ exports.updateProduct = CatchAsync(async (req, res) => {
       v => v.color === incoming.color
     );
 
-  const existingImages = existing?.images || [];
+    const existingImages = existing?.images || [];
 
-const keptImages = (incoming.images || []).filter(Boolean);
+    const keptImages = (incoming.images || []).filter(Boolean);
 
-const newImages = uploadedImagesByColor[incoming.color] || [];
+    const newImages = uploadedImagesByColor[incoming.color] || [];
 
-const finalImages = [...keptImages, ...newImages].filter(Boolean);
+    const finalImages = [...keptImages, ...newImages].filter(Boolean);
 
-if (!finalImages.length) {
-  return validationErrorResponse(
-    res,
-    `Images required for color ${incoming.color}`,
-    400
-  );
-}
+    if (!finalImages.length) {
+      return validationErrorResponse(
+        res,
+        `Images required for color ${incoming.color}`,
+        400
+      );
+    }
 
     // delete removed images
     await Promise.all(
@@ -266,6 +285,24 @@ if (!finalImages.length) {
   /* ------------------ 7️⃣ Save ------------------ */
 
   const updatedProduct = await product.save();
+
+  const users = await User.find({
+    role: "customer",
+    status: "active",
+    deleted_at: null,
+  });
+
+  await Promise.all(
+    users.map(user =>
+      sendNotification({
+        senderId: req.user.id,
+        receiverId: user._id,
+        referenceId: updatedProduct._id,
+        referenceType: "Product",
+        text: `New Product added: ${updatedProduct.title}`,
+      })
+    )
+  );
 
   return successResponse(
     res,
@@ -350,9 +387,9 @@ exports.getProductBySubCategory = CatchAsync(async (req, res) => {
 
     const { color, lowPrice, highPrice } = req.query;
 
-    console.log("color" , req.query.color)
-    console.log("color" , req.query.lowPrice)
-    console.log("color" , req.query.highPrice)
+    console.log("color", req.query.color)
+    console.log("color", req.query.lowPrice)
+    console.log("color", req.query.highPrice)
 
 
     /* -------------------- BASE FILTER -------------------- */

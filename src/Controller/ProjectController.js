@@ -1,7 +1,10 @@
 const Project = require("../Model/Project");
+const User = require("../Model/User");
 const CatchAsync = require("../Utill/catchAsync");
 const { errorResponse, successResponse, validationErrorResponse } = require("../Utill/ErrorHandling");
 const { deleteFile } = require("../Utill/S3");
+const sendNotification = require("./sendNotification");
+
 
 exports.AddProject = CatchAsync(async (req, res) => {
     try {
@@ -23,6 +26,25 @@ exports.AddProject = CatchAsync(async (req, res) => {
         });
 
         const record = await Projects.save();
+
+        // const users = await User.find({
+        //     role: "customer",
+        //     status: "active",
+        //     deleted_at: null,
+        // });
+
+        // await Promise.all(
+        //     users.map(user =>
+        //         sendNotification({
+        //             senderId: req.user.id,
+        //             receiverId: user._id,
+        //             referenceId: record._id,
+        //             referenceType: "project",
+        //             text: `New project added: ${record.title}`,
+        //         })
+        //     )
+        // );
+
         return successResponse(res, "project created successfully.", 201, record);
 
     } catch (error) {
@@ -85,6 +107,24 @@ exports.UpdateProject = CatchAsync(
             }
 
             const updatedprojects = await data.save();
+
+            //              const users = await User.find({
+            //     role: "customer",
+            //     status: "active",
+            //     deleted_at: null,
+            //   });
+
+            //   await Promise.all(
+            //     users.map(user =>
+            //       sendNotification({
+            //         senderId: req.user.id,
+            //         receiverId: user._id,
+            //         referenceId: updatedprojects._id,
+            //         referenceType: "project",
+            //         text: `New project added: ${updatedprojects.title}`,
+            //       })
+            //     )
+            //   );
             return successResponse(res, "PROJECT updated successfully.", 200, updatedprojects);
 
         } catch (error) {
