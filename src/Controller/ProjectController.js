@@ -6,6 +6,31 @@ const { deleteFile } = require("../Utill/S3");
 const sendNotification = require("./sendNotification");
 
 
+const makeSlug = (text) => {
+    return text
+        .toString()
+        .toLowerCase()
+        .trim()
+        .replace(/[\s\_]+/g, "-")
+        .replace(/[^\w\-]+/g, "")
+        .replace(/\-\-+/g, "-");
+};
+
+const generateUniqueSlug = async (Model, title) => {
+    let baseSlug = makeSlug(title);
+    let slug = baseSlug;
+    let counter = 1;
+
+    while (await Model.findOne({ slug })) {
+        slug = `${baseSlug}-${counter}`;
+        counter++;
+    }
+
+    return slug;
+};
+
+
+
 exports.AddProject = CatchAsync(async (req, res) => {
     try {
         const { designed, title, brief, solution, content } = req.body;
@@ -19,11 +44,14 @@ exports.AddProject = CatchAsync(async (req, res) => {
         if (req.file) {
             imageUrl = req.file.location;
         }
+        const slug = await generateUniqueSlug(Project, title);
+
 
         const Projects = new Project({
             designed, title, brief, solution, content,
-            Image: imageUrl,
+            Image: imageUrl, slug
         });
+
 
         const record = await Projects.save();
 
@@ -80,59 +108,58 @@ exports.GetProjectById = CatchAsync(
 );
 
 
-exports.UpdateProject = CatchAsync(
-    async (req, res) => {
-        try {
-            const { designed, title, brief, solution, content } = req.body;
-            const data = await Project.findById(req.params.id);
-            if (!data) {
-                return validationErrorResponse(res, "Project not found.", 404);
-            }
-            if (title) data.title = title;
-            if (designed) data.designed = designed;
-            if (brief) data.brief = brief;
-            if (solution) data.solution = solution;
-            if (content) data.content = content;
+exports.UpdateProject = CatchAsync(async (req, res) => {
+    try {
+        const { designed, title, brief, solution, content } = req.body;
 
-            if (req.file && req.file.location) {
+        const data = await Project.findById(req.params.id);
 
-                if (data.Image) {
-                    try {
-                        await deleteFile(data.Image);
-                    } catch (err) {
-                        console.log("Error deleting old image:", err.message);
-                    }
-                }
-                data.Image = req.file.location;
-            }
-
-            const updatedprojects = await data.save();
-
-            //              const users = await User.find({
-            //     role: "customer",
-            //     status: "active",
-            //     deleted_at: null,
-            //   });
-
-            //   await Promise.all(
-            //     users.map(user =>
-            //       sendNotification({
-            //         senderId: req.user.id,
-            //         receiverId: user._id,
-            //         referenceId: updatedprojects._id,
-            //         referenceType: "project",
-            //         text: `New project added: ${updatedprojects.title}`,
-            //       })
-            //     )
-            //   );
-            return successResponse(res, "PROJECT updated successfully.", 200, updatedprojects);
-
-        } catch (error) {
-            console.log(error);
-            return errorResponse(res, error.message || "Internal Server Error", 500);
+        if (!data) {
+            return validationErrorResponse(res, "Project not found.", 404);
         }
+
+        // ✅ Update fields
+        if (title) {
+            data.title = title;
+
+            // 🔥 slug bhi update karo jab title change ho
+            data.slug = await generateUniqueSlug(Project, title);
+        }
+
+        if (designed) data.designed = designed;
+        if (brief) data.brief = brief;
+        if (solution) data.solution = solution;
+        if (content) data.content = content;
+
+        // ✅ Image update
+        if (req.file && req.file.location) {
+            if (data.Image) {
+                try {
+                    await deleteFile(data.Image);
+                } catch (err) {
+                    console.log("Error deleting old image:", err.message);
+                }
+            }
+            data.Image = req.file.location;
+        }
+
+        const updatedprojects = await data.save();
+
+        return successResponse(
+            res,
+            "PROJECT updated successfully.",
+            200,
+            updatedprojects
+        );
+    } catch (error) {
+        console.log(error);
+        return errorResponse(
+            res,
+            error.message || "Internal Server Error",
+            500
+        );
     }
-);
+});
 
 
 exports.GetAllProjectStatus = CatchAsync(
@@ -167,4 +194,32 @@ exports.ProjectDelete = CatchAsync(async (req, res) => {
     } catch (error) {
         return errorResponse(res, error.message || "Internal Server Error", 500);
     }
+});
+
+
+exports.GetProjectBySlug = CatchAsync(async (req, res) => {
+  try {
+    const projects = await Project.findOne({ slug: req.params.slug });
+
+    if (!projects) {
+      return validationErrorResponse(
+        res,
+        "Project not found.",
+        400
+      );
+    }
+
+    return successResponse(
+      res,
+      "Project Details successfully.",
+      200,
+      projects
+    );
+  } catch (error) {
+    return errorResponse(
+      res,
+      error.message || "Internal Server Error",
+      500
+    );
+  }
 });

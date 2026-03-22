@@ -902,16 +902,26 @@ exports.removeProductVariantFromCart = catchAsync(async (req, res) => {
   }
 });
 
-exports.GetAllProject = catchAsync(
-  async (req, res) => {
-    try {
-      const projects = await Project.find().sort({ createdAt: -1 });
-      return successResponse(res, "Project list successfully.", 201, projects);
-    } catch (error) {
-      return errorResponse(res, error.message || "Internal Server Error", 500);
-    }
+exports.GetAllProject = catchAsync(async (req, res) => {
+  try {
+    const projects = await Project.find({
+      deletedAt: null, 
+    }).sort({ createdAt: -1 });
+
+    return successResponse(
+      res,
+      "Project list successfully.",
+      200,
+      projects
+    );
+  } catch (error) {
+    return errorResponse(
+      res,
+      error.message || "Internal Server Error",
+      500
+    );
   }
-);
+});
 
 exports.GetServicesType = catchAsync(
   async (req, res) => {

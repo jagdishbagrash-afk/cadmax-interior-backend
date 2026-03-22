@@ -284,25 +284,25 @@ exports.updateProduct = CatchAsync(async (req, res) => {
 
   /* ------------------ 7️⃣ Save ------------------ */
 
-  const updatedProduct = await product.save();
+  // const updatedProduct = await product.save();
 
-  const users = await User.find({
-    role: "customer",
-    status: "active",
-    deleted_at: null,
-  });
+  // const users = await User.find({
+  //   role: "customer",
+  //   status: "active",
+  //   deleted_at: null,
+  // });
 
-  await Promise.all(
-    users.map(user =>
-      sendNotification({
-        senderId: req.user.id,
-        receiverId: user._id,
-        referenceId: updatedProduct._id,
-        referenceType: "Product",
-        text: `New Product added: ${updatedProduct.title}`,
-      })
-    )
-  );
+  // await Promise.all(
+  //   users.map(user =>
+  //     sendNotification({
+  //       senderId: req.user.id,
+  //       receiverId: user._id,
+  //       referenceId: updatedProduct._id,
+  //       referenceType: "Product",
+  //       text: `New Product added: ${updatedProduct.title}`,
+  //     })
+  //   )
+  // );
 
   return successResponse(
     res,

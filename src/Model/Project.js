@@ -21,6 +21,9 @@ const ProjectSchema = mongoose.Schema(
       type: String,
       required: [true, "Solution is required"],
     },
+    slug: {
+      type: String
+    },
     content: {
       type: String,
     },
