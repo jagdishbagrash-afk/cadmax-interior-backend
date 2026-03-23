@@ -139,7 +139,7 @@ exports.AddVendor = CatchAsync(async (req, res) => {
     try {
         console.log("req.files", req.files)
 
-        const { name, experience, sepectailze, VendorCategory, phone, VendorSubCategory } = req.body;
+        const { name, experience, specialization, VendorCategory, phone, VendorSubCategory, content } = req.body;
         if (!name) {
             return validationErrorResponse(res, "Category name is required", 400);
         }
@@ -154,7 +154,9 @@ exports.AddVendor = CatchAsync(async (req, res) => {
             Image: Image,
             multiple_images: imageUrls,
             slug: slug,
-            name, experience, sepectailze, VendorCategory, phone, VendorSubCategory
+            specialization: specialization,
+            content,
+            name, experience, VendorCategory, phone, VendorSubCategory
         });
 
         const record = await VendorsData.save();
@@ -181,7 +183,7 @@ exports.updatevendor = CatchAsync(
     async (req, res) => {
         try {
             console.log("req.files", req.files)
-            const { name, phone, VendorCategory, sepectailze, experience, VendorSubCategory, } = req.body;
+            const { name, phone, VendorCategory, specialization, experience, content, } = req.body;
 
             const data = await Vendor.findById(req.params.id);
 
@@ -203,9 +205,9 @@ exports.updatevendor = CatchAsync(
             if (name) data.name = name;
             if (phone) data.phone = phone;
             if (VendorCategory) data.VendorCategory = VendorCategory;
-            if (sepectailze) data.sepectailze = sepectailze;
+            if (specialization) data.specialization = specialization;
             if (experience) data.experience = experience;
-
+            if (content) data.content = content;
             if (req.file && req.file.location) {
 
                 if (data.Image) {

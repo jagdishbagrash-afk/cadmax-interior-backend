@@ -9,10 +9,11 @@ const vendorSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    sepectailze: {
+    specialization: {
         type: String,
         required: true
     },
+    content :{type :String},
 
     Image: {
         type: String,
