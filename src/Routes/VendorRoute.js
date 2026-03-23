@@ -7,14 +7,23 @@ const { upload } = require("../Utill/S3.js");
 router.post("/vendor/category/add", upload.single("Image"),  VendorController.AddVendorCategory);        
 router.get("/vendor/category/list", VendorController.getAllVendorCategorys);    
 router.post("/vendor/category/edit/:id", upload.single("Image"),   VendorController.updateCategory);   
-router.post("/vendor/add", upload.single("Image"),  VendorController.AddVendor);        
+router.post("/vendor/add",  upload.fields([
+    { name: "Image", maxCount: 1 },
+    { name: "images[]", maxCount: 10 },
+]), VendorController.AddVendor);        
 router.get("/vendor/list", VendorController.getAllVendors);    
 
-router.post("/vendor/edit/:id", upload.single("Image"),   VendorController.updatevendor);   
+router.post("/vendor/edit/:id",  upload.fields([
+    { name: "Image", maxCount: 1 },
+    { name: "images[]", maxCount: 10 },
+]),  VendorController.updatevendor);   
 router.get("/vendor/delete/:id", VendorController.DeleteVendor);
 router.get("/vendor/get", VendorController.getVendors);    
 
 router.get("/category/vendor/:slug",    VendorController.getVendorCategoryIds);   
+
+router.get("/vendor-slug/:slug", VendorController.GetVendorBySlug);
+
 
 // router.get("/vendor/category/list/:id", VendorController.getServiceById);  
 // router.post("/vendor/category/delete/:id", VendorController.deleteService);

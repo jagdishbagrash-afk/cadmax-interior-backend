@@ -137,23 +137,27 @@ exports.updateCategory = CatchAsync(async (req, res) => {
 
 exports.AddVendor = CatchAsync(async (req, res) => {
     try {
-        console.log("req.body" ,req.body)
+        console.log("req.files", req.files)
+
         const { name, experience, sepectailze, VendorCategory, phone, VendorSubCategory } = req.body;
         if (!name) {
             return validationErrorResponse(res, "Category name is required", 400);
         }
-        let imageUrl = null;
 
-        if (req.file) {
-            imageUrl = req.file.location;   // ✅ S3 image URL
-        }
 
-        const Categorys = new Vendor({
-            Image: imageUrl,
+        const slug = await generateUniqueSlug(Vendor, req.body.name);
+        const imageUrls = req.files["images[]"]?.map((f) => f.location) || [];
+        const Image = req.files?.["Image"]?.[0]?.location;
+
+
+        const VendorsData = new Vendor({
+            Image: Image,
+            multiple_images: imageUrls,
+            slug: slug,
             name, experience, sepectailze, VendorCategory, phone, VendorSubCategory
         });
 
-        const record = await Categorys.save();
+        const record = await VendorsData.save();
         return successResponse(res, "vendor created successfully.", 201, record);
 
     } catch (error) {
@@ -176,33 +180,42 @@ exports.getAllVendors = CatchAsync(
 exports.updatevendor = CatchAsync(
     async (req, res) => {
         try {
-            const { name, phone, VendorCategory, sepectailze, experience, VendorSubCategory } = req.body;
+            console.log("req.files", req.files)
+            const { name, phone, VendorCategory, sepectailze, experience, VendorSubCategory, } = req.body;
 
             const data = await Vendor.findById(req.params.id);
+
+            const imageUrls = req.files?.["images[]"]?.map((f) => f.location) || [];
+            const Image = req.files?.["Image"]?.[0]?.location;
 
             if (!data) {
                 return validationErrorResponse(res, "Vendor Category not found.", 404);
             }
-            // ✅ Update name if provided
+
+            if (imageUrls.length > 0) {
+                data.multiple_images = [...data.multiple_images, ...imageUrls]; // append new images
+            }
+
+            if (name) {
+                data.name = name;
+                data.slug = await generateUniqueSlug(Vendor, name);
+            }
             if (name) data.name = name;
             if (phone) data.phone = phone;
             if (VendorCategory) data.VendorCategory = VendorCategory;
-            if (VendorSubCategory) data.VendorSubCategory = VendorSubCategory;
             if (sepectailze) data.sepectailze = sepectailze;
             if (experience) data.experience = experience;
 
-            // ✅ If new image uploaded → delete old image first
             if (req.file && req.file.location) {
 
                 if (data.Image) {
                     try {
-                        await deleteFile(data.Image);   // ✅ S3 old image delete
+                        await deleteFile(data.Image);
                     } catch (err) {
                         console.log("Error deleting old image:", err.message);
                     }
                 }
 
-                // ✅ Store new S3 image URL
                 data.Image = req.file.location;
             }
 
@@ -255,15 +268,13 @@ exports.getVendors = CatchAsync(
 exports.getVendorCategoryIds = CatchAsync(async (req, res) => {
     try {
         const slug = req.params.slug;
-        console.log('slug', slug)
 
         if (!slug) {
             return errorResponse(res, "Category slug is required", 400);
         }
 
-        const category = await VendorCategory.findOne({  slug });
+        const category = await VendorCategory.findOne({ slug });
 
-        console.log("category", category)
         if (!category) {
             return errorResponse(res, "Vendor Category not found", 404);
         }
@@ -286,3 +297,30 @@ exports.getVendorCategoryIds = CatchAsync(async (req, res) => {
     }
 });
 
+
+exports.GetVendorBySlug = CatchAsync(async (req, res) => {
+    try {
+        const Vendors = await Vendor.findOne({ slug: req.params.slug });
+
+        if (!Vendors) {
+            return validationErrorResponse(
+                res,
+                "Vendor not found.",
+                400
+            );
+        }
+
+        return successResponse(
+            res,
+            "Project Details successfully.",
+            200,
+            Vendors
+        );
+    } catch (error) {
+        return errorResponse(
+            res,
+            error.message || "Internal Server Error",
+            500
+        );
+    }
+});

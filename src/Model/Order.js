@@ -39,13 +39,13 @@ const OrderSchema = new mongoose.Schema(
       type: String,
       required: [true, "Mobile number is required"],
     },
-      orderId: {
-  type: String,
-  unique: true,
-  index: true,
-  required: true
-}
-,
+    orderId: {
+      type: String,
+      unique: true,
+      index: true,
+      required: true
+    }
+    ,
     address: {
       type: String,
       required: [true, "Address is required"],
@@ -54,7 +54,7 @@ const OrderSchema = new mongoose.Schema(
       type: [OrderProductSchema],
       required: [true, "Product is required"],
     },
-    status:{
+    status: {
       type: String,
       enum: ["pending", "confirmed", "shipped", "delivered", "cancelled"],
       default: "pending"

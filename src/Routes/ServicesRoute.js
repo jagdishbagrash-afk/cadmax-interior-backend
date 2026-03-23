@@ -30,7 +30,7 @@ router.post("/services/edit/:id", upload.fields([
 
 router.get("/services/delete/:id", servicesController.DeleteServices);
 
-router.get("/services/images/delete/:projectId/:images", servicesController.DeleteAWSImages)
+router.get("/services/images/delete/:projectId/:images/:type", servicesController.DeleteAWSImages)
 
 //
 

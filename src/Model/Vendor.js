@@ -24,9 +24,12 @@ const vendorSchema = new mongoose.Schema({
         ref: "VendorCategory",
         required: true
     },
-
-
-
+    slug: {
+        type: String
+    },
+    multiple_images: {
+        type: Array
+    },
     phone: {
         type: String,
         required: true
