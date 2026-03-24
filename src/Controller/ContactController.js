@@ -1,4 +1,5 @@
 const contactmodal = require("../Model/Contact");
+const Lead = require("../Model/Lead");
 const catchAsync = require('../Utill/catchAsync');
 // const logger = require("../Utill/Logger");
 
@@ -60,6 +61,46 @@ exports.ContactGet = catchAsync(async (req, res, next) => {
                 nextPage: page < totalPages ? page + 1 : null,
                 previousPage: page > 1 ? page - 1 : null,
             },
+            msg: "Contact Get",
+        });
+    } catch (error) {
+        // logger.error(error);
+        res.status(500).json({
+            msg: "Failed to fetch Contact get",
+            error: error.message,
+        });
+    }
+});
+
+
+exports.createLead = catchAsync(async (req, res) => {
+  try {
+    const  assignedTo = req.user.id
+      const { title ,  message, services , pageurl   , name , email , phone} = req.body;
+const record   =  Lead.create({
+assignedTo, title ,  message, services , pageurl  , name , email , phone
+})
+
+    res.json({
+            status: true,
+            message: " Request submitted & emails sent successfully.",
+            record : record
+        });
+  
+  } catch (error) {
+    res.status(500).json({
+      status: false,
+      message: error.message,
+    });
+  }
+});
+
+
+exports.LeadGet = catchAsync(async (req, res, next) => {
+    try {
+        const leadget = await Lead.find({});
+        res.status(200).json({
+            data: leadget,
             msg: "Contact Get",
         });
     } catch (error) {
