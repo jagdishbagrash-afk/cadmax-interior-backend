@@ -2,7 +2,6 @@ const mongoose = require("mongoose");
 
 const leadSchema = new mongoose.Schema(
   {
-    // Lead Info
     title: { type: String,  },
     message: { type: String },
     name :  String,

@@ -60,7 +60,7 @@ AppRoute.get("/app/desgin-concept", GetAllServicesSubCategorys);
 
 AppRoute.get("/app/services/subcategory/list", ServciesSubCategoryController.GetAllServicesSubCategorys);
 
-AppRoute.post("/app/address/add", verifyToken , MultipleAddressController.addAddress);
+AppRoute.post("/app/address-add", verifyToken , MultipleAddressController.addAddress);
 
 AppRoute.get("/app/address/list", verifyToken, MultipleAddressController.getAddresses);
 
