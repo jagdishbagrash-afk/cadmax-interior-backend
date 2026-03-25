@@ -29,7 +29,7 @@ exports.getAddresses = catchAsync(async (req, res) => {
 
   const addresses = await Address.find({
     userId,
-    deletedAt: null, // 👈 ye add karo
+    deletedAt: null, 
   });
 
   return successResponse(
