@@ -25,10 +25,12 @@ exports.addAddress = catchAsync(
 );
 
 exports.getAddresses = catchAsync(async (req, res) => {
-
   const userId = req.user.id;
 
-  const addresses = await Address.find({ userId });
+  const addresses = await Address.find({
+    userId,
+    deletedAt: null, // 👈 ye add karo
+  });
 
   return successResponse(
     res,
@@ -36,7 +38,6 @@ exports.getAddresses = catchAsync(async (req, res) => {
     200,
     { addresses }
   );
-
 });
 
 exports.getAddressById = catchAsync(
