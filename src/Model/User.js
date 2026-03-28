@@ -7,6 +7,10 @@ const UserSchema = new mongoose.Schema({
     maxlength: [50, "Name must be less than 50 characters"],
     trim: true,
   },
+  dob: {
+  type: String,
+  default: "01-01-2000"
+},
   phone: {
     type: Number,
     unique: true,
@@ -56,11 +60,11 @@ const UserSchema = new mongoose.Schema({
     },
     default: "customer",
   },
-  gender :{
-    type :String ,
+  gender: {
+    type: String,
   },
-   address :{
-    type :String ,
+  address: {
+    type: String,
   },
   deleted_at: {
     type: Date,

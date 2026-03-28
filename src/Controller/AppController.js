@@ -1058,7 +1058,7 @@ exports.EditProfile = catchAsync(async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const { name, email, phone, gender } = req.body;
+    const { name, email, phone, gender ,  dob } = req.body;
 
     const existingUser = await User.findOne({
       _id: { $ne: userId },
@@ -1074,6 +1074,7 @@ exports.EditProfile = catchAsync(async (req, res) => {
     if (gender) existingUser.gender = gender;
     if ( phone  ) existingUser.phone =  phone;
     if ( name ) existingUser.name  =  name ;
+    if(dob) existingUser.dob =  dob ;
 
     if (req.file && req.file.location) {
 
