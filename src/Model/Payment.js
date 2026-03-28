@@ -25,7 +25,7 @@ const paymentSchema = new mongoose.Schema({
     type: String,
     default: 'pending',
   },
-  product_name: {
+  product: {
     type: String,
   },
   product_id: {
@@ -36,8 +36,6 @@ const paymentSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
   },
-
-
   type: {
     type: String,
   },

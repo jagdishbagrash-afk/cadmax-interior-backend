@@ -34,8 +34,7 @@ const razorpayInstance = new Razorpay({
   };
 
   exports.paymentAdd = catchAsync(async (req, res) => {
-    console.log("req", req?.body);
-    const { order_id, payment_id, amount, currency, payment_status, product_name,type } = req.body;
+    const { order_id, payment_id, amount, currency, payment_status, product_name,type ,product_id } = req.body;
     const status = payment_status === 'failed' ? 'failed' : 'success';
     const payment = new Payment({
         order_id: order_id,
@@ -46,6 +45,7 @@ const razorpayInstance = new Razorpay({
         product_name,
         type,
         status: status, 
+        product_id 
     });
 
     await payment.save();

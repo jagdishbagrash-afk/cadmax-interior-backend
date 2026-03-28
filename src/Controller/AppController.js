@@ -1058,50 +1058,69 @@ exports.EditProfile = catchAsync(async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const { name, email, phone, gender ,  dob } = req.body;
+    const { name, email, phone, gender, dob } = req.body;
 
-    const existingUser = await User.findOne({
-      _id: { $ne: userId },
-      $or: [{ email }, { phone }],
-    });
-
+    // 1. Current user find karo
+    const existingUser = await User.findById(userId);
 
     if (!existingUser) {
-      return validationErrorResponse(res, "Profile  not found.", 404);
+      return validationErrorResponse(res, "User not found.", 404);
     }
 
+    // 2. Check duplicate email/phone (optional but recommended)
+    if (email || phone) {
+      const duplicateUser = await User.findOne({
+        _id: { $ne: userId },
+        $or: [
+          ...(email ? [{ email }] : []),
+          ...(phone ? [{ phone }] : []),
+        ],
+      });
+
+      if (duplicateUser) {
+        return validationErrorResponse(
+          res,
+          "Email or Phone already in use.",
+          400
+        );
+      }
+    }
+
+    // 3. Update fields
+    if (name) existingUser.name = name;
     if (email) existingUser.email = email;
+    if (phone) existingUser.phone = phone;
     if (gender) existingUser.gender = gender;
-    if ( phone  ) existingUser.phone =  phone;
-    if ( name ) existingUser.name  =  name ;
-    if(dob) existingUser.dob =  dob ;
+    if (dob) existingUser.dob = dob;
 
+    // 4. Profile image update
     if (req.file && req.file.location) {
-
-      if (existingUser.
-        profileImage
-      ) {
+      if (existingUser.profileImage) {
         try {
-          await deleteFile(existingUser.
-            profileImage
-          );
+          await deleteFile(existingUser.profileImage);
         } catch (err) {
           console.log("Error deleting old image:", err.message);
         }
       }
-      existingUser.
-        profileImage
-        = req.file.location;
+      existingUser.profileImage = req.file.location;
     }
 
+    // 5. Save
     const updatedUser = await existingUser.save();
 
-    if (!updatedUser) {
-      return errorResponse(res, "Profile Not Update ", 404);
-    }
-    return successResponse(res, "Profile updated successfully.", 200, updatedUser);
+    return successResponse(
+      res,
+      "Profile updated successfully.",
+      200,
+      updatedUser
+    );
+
   } catch (error) {
-    return errorResponse(res, error.message || "Internal Server Error", 500);
+    return errorResponse(
+      res,
+      error.message || "Internal Server Error",
+      500
+    );
   }
 });
 
