@@ -1067,7 +1067,7 @@ exports.EditProfile = catchAsync(async (req, res) => {
 
 
     if (!existingUser) {
-      return validationErrorResponse(res, "User not found.", 404);
+      return validationErrorResponse(res, "Profile  not found.", 404);
     }
 
     if (email) existingUser.email = email;
@@ -1095,8 +1095,9 @@ exports.EditProfile = catchAsync(async (req, res) => {
     }
 
     const updatedUser = await existingUser.save();
+
     if (!updatedUser) {
-      return errorResponse(res, "User not found", 404);
+      return errorResponse(res, "Profile Not Update ", 404);
     }
     return successResponse(res, "Profile updated successfully.", 200, updatedUser);
   } catch (error) {
