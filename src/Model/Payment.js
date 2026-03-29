@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 
+
 const paymentSchema = new mongoose.Schema({
   order_id: {
     type: String,
@@ -25,12 +26,9 @@ const paymentSchema = new mongoose.Schema({
     type: String,
     default: 'pending',
   },
-  product: {
-    type: String,
-  },
-  product_id: {
+  OrderID: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Product",
+    ref: "Order",
   },
   user_id: {
     type: mongoose.Schema.Types.ObjectId,

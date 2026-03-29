@@ -151,6 +151,8 @@ exports.Login = catchAsync(async (req, res) => {
     }
     const user = await User.findOne({ phone: phone });
 
+    console.log("user" ,user)
+
     if (user?.deleted_at != null) {
       return errorResponse(res, "This account is blocked", 200);
     }
@@ -1067,33 +1069,13 @@ exports.EditProfile = catchAsync(async (req, res) => {
       return validationErrorResponse(res, "User not found.", 404);
     }
 
-    // 2. Check duplicate email/phone (optional but recommended)
-    if (email || phone) {
-      const duplicateUser = await User.findOne({
-        _id: { $ne: userId },
-        $or: [
-          ...(email ? [{ email }] : []),
-          ...(phone ? [{ phone }] : []),
-        ],
-      });
 
-      if (duplicateUser) {
-        return validationErrorResponse(
-          res,
-          "Email or Phone already in use.",
-          400
-        );
-      }
-    }
-
-    // 3. Update fields
     if (name) existingUser.name = name;
     if (email) existingUser.email = email;
     if (phone) existingUser.phone = phone;
     if (gender) existingUser.gender = gender;
     if (dob) existingUser.dob = dob;
 
-    // 4. Profile image update
     if (req.file && req.file.location) {
       if (existingUser.profileImage) {
         try {

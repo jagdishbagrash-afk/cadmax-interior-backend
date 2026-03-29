@@ -48,7 +48,6 @@ const OrderSchema = new mongoose.Schema(
     ,
     address: {
       type: String,
-      required: [true, "Address is required"],
     },
     product: {
       type: [OrderProductSchema],
@@ -63,6 +62,14 @@ const OrderSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: [true, "User ID is required"],
+    },
+    addressId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Address",
+    },
+    PaymentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Payment",
     },
     amount: {
       type: Number,

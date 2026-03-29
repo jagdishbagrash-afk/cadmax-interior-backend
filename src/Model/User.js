@@ -8,9 +8,9 @@ const UserSchema = new mongoose.Schema({
     trim: true,
   },
   dob: {
-  type: String,
-  default: "01-01-2000"
-},
+    type: String,
+    default: "01-01-2000"
+  },
   phone: {
     type: Number,
     unique: true,
