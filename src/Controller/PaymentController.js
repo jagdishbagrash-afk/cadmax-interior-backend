@@ -64,7 +64,11 @@ const razorpayInstance = new Razorpay({
 
 exports.PaymentGet = catchAsync(async (req, res, next) => {
   try {
-    const payment = await Payment.find({}).sort({payment_date:-1});
+    const payment = await Payment.find({})
+      .populate("OrderID")   
+      .populate("user_id") 
+      .sort({ payment_date: -1 });
+
     if (!payment || payment.length === 0) {
       return res.status(204).json({
         status: false,
@@ -72,17 +76,19 @@ exports.PaymentGet = catchAsync(async (req, res, next) => {
         Payment: [],
       });
     }
+
     res.status(200).json({
       status: true,
       message: "Payment retrieved successfully!",
       Payment: payment,
     });
+
   } catch (err) {
-    console.error("Error retrieving payments:", err.message); 
+    console.error("Error retrieving payments:", err.message);
     return res.status(500).json({
       status: false,
       message: "An unknown error occurred. Please try again later.",
-      error: err.message, 
+      error: err.message,
     });
   }
 });
