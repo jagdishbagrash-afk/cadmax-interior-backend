@@ -32,6 +32,7 @@ exports.addOrder = catchAsync(async (req, res) => {
     });
 
     const record = await newOrder.save();
+    console.log("record" ,record)
     const subject = `Welcome to Cadmax!🎉`;
     const emailHtml = OrderEmail(record?.name, record);
     await sendEmail({
@@ -40,7 +41,7 @@ exports.addOrder = catchAsync(async (req, res) => {
       emailHtml: emailHtml,
     });
 
-    return successResponse(res, "Order added successfully", 201, newOrder);
+    return successResponse(res, "Order added successfully", 201, record);
   } catch (error) {
     console.error(error);
     return errorResponse(res, error.message || "Internal Server Error", 500);

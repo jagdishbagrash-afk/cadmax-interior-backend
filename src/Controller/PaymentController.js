@@ -34,9 +34,10 @@ const razorpayInstance = new Razorpay({
   };
 
   exports.paymentAdd = catchAsync(async (req, res) => {
-    const { order_id, payment_id, amount, currency, payment_status, product_name,type ,product_id } = req.body;
+    console.log("req.body" ,req.body)
+    const { order_id, payment_id, amount, currency, payment_status, product_name,type ,product_id  , OrderID } = req.body;
     const status = payment_status === 'failed' ? 'failed' : 'success';
-    const payment = new Payment({
+    const paymentdata = new Payment({
         order_id: order_id,
         currency: currency,
         payment_id: payment_id,
@@ -45,14 +46,15 @@ const razorpayInstance = new Razorpay({
         product_name,
         type,
         status: status, 
-        product_id 
+        product_id ,
+        OrderID
     });
 
-    await payment.save();
+    const record = await paymentdata.save();
     if (payment_status === 'failed') {
-        return res.status(200).json({ status: 'failed', message: 'Payment failed and saved successfully' });
+        return res.status(200).json({ status: 'failed', message: 'Payment failed and saved successfully' , record});
     } else {
-        return res.status(200).json({ status: 'success', message: 'Payment verified and saved successfully' });
+        return res.status(200).json({ status: 'success', message: 'Payment verified and saved successfully' , record});
     }
 });
 
