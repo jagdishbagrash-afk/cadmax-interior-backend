@@ -40,7 +40,7 @@ AppRoute.get("/app/concept/details/:id", GetServicesDetails);
 
 AppRoute.post("/app/concept/user", verifyToken, ConceptUserPost);
 
-AppRoute.post("/app/booking/add", BookingAppAdd);
+AppRoute.post("/app/booking/add",verifyToken, BookingAppAdd);
 
 
 AppRoute.get("/app/vendor/category", GetVendorCatApp);

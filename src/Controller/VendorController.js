@@ -302,7 +302,7 @@ exports.getVendorCategoryIds = CatchAsync(async (req, res) => {
 
 exports.GetVendorBySlug = CatchAsync(async (req, res) => {
     try {
-        const Vendors = await Vendor.findOne({ slug: req.params.slug });
+        const Vendors = await Vendor.findOne({ slug: req.params.slug }).populate("VendorCategory");
 
         if (!Vendors) {
             return validationErrorResponse(

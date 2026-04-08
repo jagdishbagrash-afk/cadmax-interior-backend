@@ -48,6 +48,11 @@ const bookingschema = mongoose.Schema({
     },
     total_amount: {
         type: Number
-    }
+    },
+    userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        required: [true, "User ID is required"],
+    },
 })
 module.exports = mongoose.model("booking", bookingschema)

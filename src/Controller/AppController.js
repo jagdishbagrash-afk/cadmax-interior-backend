@@ -151,7 +151,7 @@ exports.Login = catchAsync(async (req, res) => {
     }
     const user = await User.findOne({ phone: phone });
 
-    console.log("user" ,user)
+    console.log("user", user)
 
     if (user?.deleted_at != null) {
       return errorResponse(res, "This account is blocked", 200);
@@ -331,7 +331,7 @@ exports.OTPVerify = catchAsync(async (req, res) => {
 exports.AppOrder = catchAsync(async (req, res) => {
   try {
     const { name, mobile, address, product, amount } = req.body;
-    const userId = req.user?.id || "692f0eeebc9b6fd6cc3a5709";
+    const userId = req.user.id || "692f0eeebc9b6fd6cc3a5709";
     console.log("userId", userId)
     if (!name || !mobile || !address || !product || !amount) {
       return validationErrorResponse(
@@ -907,7 +907,7 @@ exports.removeProductVariantFromCart = catchAsync(async (req, res) => {
 exports.GetAllProject = catchAsync(async (req, res) => {
   try {
     const projects = await Project.find({
-      deletedAt: null, 
+      deletedAt: null,
     }).sort({ createdAt: -1 });
 
     return successResponse(
@@ -1108,21 +1108,22 @@ exports.EditProfile = catchAsync(async (req, res) => {
 
 exports.BookingAppAdd = catchAsync(async (req, res) => {
   try {
-    const {
-      project_type, servcies_model, area, budget_range, finish_level,
-      name, email, phone_number, city, phone_mode, timeLine,
-      rate, subtotal, taxes, total_amount, scope
-    } = req.body;
-
+    const userId = req.user.id;
+    const userData = await User.findById(userId);
+    if (!userData) {
+      return errorResponse(res, "User not found", 404);
+    }
+    const { project_type, servcies_model, area, budget_range, finish_level, city, phone_mode, timeLine, rate, subtotal, taxes, total_amount, scope } = req.body;
     const booking = await BookingModel.create({
       project_type,
       servcies_model,
       area,
       budget_range,
       finish_level,
-      name,
-      email,
-      phone_number,
+      name: userData.name,
+      email: userData.email,
+      phone_number: userData.phone,
+      userId: userId,
       city,
       phone_mode,
       timeLine,
@@ -1156,6 +1157,14 @@ exports.BookingAppAdd = catchAsync(async (req, res) => {
 
   }
 })
+
+exports.getAllBookings = catchAsync(async (req, res) => {
+  const bookings = await BookingModel.find().sort({ createdAt: -1 });
+
+  return successResponse(res, "All bookings fetched successfully", 200, bookings);
+});
+
+
 
 
 exports.GetVendorCatApp = catchAsync(
@@ -1231,10 +1240,10 @@ exports.bestSellerProducts = catchAsync(async (req, res) => {
     },
   ]);
 
-    const record = bestSellers.map(item => item.product);
+  const record = bestSellers.map(item => item.product);
 
 
-console.log("record" ,record)
+  console.log("record", record)
   res.status(200).json({
     success: true,
     message: "Best seller products fetched successfully",
@@ -1275,3 +1284,14 @@ exports.GetAllServicesSubCategorys = catchAsync(
     }
   }
 );
+
+
+exports.getMyBookings = catchAsync(async (req, res) => {
+  const userId = req.user.id;
+
+  const bookings = await BookingModel.find({ userId })
+    .populate("userId", "name email phone")
+    .sort({ createdAt: -1 });
+
+  return successResponse(res, "User bookings fetched", 200, bookings);
+});
