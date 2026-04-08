@@ -1286,12 +1286,32 @@ exports.GetAllServicesSubCategorys = catchAsync(
 );
 
 
-exports.getMyBookings = catchAsync(async (req, res) => {
-  const userId = req.user.id;
+exports.getMyBookings = async (req, res) => {
+  try {
+    const userId = req.user?.id;
 
-  const bookings = await BookingModel.find({ userId })
-    .populate("userId", "name email phone")
-    .sort({ createdAt: -1 });
+    if (!userId) {
+      return errorResponse(res, "Unauthorized user", 401);
+    }
 
-  return successResponse(res, "User bookings fetched", 200, bookings);
-});
+    const bookings = await BookingModel.find({ userId })
+      .populate("userId", "name email phone")
+      .sort({ createdAt: -1 });
+
+    return successResponse(
+      res,
+      "User bookings fetched successfully",
+      200,
+      bookings
+    );
+
+  } catch (error) {
+    console.error("GET MY BOOKINGS ERROR:", error);
+
+    return errorResponse(
+      res,
+      error.message || "Internal Server Error",
+      500
+    );
+  }
+};

@@ -1,4 +1,4 @@
-const { signup, Login, SendOtp, profilegettoken, PhoneVerify, OTPVerify, AppOrder, getAllCategorys, getSubCategoryByCategory, getProductBySubCategory, getProductById, AddToCart, getCart, GetAllProject, GetServicesType, GetServiceTypeId, GetServicesDetails, ConceptUserPost, removeProductVariantFromCart, EditProfile, BookingAppAdd, GetVendorCatApp, GetAllVendor, GetVendorCategory, updateCart, clearCart, OrderList, bestSellerProducts, latestProducts, GetAllServicesSubCategorys } = require("../Controller/AppController");
+const { signup, Login, SendOtp, profilegettoken, PhoneVerify, OTPVerify, AppOrder, getAllCategorys, getSubCategoryByCategory, getProductBySubCategory, getProductById, AddToCart, getCart, GetAllProject, GetServicesType, GetServiceTypeId, GetServicesDetails, ConceptUserPost, removeProductVariantFromCart, EditProfile, BookingAppAdd, GetVendorCatApp, GetAllVendor, GetVendorCategory, updateCart, clearCart, OrderList, bestSellerProducts, latestProducts, GetAllServicesSubCategorys, getAllBookings } = require("../Controller/AppController");
 const {  GetAllBanner  } = require("../Controller/BannerController");
 const ServciesSubCategoryController = require("../Controller/ServciesSubCategoryController.js");
 const MultipleAddressController = require("../Controller/MultipleAddressController");
@@ -41,6 +41,9 @@ AppRoute.get("/app/concept/details/:id", GetServicesDetails);
 AppRoute.post("/app/concept/user", verifyToken, ConceptUserPost);
 
 AppRoute.post("/app/booking/add",verifyToken, BookingAppAdd);
+
+AppRoute.post("/app/booking/get",verifyToken, getAllBookings);
+
 
 
 AppRoute.get("/app/vendor/category", GetVendorCatApp);
