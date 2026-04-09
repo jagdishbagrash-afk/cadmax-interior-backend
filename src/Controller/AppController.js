@@ -355,7 +355,7 @@ exports.AppOrder = catchAsync(async (req, res) => {
     if (!cart) {
         return validationErrorResponse(
         res,
-      Unable to clear cart after order placement for user:",
+      "Unable to clear cart after order placement for user:",
         401
       );
     }
