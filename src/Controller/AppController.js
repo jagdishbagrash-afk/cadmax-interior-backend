@@ -330,49 +330,45 @@ exports.OTPVerify = catchAsync(async (req, res) => {
 
 exports.AppOrder = catchAsync(async (req, res) => {
   try {
-    const { name, mobile, address, product, amount } = req.body;
-    const userId = req.user.id || "692f0eeebc9b6fd6cc3a5709";
-    console.log("userId", userId)
-    if (!name || !mobile || !address || !product || !amount) {
+    const { name, mobile, address, product, amount, addressId ,PaymentId } = req.body;
+    const userId = req.user?.id || "692dcfbd4816433146e11abd";
+
+    const orderId = `ORD-${uuidv4().slice(0, 8).toUpperCase()}`;
+
+    if (!name || !mobile || !product || !amount) {
       return validationErrorResponse(
         res,
         "All fields (name, mobile, address, product, amount) are required"
       );
     }
-    const orderId = `ORD-${uuidv4().slice(0, 8).toUpperCase()}`;
 
     const newOrder = await Order({
       name,
       mobile,
       address,
       product,
+      addressId,
       amount,
       userId,
-      orderId
+      orderId ,
+      PaymentId
     });
-    const record = await newOrder.save();
-    const cart = await Cart.findOneAndDelete({ user: userId });
-    if (!cart) {
-        return validationErrorResponse(
-        res,
-      "Unable to clear cart after order placement for user:",
-        401
-      );
-    }
 
-    const subject = `Welcome to Cadmax!🎉`;
-    const emailHtml = OrderEmail(req?.body?.name, record);
-    await sendEmail({
-      email: req?.body.email,
-      subject: subject,
-      emailHtml: emailHtml,
-    });
-    return successResponse(res, "Order placed successfully", 201, newOrder);
+    const record = await newOrder.save();
+    return successResponse(res, "Order added successfully", 201, record);
+    //    const subject = `Welcome to Cadmax!🎉`;
+    // const emailHtml = OrderEmail(record?.name, record);
+    // await sendEmail({
+    //   email: req?.user?.email,
+    //   subject: subject,
+    //   emailHtml: emailHtml,
+    // });
   } catch (error) {
     console.error(error);
     return errorResponse(res, error.message || "Internal Server Error", 500);
   }
 });
+
 
 exports.OrderList = catchAsync(async (req, res) => {
   const orders = await Order.find()
