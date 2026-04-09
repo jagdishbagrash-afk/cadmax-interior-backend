@@ -353,7 +353,11 @@ exports.AppOrder = catchAsync(async (req, res) => {
     const record = await newOrder.save();
     const cart = await Cart.findOneAndDelete({ user: userId });
     if (!cart) {
-      logger.error("Unable to clear cart after order placement for user:", userId);
+        return validationErrorResponse(
+        res,
+      Unable to clear cart after order placement for user:",
+        401
+      );
     }
 
     const subject = `Welcome to Cadmax!🎉`;
