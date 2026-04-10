@@ -308,7 +308,7 @@ exports.updateProduct = CatchAsync(async (req, res) => {
     res,
     "Product updated successfully",
     200,
-    updatedProduct
+    product
   );
 });
 
