@@ -8,6 +8,8 @@ const ProductSchema = new mongoose.Schema(
       ref: "Product",
       required: true,
     },
+
+
     variant: {
       type: String, // color
       required: true,
@@ -17,7 +19,7 @@ const ProductSchema = new mongoose.Schema(
       min: 1,
       required: true,
     },
-  },{ _id: false }
+  }, { _id: false }
 );
 
 const CartSchema = mongoose.Schema(
@@ -39,6 +41,10 @@ const CartSchema = mongoose.Schema(
     discount: {
       type: Number,
       default: 2
+    },
+    status: {
+      type: String, // color,
+      default : "pending" 
     },
   },
   { timestamps: true }

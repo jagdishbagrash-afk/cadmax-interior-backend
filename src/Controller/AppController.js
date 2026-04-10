@@ -330,7 +330,7 @@ exports.OTPVerify = catchAsync(async (req, res) => {
 
 exports.AppOrder = catchAsync(async (req, res) => {
   try {
-    const { name, mobile, address, product, amount, addressId ,PaymentId } = req.body;
+    const { name, mobile, address, product, amount, addressId, PaymentId } = req.body;
     const userId = req.user?.id || "692dcfbd4816433146e11abd";
 
     const orderId = `ORD-${uuidv4().slice(0, 8).toUpperCase()}`;
@@ -350,11 +350,43 @@ exports.AppOrder = catchAsync(async (req, res) => {
       addressId,
       amount,
       userId,
-      orderId ,
+      orderId,
       PaymentId
     });
 
+
+
+
+
     const record = await newOrder.save();
+
+    const cart = await Cart.findOne({ user: userId });
+
+    if (cart && cart.product?.length && Array.isArray(product)) {
+      cart.product = cart.product.map((item) => {
+
+        const matched = product.find((p) => {
+          // ✅ safety checks
+          if (!p?.productId || !item?.productId) return false;
+
+          return (
+            p.productId.toString() === item.productId.toString() &&
+            p.variant === item.variant
+          );
+        });
+
+        if (matched) {
+          return {
+            ...item.toObject(),
+            status: "done"
+          };
+        }
+
+        return item;
+      });
+
+      await cart.save();
+    }
     return successResponse(res, "Order added successfully", 201, record);
     //    const subject = `Welcome to Cadmax!🎉`;
     // const emailHtml = OrderEmail(record?.name, record);
@@ -446,7 +478,6 @@ exports.getAllCategorys = catchAsync(
 exports.getSubCategoryByCategory = catchAsync(async (req, res) => {
   try {
     const categoryId = req.params.id;
-    console.log("categoryId0", categoryId)
     const subCategories = await SubCategory.find({
       category: categoryId,
       deletedAt: null
@@ -774,21 +805,21 @@ exports.getCart = catchAsync(async (req, res) => {
       select: "title amount images variants"
     });
 
+
     // console.log("cart", cart);
 
-    if (!cart || cart.product.length === 0) {
-      return successResponse(res, "Cart is empty", 200,
-        {
-          items: [],
-          summary: {
-            subtotal: 0,
-            discountPercent: cart?.discount || 0,
-            discountAmount: 0,
-            taxPercent: cart?.tax || 0,
-            taxAmount: 0,
-            finalAmount: 0
-          }
-        });
+    if (!cart || cart.status !== "pending" || cart.product.length === 0) {
+      return successResponse(res, "Cart is empty", 200, {
+        items: [],
+        summary: {
+          subtotal: 0,
+          discountPercent: cart?.discount || 0,
+          discountAmount: 0,
+          taxPercent: cart?.tax || 0,
+          taxAmount: 0,
+          finalAmount: 0
+        }
+      });
     }
 
     let subtotal = 0;

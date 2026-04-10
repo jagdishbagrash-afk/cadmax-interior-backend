@@ -85,3 +85,34 @@ exports.GetAllCommonProject = catchAsync(async (req, res) => {
     return errorResponse(res, error.message || "Internal Server Error", 500);
   }
 });
+
+
+
+exports.deleteImage = async (req, res) => {
+    try {
+        const { imageUrl } = req.body;
+
+        if (!imageUrl) {
+            return res.status(400).json({
+                success: false,
+                message: "Image URL is required"
+            });
+        }
+
+        await deleteFile(imageUrl);
+
+        return res.status(200).json({
+            success: true,
+            message: "Image deleted successfully"
+        });
+
+    } catch (error) {
+        console.error("Delete Image Error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to delete image",
+            error: error.message
+        });
+    }
+};
