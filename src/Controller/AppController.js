@@ -595,9 +595,9 @@ exports.AddToCart = catchAsync(async (req, res) => {
     }
     const { id: productId, quantity, variant } = product;
     // Quantity validation
-    if (quantity < 1) {
-      return errorResponse(res, "Quantity must be at least 1", 400);
-    }
+  if (quantity <= 0) {
+  return errorResponse(res, "Quantity must be at least 1", 400);
+}
     const dbProduct = await Product.findById(productId);
     if (!dbProduct) {
       return errorResponse(res, "Product not found", 400);
