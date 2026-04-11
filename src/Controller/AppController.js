@@ -354,19 +354,24 @@ exports.AppOrder = catchAsync(async (req, res) => {
       PaymentId
     });
 
-
-
-
-
     const record = await newOrder.save();
+
+
 
     const cart = await Cart.findOne({ user: userId });
 
-    if (cart && cart.product?.length && Array.isArray(product)) {
-      cart.product = cart.product.map((item) => {
+    if (
+      cart &&
+      cart.user.toString() === userId.toString() &&
+      cart.product?.length &&
+      Array.isArray(product)
+    ) {
+      cart.product.forEach((item) => {
+
+        // ✅ Skip if already done
+        if (item.status === "Done") return;
 
         const matched = product.find((p) => {
-          // ✅ safety checks
           if (!p?.productId || !item?.productId) return false;
 
           return (
@@ -376,17 +381,14 @@ exports.AppOrder = catchAsync(async (req, res) => {
         });
 
         if (matched) {
-          return {
-            ...item.toObject(),
-            status: "done"
-          };
+          item.status = "Done"; // ✅ update only if not already done
         }
 
-        return item;
       });
 
       await cart.save();
     }
+    console.log("cart", cart)
     return successResponse(res, "Order added successfully", 201, record);
     //    const subject = `Welcome to Cadmax!🎉`;
     // const emailHtml = OrderEmail(record?.name, record);
@@ -482,7 +484,7 @@ exports.getSubCategoryByCategory = catchAsync(async (req, res) => {
       category: categoryId,
       deletedAt: null
     }).populate("category");
-    
+
     if (!subCategories || subCategories?.length === 0) {
       return validationErrorResponse(res, "No Subcategories found for this category.", 404);
     }
@@ -588,16 +590,16 @@ exports.AddToCart = catchAsync(async (req, res) => {
   try {
     const userId = req.user.id;
     const { product } = req.body;
-    console.log("req.body" ,req.body)
+    console.log("req.body", req.body)
     console.log(product)
     if (!product || !product.id || !product.quantity || !product.variant) {
       return errorResponse(res, "Invalid product payload", 400);
     }
     const { id: productId, quantity, variant } = product;
     // Quantity validation
-  if (quantity <= 0) {
-  return errorResponse(res, "Quantity must be at least 1", 400);
-}
+    if (quantity <= 0) {
+      return errorResponse(res, "Quantity must be at least 1", 400);
+    }
     const dbProduct = await Product.findById(productId);
     if (!dbProduct) {
       return errorResponse(res, "Product not found", 400);
@@ -809,21 +811,21 @@ exports.getCart = catchAsync(async (req, res) => {
 
     // console.log("cart", cart);
 
-   const activeProducts = cart?.product?.filter(p => p.status !== "done") || [];
+    const activeProducts = cart?.product?.filter(p => p.status !== "done") || [];
 
-if (!cart || cart.status !== "pending" || activeProducts.length === 0) {
-  return successResponse(res, "Cart is empty", 200, {
-    items: [],
-    summary: {
-      subtotal: 0,
-      discountPercent: cart?.discount || 0,
-      discountAmount: 0,
-      taxPercent: cart?.tax || 0,
-      taxAmount: 0,
-      finalAmount: 0
+    if (!cart || cart.status !== "pending" || activeProducts.length === 0) {
+      return successResponse(res, "Cart is empty", 200, {
+        items: [],
+        summary: {
+          subtotal: 0,
+          discountPercent: cart?.discount || 0,
+          discountAmount: 0,
+          taxPercent: cart?.tax || 0,
+          taxAmount: 0,
+          finalAmount: 0
+        }
+      });
     }
-  });
-}
 
     let subtotal = 0;
 
