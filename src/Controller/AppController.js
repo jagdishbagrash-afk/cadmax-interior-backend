@@ -588,6 +588,7 @@ exports.AddToCart = catchAsync(async (req, res) => {
   try {
     const userId = req.user.id;
     const { product } = req.body;
+    console.log("req.body" ,req.body)
     console.log(product)
     if (!product || !product.id || !product.quantity || !product.variant) {
       return errorResponse(res, "Invalid product payload", 400);
