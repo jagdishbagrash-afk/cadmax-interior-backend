@@ -44,7 +44,7 @@ const CartSchema = mongoose.Schema(
     },
     status: {
       type: String, // color,
-      deafult :"pending"
+      default :"pending"
     },
   },
   { timestamps: true }
