@@ -782,24 +782,24 @@ exports.getCart = catchAsync(async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const cart = await Cart.findOne({ user: userId }).populate({
+    // ✅ Only fetch active (pending) cart
+    const cart = await Cart.findOne({
+      user: userId,
+      status: "pending"
+    }).populate({
       path: "product.productId",
       select: "title amount images variants"
     });
 
-
-    // console.log("cart", cart);
-
-    const activeProducts = cart?.product?.filter(p => p.status !== "done") || [];
-
-    if (!cart || cart.status !== "pending" || activeProducts.length === 0) {
+    // ✅ Empty cart check
+    if (!cart || !cart.product || cart.product.length === 0) {
       return successResponse(res, "Cart is empty", 200, {
         items: [],
         summary: {
           subtotal: 0,
-          discountPercent: cart?.discount || 0,
+          discountPercent: 0,
           discountAmount: 0,
-          taxPercent: cart?.tax || 0,
+          taxPercent: 0,
           taxAmount: 0,
           finalAmount: 0
         }
@@ -809,12 +809,12 @@ exports.getCart = catchAsync(async (req, res) => {
     let subtotal = 0;
 
     const items = cart.product
-      .map(item => {
+      .map((item) => {
         const product = item.productId;
         if (!product) return null;
 
         const selectedVariant = product.variants.find(
-          v => v.color === item.variant
+          (v) => v.color === item.variant
         );
 
         const variantImages = selectedVariant?.images || [];
@@ -834,17 +834,16 @@ exports.getCart = catchAsync(async (req, res) => {
       })
       .filter(Boolean);
 
-
-    // Discount
+    // ✅ Discount
     const discountPercent = cart.discount || 0;
     const discountAmount = +(subtotal * (discountPercent / 100));
     const afterDiscount = subtotal - discountAmount;
 
-    // Tax
+    // ✅ Tax
     const taxPercent = cart.tax || 0;
     const taxAmount = +(subtotal * (taxPercent / 100)).toFixed(2);
 
-    // Final
+    // ✅ Final Amount
     const finalAmount = +(afterDiscount + taxAmount).toFixed(2);
 
     return successResponse(res, "Cart fetched successfully", 200, {
