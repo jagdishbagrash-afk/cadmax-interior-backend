@@ -338,11 +338,12 @@ exports.AppOrder = catchAsync(async (req, res) => {
     if (!name || !mobile || !product || !amount) {
       return validationErrorResponse(
         res,
-        "All fields (name, mobile, address, product, amount) are required"
+        "All fields (name, mobile, product, amount) are required"
       );
     }
 
-    const newOrder = await Order({
+    // ✅ Save Order
+    const newOrder = new Order({
       name,
       mobile,
       address,
@@ -356,46 +357,16 @@ exports.AppOrder = catchAsync(async (req, res) => {
 
     const record = await newOrder.save();
 
-
-
-
+    // ✅ Update Cart Status
     const cart = await Cart.findOne({ user: userId });
 
-    if (
-      cart &&
-      cart.product?.length &&
-      Array.isArray(product)
-    ) {
-      cart.product.forEach((item) => {
-
-        // ✅ Skip if already done
-        if (item.status === "done") return;
-
-        const matched = product.find((p) => {
-          if (!p?.productId || !item?.productId) return false;
-
-          return (
-            p.productId.toString() === item.productId.toString() &&
-            p.variant === item.variant
-          );
-        });
-
-        if (matched) {
-          item.status = "done"; // ✅ lowercase use karo
-        }
-
-      });
-
-      await cart.save(); // ✅ ab save hoga
+    if (cart && cart.status !== "done") {
+      cart.status = "done"; // 🔥 main fix
+      await cart.save();
     }
+
     return successResponse(res, "Order added successfully", 201, record);
-    //    const subject = `Welcome to Cadmax!🎉`;
-    // const emailHtml = OrderEmail(record?.name, record);
-    // await sendEmail({
-    //   email: req?.user?.email,
-    //   subject: subject,
-    //   emailHtml: emailHtml,
-    // });
+
   } catch (error) {
     console.error(error);
     return errorResponse(res, error.message || "Internal Server Error", 500);
