@@ -1076,32 +1076,38 @@ exports.EditProfile = catchAsync(async (req, res) => {
 
     const { name, email, phone, gender, dob } = req.body;
 
-    // 1. Current user find karo
+    // 1. Find user
     const existingUser = await User.findById(userId);
 
     if (!existingUser) {
       return validationErrorResponse(res, "User not found.", 404);
     }
 
-
+    // 2. Update fields (only if provided)
     if (name) existingUser.name = name;
     if (email) existingUser.email = email;
     if (phone) existingUser.phone = phone;
     if (gender) existingUser.gender = gender;
     if (dob) existingUser.dob = dob;
 
-    if (req.file && req.file.location) {
+    // 3. PROFILE IMAGE LOGIC (IMPORTANT)
+    if (req.file?.location) {
+      // delete old image (optional but recommended)
       if (existingUser.profileImage) {
         try {
           await deleteFile(existingUser.profileImage);
         } catch (err) {
-          console.log("Error deleting old image:", err.message);
+          console.log("Old image delete error:", err.message);
         }
       }
+
+      // set new image
       existingUser.profileImage = req.file.location;
     }
 
-    // 5. Save
+    // ❗ if no file → DO NOTHING (old image remains same)
+
+    // 4. Save
     const updatedUser = await existingUser.save();
 
     return successResponse(

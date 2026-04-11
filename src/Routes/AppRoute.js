@@ -24,7 +24,7 @@ AppRoute.get("/app/cart/get", verifyToken, getCart);
 AppRoute.get("/app/cart/clear", verifyToken, clearCart); 
 AppRoute.get("/app/cart/remove/:productId/:variant" , verifyToken , removeProductVariantFromCart)
 
-AppRoute.post("/app/order/add" , verifyToken,  AppOrder); 
+AppRoute.post("/app/order/add" ,verifyToken,  AppOrder); 
 
 AppRoute.get("/app/order/list", verifyToken ,  OrderList); 
 
@@ -48,7 +48,7 @@ AppRoute.get("/app/vendor/category", GetVendorCatApp);
 
 AppRoute.get("/app/vendor/:id",   GetVendorCategory);   
 
-AppRoute.post("/app/user/edit-profile" , verifyToken , upload.single("profileImage"),  EditProfile)
+AppRoute.post("/app/user/edit-profile" , verifyToken , upload.single("profile_image"),  EditProfile)
 
 AppRoute.get("/app/bestseller", bestSellerProducts);
 
