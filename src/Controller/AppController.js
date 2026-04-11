@@ -809,19 +809,21 @@ exports.getCart = catchAsync(async (req, res) => {
 
     // console.log("cart", cart);
 
-    if (!cart || cart.status !== "pending" || cart.product.length === 0) {
-      return successResponse(res, "Cart is empty", 200, {
-        items: [],
-        summary: {
-          subtotal: 0,
-          discountPercent: cart?.discount || 0,
-          discountAmount: 0,
-          taxPercent: cart?.tax || 0,
-          taxAmount: 0,
-          finalAmount: 0
-        }
-      });
+   const activeProducts = cart?.product?.filter(p => p.status !== "done") || [];
+
+if (!cart || cart.status !== "pending" || activeProducts.length === 0) {
+  return successResponse(res, "Cart is empty", 200, {
+    items: [],
+    summary: {
+      subtotal: 0,
+      discountPercent: cart?.discount || 0,
+      discountAmount: 0,
+      taxPercent: cart?.tax || 0,
+      taxAmount: 0,
+      finalAmount: 0
     }
+  });
+}
 
     let subtotal = 0;
 
