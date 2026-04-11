@@ -24,7 +24,7 @@ AppRoute.get("/app/cart/get", verifyToken, getCart);
 AppRoute.get("/app/cart/clear", verifyToken, clearCart); 
 AppRoute.get("/app/cart/remove/:productId/:variant" , verifyToken , removeProductVariantFromCart)
 
-AppRoute.post("/app/order/add" ,  AppOrder); 
+AppRoute.post("/app/order/add" , verifyToken,  AppOrder); 
 
 AppRoute.get("/app/order/list", verifyToken ,  OrderList); 
 
