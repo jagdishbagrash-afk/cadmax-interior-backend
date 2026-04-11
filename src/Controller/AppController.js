@@ -590,7 +590,6 @@ exports.AddToCart = catchAsync(async (req, res) => {
   try {
     const userId = req.user.id;
     const { product } = req.body;
-    console.log("req.body", req.body)
     console.log(product)
     if (!product || !product.id || !product.quantity || !product.variant) {
       return errorResponse(res, "Invalid product payload", 400);
@@ -811,7 +810,7 @@ exports.getCart = catchAsync(async (req, res) => {
 
     // console.log("cart", cart);
 
-    const activeProducts = cart?.product?.filter(p => p.status !== "done") || [];
+    const activeProducts = cart?.product?.filter(p => p.status !== "Done") || [];
 
     if (!cart || cart.status !== "pending" || activeProducts.length === 0) {
       return successResponse(res, "Cart is empty", 200, {
