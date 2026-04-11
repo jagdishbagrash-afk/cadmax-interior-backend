@@ -780,7 +780,7 @@ exports.getCart = catchAsync(async (req, res) => {
 
     // console.log("cart", cart);
 
-    const activeProducts = cart?.product?.filter(p => p.status !== "Done") || [];
+    const activeProducts = cart?.product?.filter(p => p.status !== "done") || [];
 
     if (!cart || cart.status !== "pending" || activeProducts.length === 0) {
       return successResponse(res, "Cart is empty", 200, {
