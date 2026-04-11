@@ -358,18 +358,18 @@ exports.AppOrder = catchAsync(async (req, res) => {
 
 
 
+
     const cart = await Cart.findOne({ user: userId });
 
     if (
       cart &&
-      cart.user.toString() === userId.toString() &&
       cart.product?.length &&
       Array.isArray(product)
     ) {
       cart.product.forEach((item) => {
 
         // ✅ Skip if already done
-        if (item.status === "Done") return;
+        if (item.status === "done") return;
 
         const matched = product.find((p) => {
           if (!p?.productId || !item?.productId) return false;
@@ -381,14 +381,13 @@ exports.AppOrder = catchAsync(async (req, res) => {
         });
 
         if (matched) {
-          item.status = "Done"; // ✅ update only if not already done
+          item.status = "done"; // ✅ lowercase use karo
         }
 
       });
 
-      await cart.save();
+      await cart.save(); // ✅ ab save hoga
     }
-    console.log("cart", cart)
     return successResponse(res, "Order added successfully", 201, record);
     //    const subject = `Welcome to Cadmax!🎉`;
     // const emailHtml = OrderEmail(record?.name, record);
