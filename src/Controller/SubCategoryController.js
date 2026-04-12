@@ -4,6 +4,29 @@ const CatchAsync = require("../Utill/catchAsync");
 const { errorResponse, successResponse, validationErrorResponse } = require("../Utill/ErrorHandling");
 const { deleteFile } = require("../Utill/S3");
 
+const makeSlug = (text) => {
+    return text
+        .toString()
+        .toLowerCase()
+        .trim()
+        .replace(/[\s\_]+/g, "-")
+        .replace(/[^\w\-]+/g, "")
+        .replace(/\-\-+/g, "-");
+};
+
+const generateUniqueSlug = async (Model, title) => {
+    let baseSlug = makeSlug(title);
+    let slug = baseSlug;
+    let counter = 1;
+
+    while (await Model.findOne({ slug })) {
+        slug = `${baseSlug}-${counter}`;
+        counter++;
+    }
+
+    return slug;
+};
+
 exports.AddSubCategory = CatchAsync(async (req, res) => {
     try {
         const { name, category } = req.body;
@@ -15,13 +38,17 @@ exports.AddSubCategory = CatchAsync(async (req, res) => {
         let imageUrl = null;
 
         if (req.file) {
-            imageUrl = req.file.location;   // ✅ S3 image URL
+            imageUrl = req.file.location;
         }
+
+        // ✅ Generate slug
+        const slug = await generateUniqueSlug(SubCategory, name);
 
         const Categorys = new SubCategory({
             name,
             Image: imageUrl,
-            category
+            category,
+            slug
         });
 
         const record = await Categorys.save();
@@ -77,42 +104,47 @@ exports.getSubCategoryByCategory = CatchAsync(async (req, res) => {
 }
 );
 
-exports.UpdateSubCategory = CatchAsync(
-    async (req, res) => {
-        try {
-            const { name, category } = req.body;
-            const data = await SubCategory.findById(req.params.id);
+exports.UpdateSubCategory = CatchAsync(async (req, res) => {
+    try {
+        const { name, category } = req.body;
+        const data = await SubCategory.findById(req.params.id);
 
-            if (!data) {
-                return validationErrorResponse(res, "Category not found.", 404);
-            }
-
-            if (name) data.name = name;
-            if (category) data.category = category;
-
-            if (req.file && req.file.location) {
-
-                if (data.Image) {
-                    try {
-                        await deleteFile(data.Image);
-                    } catch (err) {
-                        console.log("Error deleting old image:", err.message);
-                    }
-                }
-
-                // ✅ Store new S3 image URL
-                data.Image = req.file.location;
-            }
-
-            const updatedCategory = await data.save();
-            return successResponse(res, "Category updated successfully.", 200, updatedCategory);
-
-        } catch (error) {
-            console.log(error);
-            return errorResponse(res, error.message || "Internal Server Error", 500);
+        if (!data) {
+            return validationErrorResponse(res, "Category not found.", 404);
         }
+
+        // ✅ Name change → slug update
+        if (name && name !== data.name) {
+            data.name = name;
+
+            const slug = await generateUniqueSlug(SubCategory, name);
+            data.slug = slug;
+        }
+
+        if (category) data.category = category;
+
+        // ✅ Image update
+        if (req.file && req.file.location) {
+            if (data.Image) {
+                try {
+                    await deleteFile(data.Image);
+                } catch (err) {
+                    console.log("Error deleting old image:", err.message);
+                }
+            }
+
+            data.Image = req.file.location;
+        }
+
+        const updatedCategory = await data.save();
+
+        return successResponse(res, "Category updated successfully.", 200, updatedCategory);
+
+    } catch (error) {
+        console.log(error);
+        return errorResponse(res, error.message || "Internal Server Error", 500);
     }
-);
+});
 
 exports.ToggleSubCategoryStatus = CatchAsync(
     async (req, res) => {
@@ -153,9 +185,8 @@ exports.GetAllSubCategoryStatus = CatchAsync(
 exports.GetSubCategoryByNameCategory = CatchAsync(async (req, res) => {
     try {
         const { name } = req.params;
-        const cleanName = name.replaceAll("-", " ");
 
-        const category = await Category.findOne({ name: cleanName });
+        const category = await Category.findOne({ slug: name });
 
 
         if (!category) {

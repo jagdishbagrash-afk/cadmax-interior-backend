@@ -14,7 +14,12 @@ const SuperCategorySchema = mongoose.Schema({
     status: {
         type: Boolean,
         default: false
-    }
+    },
+    slug: {
+        type: String,
+        required: true
+    },
+
 },
 
     { timestamps: true });

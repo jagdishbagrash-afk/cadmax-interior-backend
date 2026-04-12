@@ -23,7 +23,12 @@ const categorySchema = mongoose.Schema({
     status: {
         type: Boolean,
         default: false
-    }
+    },
+
+    slug: {
+        type: String,
+        required: true
+    },
 
 });
 
