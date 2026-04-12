@@ -32,7 +32,6 @@ exports.addOrder = catchAsync(async (req, res) => {
     });
 
     const record = await newOrder.save();
-    console.log("record" ,record)
     const subject = `Welcome to Cadmax!🎉`;
     const emailHtml = OrderEmail(record?.name, record);
     await sendEmail({

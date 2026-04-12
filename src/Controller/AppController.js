@@ -151,7 +151,6 @@ exports.Login = catchAsync(async (req, res) => {
     }
     const user = await User.findOne({ phone: phone });
 
-    console.log("user", user)
 
     if (user?.deleted_at != null) {
       return errorResponse(res, "This account is blocked", 200);
@@ -186,7 +185,6 @@ exports.Login = catchAsync(async (req, res) => {
 exports.signup = catchAsync(async (req, res) => {
   try {
     const { email, name, profileImage, role, phone, gender } = req.body;
-    console.log(" req.body", req.body)
     // Check if user already exists
     const existingUser = await User.find({
       $or: [{ email }, { phone }],
@@ -219,7 +217,6 @@ exports.signup = catchAsync(async (req, res) => {
     });
 
     const result = await record.save();
-    console.log("result", result)
     const token = jwt.sign(
       { id: result._id, role: result.role, email: result.email },
       process.env.JWT_SECRET,
@@ -332,7 +329,6 @@ exports.AppOrder = catchAsync(async (req, res) => {
   try {
     const { name, mobile, address, product, amount, addressId, PaymentId } = req.body;
     const userId = req.user?.id || "692dcfbd4816433146e11abd";
-    console.log("userId", req.user)
 
     const orderId = `ORD-${uuidv4().slice(0, 8).toUpperCase()}`;
 
@@ -358,7 +354,6 @@ exports.AppOrder = catchAsync(async (req, res) => {
 
     const record = await newOrder.save();
 
-    console.log("product" ,product)
 
     const productIds = product.map(p => p.id); // req.body.product se ids nikalo
 
@@ -368,13 +363,11 @@ const cart = await Cart.findOne({
   "product.productId": { $in: productIds }
 });
 
-console.log("filtered cart", cart);
 
 
     if (cart && cart.status !== "done") {
       cart.status = "done"; // 🔥 main fix
       const record = await cart.save();
-      console.log("record", record)
     }
 
     return successResponse(res, "Order added successfully", 201, record);
@@ -572,7 +565,6 @@ exports.AddToCart = catchAsync(async (req, res) => {
   try {
     const userId = req.user.id;
     const { product } = req.body;
-    console.log(product)
     if (!product || !product.id || !product.quantity || !product.variant) {
       return errorResponse(res, "Invalid product payload", 400);
     }
@@ -624,8 +616,6 @@ exports.AddToCart = catchAsync(async (req, res) => {
     );
     if (existingItem) {
       const newQuantity = existingItem.quantity + quantity;
-      console.log("newQuantity", newQuantity)
-      console.log("ss", matchedVariant.stock)
       if (newQuantity > matchedVariant.stock) {
         return errorResponse(
           res,
@@ -1022,7 +1012,6 @@ exports.GetServiceTypeId = catchAsync(async (req, res) => {
 exports.GetServicesDetails = catchAsync(async (req, res) => {
   try {
     const { id } = req.params;
-    console.log("at", id)
 
     if (!id) {
       return validationErrorResponse(res, "id is required", 400);
@@ -1046,7 +1035,6 @@ exports.GetServicesDetails = catchAsync(async (req, res) => {
 
 exports.ConceptUserPost = catchAsync(async (req, res) => {
   try {
-    console.log("req.body", req.body);
     const userId = req?.user?.id;
     const { User, ServicesType, Services, concept } = req.body;
 
@@ -1172,7 +1160,6 @@ exports.BookingAppAdd = catchAsync(async (req, res) => {
       subject: "New Booking Received - Cadmax",
       emailHtml: adminEmailTemplate(emailData),
     });
-    console.log("BOOKING EMAIL =>", booking.email);
     return successResponse(res, "Booking Success", 201, booking)
 
   } catch (error) {
@@ -1205,7 +1192,6 @@ exports.GetVendorCatApp = catchAsync(
 exports.GetVendorCategory = catchAsync(async (req, res) => {
   try {
     const id = req.params.id;
-    console.log("slug:", id);
     if (!id) {
       return errorResponse(res, "Category id is required", 400);
     }
@@ -1267,7 +1253,6 @@ exports.bestSellerProducts = catchAsync(async (req, res) => {
   const record = bestSellers.map(item => item.product);
 
 
-  console.log("record", record)
   res.status(200).json({
     success: true,
     message: "Best seller products fetched successfully",

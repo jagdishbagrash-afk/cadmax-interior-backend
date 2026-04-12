@@ -102,17 +102,23 @@ exports.addProduct = CatchAsync(async (req, res) => {
       deleted_at: null,
     });
 
-    await Promise.all(
-      users.map(user =>
-        sendNotification({
-          senderId: req.user.id,
-          receiverId: user._id,
-          referenceId: record._id,
-          referenceType: "Product",
-          text: `New Product added: ${record.title}`,
-        })
-      )
-    );
+   const admindata = await User.find({
+      role: "admin",
+      status: "active",
+      deleted_at: null,
+    });
+
+    // await Promise.all(
+    //   users.map(user =>
+    //     sendNotification({
+    //       senderId: admindata._id,
+    //       receiverId: user._id,
+    //       referenceId: record._id,
+    //       referenceType: "Product",
+    //       text: `New Product added: ${record.title}`,
+    //     })
+    //   )
+    // );
 
     return successResponse(
       res,

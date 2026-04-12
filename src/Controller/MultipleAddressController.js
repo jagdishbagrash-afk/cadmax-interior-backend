@@ -69,7 +69,6 @@ exports.updateAddress = async (req, res) => {
 
     const { pincode, city, state, country, street_address, addressType } = req.body;
 
-    console.log("req.body", req.body);
 
     const address = await Address.findByIdAndUpdate(
       id,

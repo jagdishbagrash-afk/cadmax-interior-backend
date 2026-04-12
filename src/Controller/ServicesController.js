@@ -222,7 +222,6 @@ exports.GetAllConcept = CatchAsync(async (req, res) => {
     .sort({ createdAt: -1 })
     .populate("ServicesSubCategory");
 
-  console.log("services", services)
   return successResponse(
     res,
     "Services list fetched successfully.",
@@ -526,7 +525,6 @@ exports.ServicesUserPost = CatchAsync(async (req, res) => {
       { path: "Services", select: "title" },
     ]);
 
-    console.log("populated", populated)
 
     const emailData = {
       userName: populated.User.name,

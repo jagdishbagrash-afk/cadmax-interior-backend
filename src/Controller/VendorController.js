@@ -16,7 +16,6 @@ const makeSlug = (text) => {
 };
 
 const generateUniqueSlug = async (Model, title) => {
-    console.log(title)
     let baseSlug = makeSlug(title);
     let slug = baseSlug;
     let counter = 1;
@@ -137,7 +136,6 @@ exports.updateCategory = CatchAsync(async (req, res) => {
 
 exports.AddVendor = CatchAsync(async (req, res) => {
     try {
-        console.log("req.files", req.files)
 
         const { name, experience, specialization, VendorCategory, phone, VendorSubCategory, content } = req.body;
         if (!name) {
@@ -182,7 +180,6 @@ exports.getAllVendors = CatchAsync(
 exports.updatevendor = CatchAsync(
     async (req, res) => {
         try {
-            console.log("req.files", req.files)
             const { name, phone, VendorCategory, specialization, experience, content, } = req.body;
 
             const data = await Vendor.findById(req.params.id);

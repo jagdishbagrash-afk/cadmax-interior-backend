@@ -98,7 +98,6 @@ exports.MarkNotificationAsRead = catchAsync(async (req, res) => {
 });
 
 exports.updateReviewNotification = catchAsync(async (req, res) => {
-  console.log("req.body", req.body);
   const {
     ShipmentId,
     receiverBrokerId,
