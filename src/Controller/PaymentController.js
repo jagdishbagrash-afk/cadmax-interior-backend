@@ -34,7 +34,6 @@ const razorpayInstance = new Razorpay({
   };
 
   exports.paymentAdd = catchAsync(async (req, res) => {
-    console.log("req.body" ,req.body)
     const  user_id =  req.user.id
     const { order_id, payment_id, amount, currency, payment_status, product_name,type ,product_id  , OrderID } = req.body;
     const status = payment_status === 'failed' ? 'failed' : 'success';

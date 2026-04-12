@@ -393,9 +393,7 @@ exports.getProductBySubCategory = CatchAsync(async (req, res) => {
 
     const { color, lowPrice, highPrice } = req.query;
 
-    console.log("color", req.query.color)
-    console.log("color", req.query.lowPrice)
-    console.log("color", req.query.highPrice)
+
 
 
     /* -------------------- BASE FILTER -------------------- */
