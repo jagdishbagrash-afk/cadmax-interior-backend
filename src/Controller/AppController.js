@@ -332,7 +332,7 @@ exports.AppOrder = catchAsync(async (req, res) => {
   try {
     const { name, mobile, address, product, amount, addressId, PaymentId } = req.body;
     const userId = req.user?.id || "692dcfbd4816433146e11abd";
-    console.log("userId",  req.user) 
+    console.log("userId", req.user)
 
     const orderId = `ORD-${uuidv4().slice(0, 8).toUpperCase()}`;
 
@@ -358,19 +358,23 @@ exports.AppOrder = catchAsync(async (req, res) => {
 
     const record = await newOrder.save();
 
-    console.log("record" ,record);
+    console.log("product" ,product)
 
-    console.log("token userId:", req.user.id);
+    const productIds = product.map(p => p.id); // req.body.product se ids nikalo
 
-const cart = await Cart.findOne({ user: req.user.id });
-console.log("cart:", cart);
-    // ✅ Update Cart Status
+const cart = await Cart.findOne({
+  user: userId,
+  status: { $ne: "done" },
+  "product.productId": { $in: productIds }
+});
 
-    console.log("cart" ,cart)
+console.log("filtered cart", cart);
+
 
     if (cart && cart.status !== "done") {
       cart.status = "done"; // 🔥 main fix
-      await cart.save();
+      const record = await cart.save();
+      console.log("record", record)
     }
 
     return successResponse(res, "Order added successfully", 201, record);
@@ -596,12 +600,12 @@ exports.AddToCart = catchAsync(async (req, res) => {
       );
     }
     // Find or create cart
-let cart = await Cart.findOne({ user: userId, status: "pending" });
+    let cart = await Cart.findOne({ user: userId, status: "pending" });
 
     if (!cart) {
       cart = await Cart.create({
         user: userId,
-           status: "pending", // ✅ important
+        status: "pending", // ✅ important
         product: [
           {
             productId,
