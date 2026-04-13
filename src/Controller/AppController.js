@@ -1324,3 +1324,49 @@ exports.getMyBookings = async (req, res) => {
     );
   }
 };
+
+
+exports.AppDeleteUser = catchAsync(async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { otp, deleted_reason } = req.body;
+
+    // ✅ Validate input
+    if (!otp) {
+      return validationErrorResponse(res, "OTP is required", 400);
+    }
+
+    if (!deleted_reason) {
+      return validationErrorResponse(res, "Delete reason is required", 400);
+    }
+
+    // ✅ Find user
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return validationErrorResponse(res, "User not found", 404);
+    }
+
+    // ✅ OTP check (TEMP hardcoded - improve later)
+    if (otp !== "123456") {
+      return validationErrorResponse(res, "Invalid OTP", 400);
+    }
+
+    // ✅ Already deleted check
+    if (user.deleted_at) {
+      return validationErrorResponse(res, "User already deleted", 400);
+    }
+
+    // ✅ SOFT DELETE
+    user.deleted_at = new Date();
+    user.status = "inactive";
+    user.deleted_reason = deleted_reason;
+
+    await user.save();
+
+    return successResponse(res, "User deleted successfully", 200);
+
+  } catch (error) {
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});

@@ -1,4 +1,4 @@
-const { signup, Login, SendOtp, profilegettoken, PhoneVerify, OTPVerify, AppOrder, getAllCategorys, getSubCategoryByCategory, getProductBySubCategory, getProductById, AddToCart, getCart, GetAllProject, GetServicesType, GetServiceTypeId, GetServicesDetails, ConceptUserPost, removeProductVariantFromCart, EditProfile, BookingAppAdd, GetVendorCatApp, GetAllVendor, GetVendorCategory, updateCart, clearCart, OrderList, bestSellerProducts, latestProducts, GetAllServicesSubCategorys, getAllBookings } = require("../Controller/AppController");
+const { signup, Login, SendOtp, profilegettoken, PhoneVerify, OTPVerify, AppOrder, getAllCategorys, getSubCategoryByCategory, getProductBySubCategory, getProductById, AddToCart, getCart, GetAllProject, GetServicesType, GetServiceTypeId, GetServicesDetails, ConceptUserPost, removeProductVariantFromCart, EditProfile, BookingAppAdd, GetVendorCatApp, GetAllVendor, GetVendorCategory, updateCart, clearCart, OrderList, bestSellerProducts, latestProducts, GetAllServicesSubCategorys, getAllBookings, AppDeleteUser } = require("../Controller/AppController");
 const { GetAllBanner } = require("../Controller/BannerController");
 const ServciesSubCategoryController = require("../Controller/ServciesSubCategoryController.js");
 const MultipleAddressController = require("../Controller/MultipleAddressController");
@@ -33,6 +33,7 @@ AppRoute.get("/app/address/:id", MultipleAddressController.getAddressById);
 AppRoute.post("/app/address/update/:id", verifyToken, MultipleAddressController.updateAddress);
 AppRoute.get("/app/address/default/:id", verifyToken, MultipleAddressController.setDefaultAddress);
 AppRoute.get("/app/address/delete/:id", MultipleAddressController.DeleteAddress);
+AppRoute.post("/app/user/delete", verifyToken, AppDeleteUser)
 
 // Witout Auth 
 

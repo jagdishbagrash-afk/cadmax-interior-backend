@@ -69,7 +69,12 @@ const UserSchema = new mongoose.Schema({
   deleted_at: {
     type: Date,
     default: null
-  }
+  },
+  deleted_reason: {
+    type: String,
+    default: null
+  },
+
 }, { timestamps: true });
 
 UserSchema.index({ name: 1, email: 1 }, { unique: true });
