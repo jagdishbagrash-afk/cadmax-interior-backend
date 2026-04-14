@@ -1,6 +1,6 @@
 const { verifyToken } = require("../Utill/tokenVerify");
 const UserRoute = require("express").Router();
-const { signup, AdminLogin, GetAllUser, profilegettoken, UserLogin, OTPVerify, SendUserOtp, UserPhoneVerify, EditProfileData, DeleteUser } = require("../Controller/AuthController");
+const { signup, AdminLogin, GetAllUser, profilegettoken, UserLogin, OTPVerify, SendUserOtp, UserPhoneVerify, EditProfileData, DeleteUser, AdminDeleteUser } = require("../Controller/AuthController");
 const { upload } = require("../Utill/S3");
 UserRoute.post("/user/signup", signup)
 UserRoute.post("/user/login", UserLogin)
@@ -12,7 +12,9 @@ UserRoute.get("/admin/alluser", GetAllUser)
 UserRoute.get("/user/profile", verifyToken, profilegettoken)
 UserRoute.get("/admin/alluser", GetAllUser)
 
-UserRoute.get("/user/delete/:id", verifyToken, DeleteUser)
+UserRoute.get("/user/delete", verifyToken , DeleteUser)
+
+UserRoute.get("/admin/user/delete/:id", AdminDeleteUser)
 
 
 UserRoute.post("/user/edit-profile" , verifyToken , upload.single("profileImage"),  EditProfileData)

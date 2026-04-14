@@ -99,8 +99,8 @@ exports.deleteImage = async (req, res) => {
             });
         }
 
-        await deleteFile(imageUrl);
-
+   const record=      await deleteFile(imageUrl);
+console.log("record" ,record)
         return res.status(200).json({
             success: true,
             message: "Image deleted successfully"

@@ -172,10 +172,9 @@ exports.updateProduct = CatchAsync(async (req, res) => {
     return validationErrorResponse(res, "Product not found", 404);
   }
 
-  const value = v => Array.isArray(v) ? v[0] : v;
+  const value = (v) => (Array.isArray(v) ? v[0] : v);
 
-  /* ------------------ 1️⃣ Basic fields ------------------ */
-
+  /* ================= 1️⃣ BASIC FIELDS ================= */
   const fields = [
     "title",
     "description",
@@ -185,17 +184,18 @@ exports.updateProduct = CatchAsync(async (req, res) => {
     "dimensions",
     "material",
     "type",
-    "terms"
+    "terms",
   ];
-  fields.forEach(f => {
+
+  fields.forEach((f) => {
     if (req.body[f] !== undefined) {
       product[f] = value(req.body[f]);
     }
   });
 
-  /* ------------------ 2️⃣ Main image ------------------ */
+  /* ================= 2️⃣ MAIN IMAGE ================= */
+  const mainImageFile = req.files?.find((f) => f.fieldname === "image");
 
-  const mainImageFile = req.files?.find(f => f.fieldname === "image");
   if (mainImageFile) {
     if (product.image) {
       await deleteFile(product.image);
@@ -203,28 +203,29 @@ exports.updateProduct = CatchAsync(async (req, res) => {
     product.image = mainImageFile.location;
   }
 
-  /* ------------------ 3️⃣ Parse variants ------------------ */
-
+  /* ================= 3️⃣ PARSE VARIANTS ================= */
   let incomingVariants = [];
+
   if (req.body.variants) {
     try {
-      incomingVariants = JSON.parse(req.body.variants).map(v => ({
+      incomingVariants = JSON.parse(req.body.variants).map((v) => ({
         ...v,
-        color: v.color.toLowerCase()
+        color: v.color.toLowerCase(),
       }));
     } catch {
       return validationErrorResponse(res, "Invalid variants data", 400);
     }
   }
 
-  /* ------------------ 4️⃣ Map uploaded images ------------------ */
-
+  /* ================= 4️⃣ MAP UPLOADED IMAGES ================= */
   const uploadedImagesByColor = {};
 
-  req.files?.forEach(file => {
+  req.files?.forEach((file) => {
     if (!file.fieldname.startsWith("variantImages_")) return;
 
-    const color = file.fieldname.replace("variantImages_", "").toLowerCase();
+    const color = file.fieldname
+      .replace("variantImages_", "")
+      .toLowerCase();
 
     if (!uploadedImagesByColor[color]) {
       uploadedImagesByColor[color] = [];
@@ -233,36 +234,49 @@ exports.updateProduct = CatchAsync(async (req, res) => {
     uploadedImagesByColor[color].push(file.location);
   });
 
-  /* ------------------ 5️⃣ Delete removed colors ------------------ */
-
-  const incomingColors = incomingVariants.map(v => v.color);
+  /* ================= 5️⃣ DELETE REMOVED COLORS ================= */
+  const incomingColors = incomingVariants.map((v) => v.color);
 
   const removedVariants = product.variants.filter(
-    v => !incomingColors.includes(v.color)
+    (v) => !incomingColors.includes(v.color)
   );
 
   for (const v of removedVariants) {
     await Promise.all(
-      (v.images || []).map(img => deleteFile(img))
+      (v.images || []).map((img) => deleteFile(img))
     );
   }
 
-  /* ------------------ 6️⃣ Build final variants ------------------ */
-
+  /* ================= 6️⃣ BUILD FINAL VARIANTS ================= */
   const finalVariants = [];
 
   for (const incoming of incomingVariants) {
     const existing = product.variants.find(
-      v => v.color === incoming.color
+      (v) => v.color === incoming.color
     );
 
     const existingImages = existing?.images || [];
 
-    const keptImages = (incoming.images || []).filter(Boolean);
+    // ✅ safe kept images
+    const keptImages = Array.isArray(incoming.images)
+      ? incoming.images.filter(Boolean)
+      : [];
 
+    // ✅ new uploaded images
     const newImages = uploadedImagesByColor[incoming.color] || [];
 
-    const finalImages = [...keptImages, ...newImages].filter(Boolean);
+    // ✅ FINAL MERGE LOGIC (VERY IMPORTANT)
+    let finalImages;
+
+    if (keptImages.length > 0) {
+      finalImages = [...keptImages, ...newImages];
+    } else {
+      // if frontend didn't send images → keep old
+      finalImages = [...existingImages, ...newImages];
+    }
+
+    // remove duplicates
+    finalImages = [...new Set(finalImages)];
 
     if (!finalImages.length) {
       return validationErrorResponse(
@@ -272,49 +286,30 @@ exports.updateProduct = CatchAsync(async (req, res) => {
       );
     }
 
-    // delete removed images
+    /* ===== DELETE REMOVED IMAGES ===== */
     await Promise.all(
       existingImages
-        .filter(img => !keptImages.includes(img))
-        .map(img => deleteFile(img))
+        .filter((img) => !finalImages.includes(img))
+        .map((img) => deleteFile(img))
     );
 
     finalVariants.push({
       color: incoming.color,
       stock: Number(incoming.stock) || 0,
-      images: [...keptImages, ...newImages]
+      images: finalImages,
     });
   }
 
   product.variants = finalVariants;
 
-  /* ------------------ 7️⃣ Save ------------------ */
-
-  // const updatedProduct = await product.save();
-
-  // const users = await User.find({
-  //   role: "customer",
-  //   status: "active",
-  //   deleted_at: null,
-  // });
-
-  // await Promise.all(
-  //   users.map(user =>
-  //     sendNotification({
-  //       senderId: req.user.id,
-  //       receiverId: user._id,
-  //       referenceId: updatedProduct._id,
-  //       referenceType: "Product",
-  //       text: `New Product added: ${updatedProduct.title}`,
-  //     })
-  //   )
-  // );
+  /* ================= 7️⃣ SAVE ================= */
+  const updatedProduct = await product.save();
 
   return successResponse(
     res,
     "Product updated successfully",
     200,
-    product
+    updatedProduct
   );
 });
 

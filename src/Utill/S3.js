@@ -242,31 +242,44 @@ const uploadFile = async (req, res) => {
 };
 
 const deleteFile = async (fileUrl) => {
-    try {
-        let key;
-        if (fileUrl.includes('amazonaws.com')) {
-            const url = new URL(fileUrl);
-            key = decodeURIComponent(url.pathname.substring(1));
-        } else {
-            key = fileUrl;
-        }
-        
-        if (!key) {
-            throw new Error("Invalid file URL or key");
-        }
-        
-        console.log("Deleting S3 Object Key:", key);
-        
-        await s3Client.send(new DeleteObjectCommand({
-            Bucket: process.env.S3_BUCKET_NAME,
-            Key: key
-        }));
-        
-        return true;
-    } catch (error) {
-        console.error('Delete error:', error);
-        throw error;
+  try {
+    if (!fileUrl) return;
+
+    let key = "";
+
+    // ✅ Handle full S3 URL
+    if (fileUrl.includes("amazonaws.com")) {
+      const url = new URL(fileUrl);
+
+      key = url.pathname.replace(/^\/+/, ""); // remove leading /
+      key = decodeURIComponent(key);
+    } else {
+      // already key
+      key = fileUrl;
     }
+
+    if (!key) {
+      throw new Error("Invalid file key");
+    }
+
+    console.log("🗑️ Deleting from S3:");
+    console.log("Bucket:", process.env.S3_BUCKET_NAME);
+    console.log("Key:", key);
+
+    const result = await s3Client.send(
+      new DeleteObjectCommand({
+        Bucket: process.env.S3_BUCKET_NAME,
+        Key: key,
+      })
+    );
+
+    console.log("✅ Delete success:", result);
+
+    return true;
+  } catch (error) {
+    console.error("❌ S3 Delete Error:", error);
+    return false; // ❗ don't throw, avoid API crash
+  }
 };
 
 const uploadMiddleware = (fieldName = 'file') => {
