@@ -186,12 +186,27 @@ exports.updateProduct = CatchAsync(async (req, res) => {
     "type",
     "terms",
   ];
+  let isTitleUpdated = false;
 
   fields.forEach((f) => {
     if (req.body[f] !== undefined) {
-      product[f] = value(req.body[f]);
+      const newValue = value(req.body[f]);
+
+      // ✅ check if title changed
+      if (f === "title" && newValue !== product.title) {
+        isTitleUpdated = true;
+      }
+
+      product[f] = newValue;
     }
   });
+
+   if (isTitleUpdated) {
+    product.slug = slugify(product.title, {
+      lower: true,
+      strict: true,
+    });
+  }
 
   /* ================= 2️⃣ MAIN IMAGE ================= */
   const mainImageFile = req.files?.find((f) => f.fieldname === "image");
