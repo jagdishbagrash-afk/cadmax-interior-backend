@@ -1226,14 +1226,11 @@ exports.bestSellerProducts = catchAsync(async (req, res) => {
       },
     },
 
-    {
-      $match: {
-        totalOrders: { $gt: 1 },
-      },
-    },
+    // ❌ removed condition
 
     { $sort: { totalQuantity: -1 } },
     { $limit: limit },
+
     {
       $lookup: {
         from: "products",
@@ -1243,6 +1240,7 @@ exports.bestSellerProducts = catchAsync(async (req, res) => {
       },
     },
     { $unwind: "$product" },
+
     {
       $project: {
         product: "$product",
@@ -1251,7 +1249,6 @@ exports.bestSellerProducts = catchAsync(async (req, res) => {
   ]);
 
   const record = bestSellers.map(item => item.product);
-
 
   res.status(200).json({
     success: true,
