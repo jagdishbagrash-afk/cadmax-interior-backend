@@ -514,9 +514,6 @@ exports.getProductByCategory = catchAsync(async (req, res) => {
 exports.getProductBySubCategory = catchAsync(async (req, res) => {
   try {
     const { id } = req.params;
-    // const page = parseInt(req.query.page, 10) || 1;
-    // const limit = parseInt(req.query.limit, 10) || 10;
-    // const skip = (page - 1) * limit;
     const filter = {
       subcategory: id,
       deletedAt: null,
@@ -1377,6 +1374,99 @@ exports.AppDeleteUser = catchAsync(async (req, res) => {
     await user.save();
 
     return successResponse(res, "User deleted successfully", 200);
+
+  } catch (error) {
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});
+
+exports.globalSearch = catchAsync(async (req, res) => {
+  try {
+    const { search } = req.query;
+
+    console.log("search" , search)
+
+    // common condition
+    const regexFilter = search
+      ? { $regex: search, $options: "i" }
+      : null;
+
+    // 🔍 PRODUCTS SEARCH
+    const productFilter = {
+      deletedAt: null,
+    };
+
+    if (regexFilter) {
+      productFilter.title = regexFilter;
+    }
+
+    const productsPromise = Product.find(productFilter)
+      .populate("subcategory")
+      .populate("category")
+      .sort({ createdAt: -1 });
+
+    // 🔍 SERVICES SEARCH (AGGREGATION)
+    const serviceMatch = {
+      status: true,
+    };
+
+    if (regexFilter) {
+      serviceMatch.title = regexFilter;
+    }
+
+    const servicesPromise = Services.aggregate([
+      {
+        $match: serviceMatch,
+      },
+      {
+        $group: {
+          _id: "$concept",
+          services: { $push: "$$ROOT" },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          k: "$_id",
+          v: "$services",
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          data: { $push: { k: "$k", v: "$v" } },
+        },
+      },
+      {
+        $replaceRoot: {
+          newRoot: { $arrayToObject: "$data" },
+        },
+      },
+    ]);
+
+    // ⚡ parallel execution (fast 🔥)
+    const [products, services] = await Promise.all([
+      productsPromise,
+      servicesPromise,
+    ]);
+
+    // default concepts
+    const defaultConcepts = {
+      contemporary: [],
+      modern: [],
+      classic: [],
+    };
+
+    const finalServices = {
+      ...defaultConcepts,
+      ...(services[0] || {}),
+    };
+
+    // ✅ FINAL RESPONSE
+    return successResponse(res, "Global search result", 200, {
+      products,
+      design: finalServices,
+    });
 
   } catch (error) {
     return errorResponse(res, error.message || "Internal Server Error", 500);
