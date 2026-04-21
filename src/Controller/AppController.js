@@ -1226,11 +1226,14 @@ exports.bestSellerProducts = catchAsync(async (req, res) => {
       },
     },
 
-    // ❌ removed condition
+    {
+      $match: {
+        totalOrders: { $gt: 1 },
+      },
+    },
 
     { $sort: { totalQuantity: -1 } },
     { $limit: limit },
-
     {
       $lookup: {
         from: "products",
@@ -1240,7 +1243,6 @@ exports.bestSellerProducts = catchAsync(async (req, res) => {
       },
     },
     { $unwind: "$product" },
-
     {
       $project: {
         product: "$product",
@@ -1250,6 +1252,7 @@ exports.bestSellerProducts = catchAsync(async (req, res) => {
 
   const record = bestSellers.map(item => item.product);
 
+
   res.status(200).json({
     success: true,
     message: "Best seller products fetched successfully",
@@ -1258,6 +1261,18 @@ exports.bestSellerProducts = catchAsync(async (req, res) => {
 });
 
 
+
+
+exports.AppAllVendors = catchAsync(
+    async (req, res) => {
+        try {
+            const Categorys = await Vendor.find().sort({ createdAt: -1 }).populate("VendorCategory");
+            return successResponse(res, "Vendor Categorys list successfully.", 201, Categorys);
+        } catch (error) {
+            return errorResponse(res, error.message || "Internal Server Error", 500);
+        }
+    }
+);
 
 
 
