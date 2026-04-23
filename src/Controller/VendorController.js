@@ -205,18 +205,16 @@ exports.updatevendor = CatchAsync(
             if (specialization) data.specialization = specialization;
             if (experience) data.experience = experience;
             if (content) data.content = content;
-            if (req.file && req.file.location) {
-
-                if (data.Image) {
-                    try {
-                        await deleteFile(data.Image);
-                    } catch (err) {
-                        console.log("Error deleting old image:", err.message);
-                    }
-                }
-
-                data.Image = req.file.location;
-            }
+           if (Image) {
+    if (data.Image) {
+        try {
+            await deleteFile(data.Image);
+        } catch (err) {
+            console.log("Error deleting old image:", err.message);
+        }
+    }
+    data.Image = Image;
+}
 
             const updatedCategory = await data.save();
             return successResponse(res, "Vendor updated successfully.", 200, updatedCategory);
