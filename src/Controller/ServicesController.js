@@ -206,21 +206,22 @@ exports.getAllServices = CatchAsync(
 exports.GetAllConcept = CatchAsync(async (req, res) => {
   const { slug } = req.params;
 
-  // Step 1: Find sub-category
-  const record = await ServicesSubCategory.findOne({ slug });
+  const record = await ServicesSubCategory.find({ slug });
+
+  console.log(record)
 
   if (!record) {
     return errorResponse(res, "Sub category not found", 404);
   }
 
-  const Id = record?._id;
-
-  // Step 2: Find services
   const services = await Services.find({
-    ServicesSubCategory: new mongoose.Types.ObjectId(Id)
+    ServicesSubCategory: record._id,
   })
     .sort({ createdAt: -1 })
     .populate("ServicesSubCategory");
+
+  console.log("Record ID:", record._id);
+  console.log("Services:", services.length);
 
   return successResponse(
     res,
