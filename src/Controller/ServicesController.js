@@ -206,7 +206,7 @@ exports.getAllServices = CatchAsync(
 exports.GetAllConcept = CatchAsync(async (req, res) => {
   const { slug } = req.params;
 
-  const record = await ServicesSubCategory.find({ slug });
+  const record = await ServicesSubCategory.findOne({ slug });
 
   console.log(record)
 
