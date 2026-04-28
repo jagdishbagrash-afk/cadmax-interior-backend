@@ -1479,7 +1479,7 @@ exports.LeadApp = catchAsync(async (req, res) => {
     const assignedTo = req.user.id; 
     console.log("assignedTo" ,assignedTo)
     const { title, message, services, type , category   } = req.body;
-    const record = Lead.create({
+    const record = await Lead.create({
       assignedTo,
       title,
       message,
@@ -1488,6 +1488,8 @@ exports.LeadApp = catchAsync(async (req, res) => {
       type,
       source: "App"
     })
+
+    console.log("record" ,record)
 
     res.json({
       status: true,
