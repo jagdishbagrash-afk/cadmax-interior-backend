@@ -154,9 +154,9 @@ exports.SendUserOtp = catchAsync(async (req, res) => {
     // Find user by phone
     const user = await User.findOne({ phone });
 
-    // if (!user) {
-    //   return errorResponse(res, "Phone not registered. Please sign up first.", 401);
-    // }
+    if (!user) {
+      return errorResponse(res, "Phone not registered. Please sign up first.", 401);
+    }
 
     if (user?.deleted_at != null) {
       return errorResponse(res, "This account is blocked", 401);

@@ -74,25 +74,25 @@ exports.ContactGet = catchAsync(async (req, res, next) => {
 
 
 exports.createLead = catchAsync(async (req, res) => {
-  try {
-    const  assignedTo = req.user.id
-      const { title ,  message, services , pageurl   , name , email , phone} = req.body;
-const record   =  Lead.create({
-assignedTo, title ,  message, services , pageurl  , name , email , phone
-})
+    try {
+        const assignedTo = req.user.id
+        const { title, message, services, pageurl, name, email, phone } = req.body;
+        const record = Lead.create({
+            assignedTo, title, message, services, pageurl, name, email, phone
+        })
 
-    res.json({
+        res.json({
             status: true,
             message: " Request submitted & emails sent successfully.",
-            record : record
+            record: record
         });
-  
-  } catch (error) {
-    res.status(500).json({
-      status: false,
-      message: error.message,
-    });
-  }
+
+    } catch (error) {
+        res.status(500).json({
+            status: false,
+            message: error.message,
+        });
+    }
 });
 
 

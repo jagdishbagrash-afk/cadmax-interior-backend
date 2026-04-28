@@ -3,11 +3,14 @@ const mongoose = require("mongoose");
 const leadSchema = new mongoose.Schema(
   {
     title: { type: String,  },
+    type: { type: String,  },
+
     message: { type: String },
     name :  String,
     email :String ,
     phone :String,
     services: { type: String },
+    category: { type: String },
     pageurl: String,
     source: {
       type: String,

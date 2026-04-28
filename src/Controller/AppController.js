@@ -23,6 +23,7 @@ const adminEmailTemplate = require("../EmailTemplate/bookingAdminEmail");
 const Welcome = require("../EmailTemplate/Welcome");
 const OrderEmail = require("../EmailTemplate/Order");
 const ServicesSubCategory = require("../Model/ServicesSubCategory");
+const Lead = require("../Model/Lead");
 
 // const twilio = require("twilio");
 
@@ -357,11 +358,11 @@ exports.AppOrder = catchAsync(async (req, res) => {
 
     const productIds = product.map(p => p.id); // req.body.product se ids nikalo
 
-const cart = await Cart.findOne({
-  user: userId,
-  status: { $ne: "done" },
-  "product.productId": { $in: productIds }
-});
+    const cart = await Cart.findOne({
+      user: userId,
+      status: { $ne: "done" },
+      "product.productId": { $in: productIds }
+    });
 
 
 
@@ -1261,14 +1262,14 @@ exports.bestSellerProducts = catchAsync(async (req, res) => {
 
 
 exports.AppAllVendors = catchAsync(
-    async (req, res) => {
-        try {
-            const Categorys = await Vendor.find().sort({ createdAt: -1 }).populate("VendorCategory");
-            return successResponse(res, "Vendor Categorys list successfully.", 201, Categorys);
-        } catch (error) {
-            return errorResponse(res, error.message || "Internal Server Error", 500);
-        }
+  async (req, res) => {
+    try {
+      const Categorys = await Vendor.find().sort({ createdAt: -1 }).populate("VendorCategory");
+      return successResponse(res, "Vendor Categorys list successfully.", 201, Categorys);
+    } catch (error) {
+      return errorResponse(res, error.message || "Internal Server Error", 500);
     }
+  }
 );
 
 
@@ -1384,7 +1385,7 @@ exports.globalSearch = catchAsync(async (req, res) => {
   try {
     const { search } = req.query;
 
-    console.log("search" , search)
+    console.log("search", search)
 
     // common condition
     const regexFilter = search
@@ -1470,5 +1471,34 @@ exports.globalSearch = catchAsync(async (req, res) => {
 
   } catch (error) {
     return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});
+
+exports.LeadApp = catchAsync(async (req, res) => {
+  try {
+    const assignedTo = req.user.id; 
+    console.log("assignedTo" ,assignedTo)
+    const { title, message, services, type , category   } = req.body;
+    const record = Lead.create({
+      assignedTo,
+      title,
+      message,
+      services,
+      category ,
+      type,
+      source: "App"
+    })
+
+    res.json({
+      status: true,
+      message: " Request submitted & emails sent successfully.",
+      record: record
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      status: false,
+      message: error.message,
+    });
   }
 });
