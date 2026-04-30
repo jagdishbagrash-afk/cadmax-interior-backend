@@ -159,7 +159,7 @@ exports.toggleCategoryStatus = CatchAsync(
 exports.getAllCategoryStatus = CatchAsync(
     async (req, res) => {
         try {
-            const Categorys = await Category.find({ status: false });
+              const Categorys = await Category.find().sort({ createdAt: -1 });
             return successResponse(res, "Categorys list successfully.", 201, Categorys);
         } catch (error) {
             return errorResponse(res, error.message || "Internal Server Error", 500);

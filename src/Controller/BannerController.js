@@ -31,7 +31,7 @@ exports.AddBanner = CatchAsync(async (req, res) => {
 exports.GetAllBanner = CatchAsync(
     async (req, res) => {
         try {
-            const Banners = await Banner.find().sort({ createdAt: -1 });
+            const Banners = await Banner.find({deleted_at : null}).sort({ createdAt: -1 });
             return successResponse(res, "Banners list successfully.", 201, Banners);
         } catch (error) {
             return errorResponse(res, error.message || "Internal Server Error", 500);

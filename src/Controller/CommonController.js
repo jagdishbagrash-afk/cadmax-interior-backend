@@ -1,3 +1,4 @@
+const Lead = require("../Model/Lead");
 const Order = require("../Model/Order");
 const Product = require("../Model/Product");
 const Project = require("../Model/Project");
@@ -116,3 +117,34 @@ console.log("record" ,record)
         });
     }
 };
+
+exports.LeadWebsite = catchAsync(async (req, res) => {
+  try {
+    const assignedTo = req.user.id; 
+    console.log("assignedTo" ,assignedTo)
+    const { title, message, services, type , category   } = req.body;
+    const record = await Lead.create({
+      assignedTo,
+      title,
+      message,
+      services,
+      category ,
+      type,
+      source: "App"
+    })
+
+    console.log("record" ,record)
+
+    res.json({
+      status: true,
+      message: " Request submitted & emails sent successfully.",
+      record: record
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      status: false,
+      message: error.message,
+    });
+  }
+});
