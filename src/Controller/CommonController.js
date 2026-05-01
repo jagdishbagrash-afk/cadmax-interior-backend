@@ -123,6 +123,7 @@ exports.LeadWebsite = catchAsync(async (req, res) => {
     const assignedTo = req.user.id; 
     console.log("assignedTo" ,assignedTo)
     const { title, message, services, type , category   } = req.body;
+    
     const record = await Lead.create({
       assignedTo,
       title,
