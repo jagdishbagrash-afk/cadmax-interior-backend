@@ -153,6 +153,7 @@ exports.SendUserOtp = catchAsync(async (req, res) => {
 
     // Find user by phone
     const user = await User.findOne({ phone });
+    console.log("user", user)
 
     if (!user) {
       return errorResponse(res, "Phone not registered. Please sign up first.", 401);
@@ -172,6 +173,32 @@ exports.SendUserOtp = catchAsync(async (req, res) => {
   }
 });
 
+
+
+exports.SendSingupUserOtp = catchAsync(async (req, res) => {
+  try {
+    const { phone } = req.body;
+
+    if (!phone) {
+      return validationErrorResponse(res, "Phone number is required", 401);
+    }
+
+    const user = await User.findOne({ phone });
+
+    if (user) {
+      return errorResponse(res, "Phone Already registered. Please Login first.", 400);
+    }
+
+
+    return successResponse(res, "OTP sent successfully", 200, {
+      otp: 123456,
+    });
+
+  } catch (error) {
+    console.error("SendOtp error:", error);
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});
 
 exports.UserLogin = catchAsync(async (req, res) => {
   try {

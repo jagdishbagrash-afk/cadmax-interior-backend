@@ -15,7 +15,6 @@ const ProjectSchema = mongoose.Schema(
     },
     Image: {
       type: String,
-      required: [true, "Image is required"],
     },
     solution: {
       type: String,
@@ -34,7 +33,10 @@ const ProjectSchema = mongoose.Schema(
     status: {
       type: Boolean,
       default: false
-    }
+    },
+    multiple_images :{
+        type :Array
+    },
   },
   { timestamps: true }
 );

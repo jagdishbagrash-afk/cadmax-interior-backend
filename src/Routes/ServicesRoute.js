@@ -20,9 +20,6 @@ router.get("/services/list", servicesController.getAllServices);
 router.get("/services/type-concept/:slug", servicesController.GetAllConcept);
 
 
-
-
-
 router.post("/services/edit/:id", upload.fields([
     { name: "Image", maxCount: 1 },
     { name: "images[]", maxCount: 10 },

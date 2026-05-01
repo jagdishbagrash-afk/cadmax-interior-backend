@@ -102,7 +102,7 @@ exports.addProduct = CatchAsync(async (req, res) => {
       deleted_at: null,
     });
 
-   const admindata = await User.find({
+    const admindata = await User.find({
       role: "admin",
       status: "active",
       deleted_at: null,
@@ -201,7 +201,7 @@ exports.updateProduct = CatchAsync(async (req, res) => {
     }
   });
 
-   if (isTitleUpdated) {
+  if (isTitleUpdated) {
     product.slug = slugify(product.title, {
       lower: true,
       strict: true,

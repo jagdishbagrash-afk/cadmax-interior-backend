@@ -39,17 +39,18 @@ exports.AddProject = CatchAsync(async (req, res) => {
             return validationErrorResponse(res, "Project  name is required", 400);
         }
 
-        let imageUrl = null;
 
-        if (req.file) {
-            imageUrl = req.file.location;
-        }
+        const imageUrls = req.files["images[]"]?.map((f) => f.location) || [];
+        const list_image = req.files["Image"]?.[0]?.location || "";
+
         const slug = await generateUniqueSlug(Project, title);
 
 
         const Projects = new Project({
             designed, title, brief, solution, content,
-            Image: imageUrl, slug
+            slug,
+            multiple_images: imageUrls,
+            Image: list_image,
         });
 
 
@@ -121,8 +122,6 @@ exports.UpdateProject = CatchAsync(async (req, res) => {
         // ✅ Update fields
         if (title) {
             data.title = title;
-
-            // 🔥 slug bhi update karo jab title change ho
             data.slug = await generateUniqueSlug(Project, title);
         }
 
@@ -131,16 +130,13 @@ exports.UpdateProject = CatchAsync(async (req, res) => {
         if (solution) data.solution = solution;
         if (content) data.content = content;
 
-        // ✅ Image update
-        if (req.file && req.file.location) {
-            if (data.Image) {
-                try {
-                    await deleteFile(data.Image);
-                } catch (err) {
-                    console.log("Error deleting old image:", err.message);
-                }
-            }
-            data.Image = req.file.location;
+        // Get files (if any new ones uploaded)
+        const imageUrls = req.files?.["images[]"]?.map((f) => f.location) || [];
+        const Image = req.files?.["image"]?.[0]?.location;
+
+        if (Image) data.Image = Image;
+        if (imageUrls.length > 0) {
+            data.multiple_images = [...data.multiple_images, ...imageUrls];
         }
 
         const updatedprojects = await data.save();
@@ -199,21 +195,23 @@ exports.ProjectDelete = CatchAsync(async (req, res) => {
 
 exports.GetProjectBySlug = CatchAsync(async (req, res) => {
   try {
-    const projects = await Project.findOne({ slug: req.params.slug });
+    const { slug } = req.params;
 
-    if (!projects) {
-      return validationErrorResponse(
-        res,
-        "Project not found.",
-        400
-      );
+    if (!slug) {
+      return validationErrorResponse(res, "Slug is required", 400);
+    }
+
+    const project = await Project.findOne({ slug });
+
+    if (!project) {
+      return validationErrorResponse(res, "Project not found.", 404);
     }
 
     return successResponse(
       res,
-      "Project Details successfully.",
+      "Project details fetched successfully.",
       200,
-      projects
+      project
     );
   } catch (error) {
     return errorResponse(

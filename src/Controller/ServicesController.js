@@ -163,7 +163,11 @@ exports.AddService = CatchAsync(
       if (!title || !content || !ServicesType) {
         return validationErrorResponse(res, "All fields are required", 400,);
       }
-      const service = new Services({ title, content, multiple_images: imageUrls, ServicesType, slug: slug, concept, Image: list_image, material_details, timeline, cost, ServicesSubCategory });
+      const service = new Services({ title, content,
+         multiple_images: imageUrls,
+         Image: list_image,
+          ServicesType, slug: slug, concept,  material_details, timeline, cost, 
+          ServicesSubCategory });
       const record = await service.save();
       // const users = await User.find({
       //   role: "customer",

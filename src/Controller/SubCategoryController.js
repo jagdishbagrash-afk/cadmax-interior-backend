@@ -94,9 +94,6 @@ exports.getSubCategoryByCategory = CatchAsync(async (req, res) => {
             deletedAt: null
         }).populate("category");
 
-        if (!subCategories || subCategories?.length === 0) {
-            return validationErrorResponse(res, "No Subcategories found for this category.", 404);
-        }
         return successResponse(res, "Subcategories fetched successfully.", 200, subCategories);
     } catch (error) {
         return errorResponse(res, error.message || "Internal Server Error", 500);
