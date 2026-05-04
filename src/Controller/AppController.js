@@ -912,9 +912,9 @@ exports.removeProductVariantFromCart = catchAsync(async (req, res) => {
 
 exports.GetAllProject = catchAsync(async (req, res) => {
   try {
-    const projects = await Project.find({
-      deletedAt: null,
-    }).sort({ createdAt: -1 });
+    const projects = await Project.find(
+      {status : true}
+    ).sort({ createdAt: -1 });
 
     return successResponse(
       res,

@@ -85,7 +85,7 @@ exports.AddProject = CatchAsync(async (req, res) => {
 exports.GetAllProject = CatchAsync(
     async (req, res) => {
         try {
-            const projects = await Project.find().sort({ createdAt: -1 });
+            const projects = await Project.find({status : true}).sort({ createdAt: -1 });
             return successResponse(res, "Project list successfully.", 201, projects);
         } catch (error) {
             return errorResponse(res, error.message || "Internal Server Error", 500);
@@ -171,25 +171,47 @@ exports.GetAllProjectStatus = CatchAsync(
 
 
 exports.ProjectDelete = CatchAsync(async (req, res) => {
-    try {
-        const id = req.params.id;
-        const userrecord = await Project.findById(id);
-        if (!userrecord) {
-            return validationErrorResponse(res, "Project not found", 404);
-        }
-        if (userrecord.deletedAt) {
-            userrecord.deletedAt = null;
-            await userrecord.save();
-            return successResponse(res, "Project restored successfully", 200);
-        }
+  try {
+    const id = req.params.id;
 
-        userrecord.deletedAt = new Date();
-        const record = await userrecord.save();
-        return successResponse(res, "Project deleted successfully", 200);
+    const project = await Project.findById(id);
 
-    } catch (error) {
-        return errorResponse(res, error.message || "Internal Server Error", 500);
+    if (!project) {
+      return validationErrorResponse(res, "Project not found", 404);
     }
+
+    // ================= RESTORE =================
+    if (project.deletedAt) {
+      project.deletedAt = null;
+      project.status = true; // ✅ active
+
+      await project.save();
+
+      return successResponse(
+        res,
+        "Project restored successfully",
+        200
+      );
+    }
+
+    // ================= DELETE =================
+    project.deletedAt = new Date();
+    project.status = false; // ❌ inactive
+
+    await project.save();
+
+    return successResponse(
+      res,
+      "Project deleted successfully",
+      200
+    );
+  } catch (error) {
+    return errorResponse(
+      res,
+      error.message || "Internal Server Error",
+      500
+    );
+  }
 });
 
 
@@ -221,3 +243,15 @@ exports.GetProjectBySlug = CatchAsync(async (req, res) => {
     );
   }
 });
+
+
+exports.GetAllAdminProject = CatchAsync(
+    async (req, res) => {
+        try {
+            const projects = await Project.find().sort({ createdAt: -1 });
+            return successResponse(res, "Project list successfully.", 201, projects);
+        } catch (error) {
+            return errorResponse(res, error.message || "Internal Server Error", 500);
+        }
+    }
+);
