@@ -108,7 +108,6 @@ exports.GetProjectById = CatchAsync(
     }
 );
 
-
 exports.UpdateProject = CatchAsync(async (req, res) => {
     try {
         const { designed, title, brief, solution, content } = req.body;
