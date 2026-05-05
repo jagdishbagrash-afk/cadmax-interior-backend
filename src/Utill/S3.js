@@ -30,7 +30,7 @@ const multerConfig = {
         return cb(null, false);
     },
     limits: {
-        fileSize: 10 * 1024 * 1024,
+        fileSize: 100 * 1024 * 1024,
     },
 };
 

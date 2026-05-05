@@ -40,9 +40,8 @@ exports.AddProject = CatchAsync(async (req, res) => {
         }
 
 
-        const imageUrls = req.files["images[]"]?.map((f) => f.location) || [];
-        const list_image = req.files["Image"]?.[0]?.location || "";
-
+        const imageUrls = req.files["images"]?.map((f) => f.location) || [];
+        const list_image = req.files["image"]?.[0]?.location || "";
         const slug = await generateUniqueSlug(Project, title);
 
 
@@ -85,7 +84,7 @@ exports.AddProject = CatchAsync(async (req, res) => {
 exports.GetAllProject = CatchAsync(
     async (req, res) => {
         try {
-            const projects = await Project.find({status : true}).sort({ createdAt: -1 });
+            const projects = await Project.find({ status: true }).sort({ createdAt: -1 });
             return successResponse(res, "Project list successfully.", 201, projects);
         } catch (error) {
             return errorResponse(res, error.message || "Internal Server Error", 500);
@@ -130,10 +129,11 @@ exports.UpdateProject = CatchAsync(async (req, res) => {
         if (content) data.content = content;
 
         // Get files (if any new ones uploaded)
-        const imageUrls = req.files?.["images[]"]?.map((f) => f.location) || [];
         const Image = req.files?.["image"]?.[0]?.location;
 
         if (Image) data.Image = Image;
+        const imageUrls = req.files?.["images"]?.map(f => f.location) || [];
+
         if (imageUrls.length > 0) {
             data.multiple_images = [...data.multiple_images, ...imageUrls];
         }
@@ -170,77 +170,77 @@ exports.GetAllProjectStatus = CatchAsync(
 
 
 exports.ProjectDelete = CatchAsync(async (req, res) => {
-  try {
-    const id = req.params.id;
+    try {
+        const id = req.params.id;
 
-    const project = await Project.findById(id);
+        const project = await Project.findById(id);
 
-    if (!project) {
-      return validationErrorResponse(res, "Project not found", 404);
+        if (!project) {
+            return validationErrorResponse(res, "Project not found", 404);
+        }
+
+        // ================= RESTORE =================
+        if (project.deletedAt) {
+            project.deletedAt = null;
+            project.status = true; // ✅ active
+
+            await project.save();
+
+            return successResponse(
+                res,
+                "Project restored successfully",
+                200
+            );
+        }
+
+        // ================= DELETE =================
+        project.deletedAt = new Date();
+        project.status = false; // ❌ inactive
+
+        await project.save();
+
+        return successResponse(
+            res,
+            "Project deleted successfully",
+            200
+        );
+    } catch (error) {
+        return errorResponse(
+            res,
+            error.message || "Internal Server Error",
+            500
+        );
     }
-
-    // ================= RESTORE =================
-    if (project.deletedAt) {
-      project.deletedAt = null;
-      project.status = true; // ✅ active
-
-      await project.save();
-
-      return successResponse(
-        res,
-        "Project restored successfully",
-        200
-      );
-    }
-
-    // ================= DELETE =================
-    project.deletedAt = new Date();
-    project.status = false; // ❌ inactive
-
-    await project.save();
-
-    return successResponse(
-      res,
-      "Project deleted successfully",
-      200
-    );
-  } catch (error) {
-    return errorResponse(
-      res,
-      error.message || "Internal Server Error",
-      500
-    );
-  }
 });
 
 
 exports.GetProjectBySlug = CatchAsync(async (req, res) => {
-  try {
-    const { slug } = req.params;
+    try {
+        const { slug } = req.params;
 
-    if (!slug) {
-      return validationErrorResponse(res, "Slug is required", 400);
+        if (!slug) {
+            return validationErrorResponse(res, "Slug is required", 400);
+        }
+
+        const project = await Project.findOne({ slug });
+
+        if (!project) {
+            return validationErrorResponse(res, "Project not found.", 404);
+        }
+
+        return successResponse(
+            res,
+            "Project details fetched successfully.",
+            200,
+            project
+        );
+    } catch (error) {
+        return errorResponse(
+            res,
+            error.message || "Internal Server Error",
+            500
+        );
     }
-
-    const project = await Project.findOne({ slug });
-
-    if (!project) {
-      return validationErrorResponse(res, "Project not found.", 404);
-    }
-
-    return successResponse(
-      res,
-      "Project details fetched successfully.",
-      200,
-      project
-    );
-  } catch (error) {
-    return errorResponse(
-      res,
-      error.message || "Internal Server Error",
-      500
-    );
-  }
 });
 
 
@@ -254,3 +254,30 @@ exports.GetAllAdminProject = CatchAsync(
         }
     }
 );
+
+
+exports.DeleteProjectImage = CatchAsync(async (req, res) => {
+  try {
+    const { image } = req.body;
+
+    const project = await Project.findById(req.params.id);
+
+    if (!project) {
+      return validationErrorResponse(res, "Project not found", 404);
+    }
+
+    // remove from array
+    project.multiple_images = project.multiple_images.filter(
+      (img) => img !== image
+    );
+
+    await project.save();
+
+    // OPTIONAL: delete from AWS S3
+    // await DeleteAWSImages([image]);
+
+    return successResponse(res, "Image deleted successfully", 200);
+  } catch (err) {
+    return errorResponse(res, err.message, 500);
+  }
+});
