@@ -1296,7 +1296,6 @@ exports.latestProducts = catchAsync(async (req, res) => {
   });
 });
 
-
 exports.GetAllServicesSubCategorys = catchAsync(
   async (req, res) => {
     try {
