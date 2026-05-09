@@ -1507,3 +1507,16 @@ exports.LeadApp = catchAsync(async (req, res) => {
     });
   }
 });
+
+
+exports.GetAllRecordServicesSubCategorys = catchAsync(
+    async (req, res) => {
+        try {
+         const SubCategorys = await ServicesSubCategory
+         .find().sort({ createdAt: -1 });
+            return successResponse(res, "SubCategorys list successfully.", 201, SubCategorys);
+        } catch (error) {
+            return errorResponse(res, error.message || "Internal Server Error", 500);
+        }
+    }
+);

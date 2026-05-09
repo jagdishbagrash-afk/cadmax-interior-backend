@@ -1,4 +1,4 @@
-const { signup, Login, SendOtp, profilegettoken, PhoneVerify, OTPVerify, AppOrder, getAllCategorys, getSubCategoryByCategory, getProductBySubCategory, getProductById, AddToCart, getCart, GetAllProject, GetServicesType, GetServiceTypeId, GetServicesDetails, ConceptUserPost, removeProductVariantFromCart, EditProfile, BookingAppAdd, GetVendorCatApp, GetAllVendor, GetVendorCategory, updateCart, clearCart, OrderList, bestSellerProducts, latestProducts, GetAllServicesSubCategorys, getAllBookings, AppDeleteUser, AppAllVendors, globalSearch, LeadApp } = require("../Controller/AppController");
+const { signup, Login, SendOtp, profilegettoken, PhoneVerify, OTPVerify, AppOrder, getAllCategorys, getSubCategoryByCategory, getProductBySubCategory, getProductById, AddToCart, getCart, GetAllProject, GetServicesType, GetServiceTypeId, GetServicesDetails, ConceptUserPost, removeProductVariantFromCart, EditProfile, BookingAppAdd, GetVendorCatApp, GetAllVendor, GetVendorCategory, updateCart, clearCart, OrderList, bestSellerProducts, latestProducts, GetAllServicesSubCategorys, getAllBookings, AppDeleteUser, AppAllVendors, globalSearch, LeadApp, GetAllRecordServicesSubCategorys } = require("../Controller/AppController");
 const { GetAllBanner } = require("../Controller/BannerController");
 const ServciesSubCategoryController = require("../Controller/ServciesSubCategoryController.js");
 const MultipleAddressController = require("../Controller/MultipleAddressController");
@@ -52,7 +52,7 @@ AppRoute.get("/app/vendor-get", AppAllVendors);
 AppRoute.get("/app/concept/details/:id", GetServicesDetails);
 AppRoute.get("/app/subcategory/:id", getSubCategoryByCategory);
 AppRoute.get("/app/product/subcategory/:id", getProductBySubCategory);
-AppRoute.get("/app/services/subcategory/list", ServciesSubCategoryController.GetAllServicesSubCategorys);
+AppRoute.get("/app/services/subcategory/list",GetAllRecordServicesSubCategorys);
 AppRoute.get("/app/search-name", globalSearch);
 AppRoute.post("/app/lead-form", verifyToken, LeadApp);
 
