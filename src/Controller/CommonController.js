@@ -388,3 +388,50 @@ const cart = await Cart.findOne({
     return errorResponse(res, error.message || "Internal Server Error", 500);
   }
 });
+
+
+// controllers/notification.js
+const admin = require("../Utill/firebase");
+
+exports.sendNotification = async (req, res) => {
+  try {
+    const { token, title, body } = req.body;
+
+    const message = {
+      token: token,
+      notification: {
+        title: title,
+        body: body,
+      },
+    };
+
+    const response = await admin.messaging().send(message);
+
+    res.json({
+      success: true,
+      response,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+
+exports.UserFCMToken = catchAsync(async (req, res) => {
+  try {
+        const userId = req.user.id;
+    const { fcmToken } = req.body;
+
+    if (fcmToken) {
+      await User.findByIdAndUpdate(userId, {
+        fcmToken: fcmToken,
+      });
+    }
+    return successResponse(res, "Fcm Token save", 200,      user,);
+
+  } catch (error) {
+    console.error(error);
+    return errorResponse(res, "Internal Server Error", 500);
+  }
+});
