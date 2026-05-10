@@ -1,204 +1,46 @@
-const ObjectId = require("mongoose").Types.ObjectId;
-const mongoose = require("mongoose");
-const catchAsync = require("../Utill/catchAsync");
-const NotificationModel = require("../Model/Notification");
+const { sendPushNotification } = require("../Utill/notificationService");
+const User = require("../Model/User");
 
-
-exports.createNotification = catchAsync(async (req, res) => {
+exports.notifyAllUsers = async (req, res) => {
   try {
-    const { SenderId, ReciverId, referenceId, referenceType } = req.body;
-    const recordData = {
-      SenderId,
-      referenceId,
-      ReciverId,
-referenceType    };
+    const { title, body } = req.body;
 
-    const record = new NotificationModel(recordData);
-    const data = await record.save();
-  } catch (error) {
-    console.error("Error saving notification:", error);
-  }
-});
+    // ✅ sab users ke tokens nikaalo
+    const users = await User.find({ fcmToken: { $ne: null } }).select("fcmToken");
 
-exports.NotificationGet = catchAsync(async (req, res) => {
-  const UserId = req.user.id;
+    const tokens = users.map(u => u.fcmToken).filter(Boolean);
 
-  try {
-    const query = {
-      $or: [{ ReciverId: UserId, IsRead: false }],
-    };
-
-    const notifications = await NotificationModel.find(query)
-      .sort({ createdAt: -1 })
-      .populate({
-        path: "ShipmentId",
-        select: "name", // Only fetch the name field
-      })
-      .populate({
-        path: "ReciverId",
-        select: "name email role", // Only fetch name and email from ReciverId.Receiver
-      })
-      .populate({
-        path: "SenderId",
-        select: "name email role", // Only fetch name and email from ReciverId.Receiver
-      });
-
-    const notificationCount = notifications.length;
-    res.json({
-      status: true,
-      data: notifications,
-      count: notificationCount,
-      message: "Notifications fetched successfully",
-    });
-  } catch (error) {
-    console.error("Error fetching notifications:", error);
-    res.status(500).json({
-      status: false,
-      message: error.message || "Failed to fetch notifications",
-    });
-  }
-});
-
-exports.MarkNotificationAsRead = catchAsync(async (req, res) => {
-  const { id } = req.body;
-  try {
-    if (!id) {
+    if (tokens.length === 0) {
       return res.status(400).json({
         status: false,
-        message: "ID is required",
+        message: "No users found with FCM tokens",
       });
     }
 
-    // Find notification by ID
-    const notification = await NotificationModel.findById(id);
+    const result = await sendPushNotification({
+      tokens,
+      title: title || "New Product Added 🛍️",
+      body: body || "Check out our latest product!",
+      data: {
+        type: "NEW_PRODUCT",
+      },
+    });
 
-    if (!notification) {
-      return res.status(404).json({
-        status: false,
-        message: "Notification not found",
-      });
+    if (!result.status) {
+      return res.status(400).json(result);
     }
 
-    // Update the isRead field to true
-    notification.IsRead = true;
-    await notification.save();
-
-    res.json({
+    return res.status(200).json({
       status: true,
-      message: "Notification marked as read successfully",
-      notification,
+      message: `Notification sent to ${tokens.length} users`,
+      data: result.results,
     });
+
   } catch (error) {
-    console.error("Error marking notification as read:", error);
-    res.status(500).json({
+    console.error(error);
+    return res.status(500).json({
       status: false,
-      message: error.message || "Failed to mark notification as read",
+      message: error.message,
     });
   }
-});
-
-exports.updateReviewNotification = catchAsync(async (req, res) => {
-  const {
-    ShipmentId,
-    receiverBrokerId,
-    receiverDriverId,
-    receiverCarrierId,
-    receiverShipperId,
-    receiverCustomerId,
-    text1,
-    text2,
-    text,
-  } = req.body;
-  // broker  assign dispatch  sheet carrire then  carrier text 1
-  // carrire  assign dispatch  sheet broker then  carrier text 2
-  // broker  Reassign dispatch  sheet carrire then  carrier text 1
-
-  try {
-    const existingNotification = await NotificationModel.findOne({
-      ShipmentId: ShipmentId,
-    });
-    await NotificationModel.findOneAndUpdate(
-      existingNotification._id,
-      {
-        $set: {
-          receiverDriverId: [
-            { Receiver: receiverDriverId, IsRead: false, text: text },
-          ],
-        },
-      },
-      { new: true }
-    );
-    await NotificationModel.findOneAndUpdate(
-      existingNotification._id,
-      {
-        $set: {
-          receiverCarrierId: [
-            {
-              Receiver: receiverCarrierId,
-              IsRead: false,
-              text: text1 ? text1 : text,
-            },
-          ],
-        },
-      },
-      { new: true }
-    );
-    await NotificationModel.findOneAndUpdate(
-      existingNotification._id,
-      {
-        $set: {
-          receiverBrokerId: [
-            {
-              Receiver: receiverBrokerId,
-              IsRead: false,
-              text: text2 ? text2 : text,
-            },
-          ],
-        },
-      },
-      { new: true }
-    );
-    await NotificationModel.findOneAndUpdate(
-      existingNotification._id,
-      {
-        $set: {
-          receiverShipperId: [
-            { Receiver: receiverShipperId, IsRead: false, text: text },
-          ],
-        },
-      },
-      { new: true }
-    );
-    await NotificationModel.findOneAndUpdate(
-      existingNotification._id,
-      {
-        $set: {
-          receiverCustomerId: [
-            { Receiver: receiverCustomerId, IsRead: true, text: text },
-          ],
-        },
-      },
-      { new: true }
-    );
-  } catch (error) {
-    console.log("eror", error);
-  }
-});
-
-exports.deleteNotification = catchAsync(async (req, res) => {
-  const { id } = req.params;
-
-  const notification = await NotificationModel.findByIdAndDelete(id);
-
-  if (!notification) {
-    return res.status(404).json({
-      status: false,
-      message: "Notification not found",
-    });
-  }
-
-  res.json({
-    status: true,
-    message: "Notification deleted successfully",
-  });
-});
+};

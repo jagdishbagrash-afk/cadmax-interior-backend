@@ -389,3 +389,43 @@ const cart = await Cart.findOne({
   }
 });
 
+
+
+const admin = require("../Utill/firebase");
+
+exports.testNotification = async (req, res) => {
+  try {
+    const { token, title, body } = req.body;
+
+    if (!token) {
+      return res.status(400).json({
+        status: false,
+        message: "FCM token is required",
+      });
+    }
+
+    const message = {
+      token: token,
+      notification: {
+        title: title || "Test Notification",
+        body: body || "This is a test push notification 🚀",
+      },
+    };
+
+    const response = await admin.messaging().send(message);
+
+    return res.status(200).json({
+      status: true,
+      message: "Notification sent successfully",
+      data: response,
+    });
+
+  } catch (error) {
+    console.error("FCM Error:", error);
+
+    return res.status(500).json({
+      status: false,
+      message: error.message,
+    });
+  }
+};

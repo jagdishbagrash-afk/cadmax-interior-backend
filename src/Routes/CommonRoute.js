@@ -1,6 +1,6 @@
 const { AddToCart, updateCart, getCart, clearCart } = require("../Controller/AppController");
 const { GetAllBanner } = require("../Controller/BannerController");
-const { bestSellerProducts, latestProducts, GetAllCommonProject, deleteImage, LeadWebsite , CommonAddToCart, updateCommonCart, removeProductVariantFromCart} = require("../Controller/CommonController");
+const { bestSellerProducts, latestProducts, GetAllCommonProject, deleteImage, LeadWebsite , CommonAddToCart, updateCommonCart, removeProductVariantFromCart, testNotification} = require("../Controller/CommonController");
 const { verifyToken } = require("../Utill/tokenVerify");
 const CommonRoute = require("express").Router();
 CommonRoute.get("/common/bestseller", bestSellerProducts);
@@ -22,6 +22,9 @@ CommonRoute.get("/cart/get", verifyToken, getCart);
 CommonRoute.get("/cart/clear", verifyToken, clearCart);
 
 CommonRoute.get("/cart/remove/:productId/:variant", verifyToken, removeProductVariantFromCart)
+
+
+CommonRoute.post("/test-notification", testNotification);
 
 
 

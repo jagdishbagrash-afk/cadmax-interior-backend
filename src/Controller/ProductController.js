@@ -4,6 +4,7 @@ const { successResponse, errorResponse, validationErrorResponse } = require("../
 const { deleteFile } = require("../Utill/S3");
 const User = require("../Model/User");
 const sendNotification = require("./sendNotification");
+const { sendPushNotification } = require("../Utill/notificationService");
 
 
 const makeSlug = (text) => {
@@ -96,17 +97,42 @@ exports.addProduct = CatchAsync(async (req, res) => {
 
     const record = await newProduct.save();
 
-    const users = await User.find({
+    // const users = await User.find({
+    //   role: "customer",
+    //   status: "active",
+    //   deleted_at: null,
+    // });
+const users = await User.find({
       role: "customer",
       status: "active",
       deleted_at: null,
-    });
+      fcmToken: { $ne: null }
+    }).select("fcmToken");
 
+    
     const admindata = await User.find({
       role: "admin",
       status: "active",
       deleted_at: null,
     });
+
+
+    const tokens = users.map(u => u.fcmToken).filter(Boolean);
+
+    // 🔥 7️⃣ Send Push Notification (ALL USERS)
+    if (tokens.length > 0) {
+      await sendPushNotification({
+        tokens,
+        title: "New Product Added 🛍️",
+        body: `${record.title} is now available. Check it out!`,
+        data: {
+          type: "NEW_PRODUCT",
+          productId: record._id.toString(),
+        },
+      });
+    }
+
+    console.log("Heelo")
 
     // await Promise.all(
     //   users.map(user =>
