@@ -5,6 +5,7 @@ const { successResponse, errorResponse, validationErrorResponse } = require("../
 const sendEmail = require("../Utill/EmailMailler");
 const OrderEmail = require("../EmailTemplate/Order");
 
+
 exports.addOrder = catchAsync(async (req, res) => {
   try {
     const { name, mobile, address, product, amount, addressId ,PaymentId } = req.body;
@@ -67,6 +68,45 @@ exports.getAllOrders = catchAsync(async (req, res) => {
 
 
 
+// exports.updateStatus = catchAsync(async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const { status } = req.body;
+
+//     if (!id) {
+//       return validationErrorResponse(res, "Order ID is required");
+//     }
+
+//     if (!status) {
+//       return validationErrorResponse(res, "Status is required");
+//     }
+
+//     const order = await Order.findByIdAndUpdate(
+//       id,
+//       { status },
+//       { new: true }
+//     );
+
+//     if (!order) {
+//       return errorResponse(res, "Order not found", 404);
+//     }
+
+//     return successResponse(
+//       res,
+//       "Order status updated successfully",
+//       200,
+//       order
+//     );
+//   } catch (error) {
+//     console.error(error);
+//     return errorResponse(res, error.message || "Internal Server Error", 500);
+//   }
+// });
+
+
+const { sendPushNotification } = require("../Utill/notificationService");
+const User = require("../Model/User");
+
 exports.updateStatus = catchAsync(async (req, res) => {
   try {
     const { id } = req.params;
@@ -80,6 +120,7 @@ exports.updateStatus = catchAsync(async (req, res) => {
       return validationErrorResponse(res, "Status is required");
     }
 
+    // ✅ Update order
     const order = await Order.findByIdAndUpdate(
       id,
       { status },
@@ -90,17 +131,66 @@ exports.updateStatus = catchAsync(async (req, res) => {
       return errorResponse(res, "Order not found", 404);
     }
 
+    // 🔥 User ka FCM token lao
+    const user = await User.findById(order.userId).select("fcmToken name");
+
+    if (user?.fcmToken) {
+
+      // 🎯 Status-wise message
+      let title = "Order Update 📦";
+      let body = "";
+
+      switch (status) {
+        case "pending":
+          body = `Hi ${user.name}, your order is pending.`;
+          break;
+
+        case "confirmed":
+          body = `Hi ${user.name}, your order has been confirmed ✅`;
+          break;
+
+        case "shipped":
+          body = `Hi ${user.name}, your order has been shipped 🚚`;
+          break;
+
+        case "delivered":
+          body = `Hi ${user.name}, your order has been delivered 🎉`;
+          break;
+
+        case "cancelled":
+          body = `Hi ${user.name}, your order has been cancelled ❌`;
+          break;
+
+        default:
+          body = `Hi ${user.name}, your order status is updated to ${status}`;
+      }
+
+      // 🚀 Send Notification
+      await sendPushNotification({
+        tokens: [user.fcmToken], // single user
+        title,
+        body,
+        data: {
+          type: "ORDER_STATUS",
+          orderId: order._id.toString(),
+          status: status,
+        },
+      });
+    }
+
     return successResponse(
       res,
-      "Order status updated successfully",
+      "Order status updated successfully & notification sent 🚀",
       200,
       order
     );
+
   } catch (error) {
     console.error(error);
     return errorResponse(res, error.message || "Internal Server Error", 500);
   }
 });
+
 
 exports.getOrdersByUser = catchAsync(async (req, res) => {
   try {
