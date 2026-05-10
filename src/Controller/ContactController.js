@@ -99,7 +99,7 @@ exports.createLead = catchAsync(async (req, res) => {
 
 exports.LeadGet = catchAsync(async (req, res, next) => {
     try {
-        const leadget = await Lead.find({});
+        const leadget = await Lead.find({}).populate("assignedTo");
         res.status(200).json({
             data: leadget,
             msg: "Contact Get",
