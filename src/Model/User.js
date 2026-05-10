@@ -70,7 +70,10 @@ const UserSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
-   fcmToken: String,
+  fcmToken: {
+    type: String,
+    default: null,
+  },
   deleted_reason: {
     type: String,
     default: null

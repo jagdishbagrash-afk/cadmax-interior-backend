@@ -137,24 +137,82 @@ exports.SendOtp = catchAsync(async (req, res) => {
 });
 
 
+// exports.Login = catchAsync(async (req, res) => {
+//   try {
+//     const { phone, otp } = req.body;
+//     if (!phone || !otp) {
+//       return validationErrorResponse(
+//         res,
+//         "Phone number, OTP all are required",
+//         401
+//       );
+//     }
+//     if (otp !== "123456") {
+//       return validationErrorResponse(res, "Invalid or expired OTP", 400);
+//     }
+//     const user = await User.findOne({ phone: phone });
+
+
+//     if (user?.deleted_at != null) {
+//       return errorResponse(res, "This account is blocked", 200);
+//     }
+
+//     const token = jwt.sign(
+//       { id: user._id, role: user.role, email: user.email },
+//       process.env.JWT_SECRET,
+//       { expiresIn: process.env.JWT_EXPIRES_IN || "8760h" }
+//     );
+
+//     return successResponse(res, "OTP verified successfully", 200, {
+//       user: user,
+//       token: token,
+//     });
+
+//     // Verify OTP with Twilio
+//     // const verificationCheck = await client.verify.v2
+//     //   .services(process.env.TWILIO_VERIFY_SID)
+//     //   .verificationChecks.create({ to: phone, code: otp });
+//     // if (verificationCheck.status === "approved") {
+//     //   return successResponse(res, "OTP verified successfully", 200);
+//     // } else {
+//     //   return validationErrorResponse(res, "Invalid or expired OTP", 400);
+//     // }
+//   } catch (error) {
+//     console.error("VerifyOtp error:", error);
+//     return errorResponse(res, error.message || "Internal Server Error", 500);
+//   }
+// });
+
 exports.Login = catchAsync(async (req, res) => {
   try {
-    const { phone, otp } = req.body;
+    const { phone, otp, fcmToken } = req.body;
+
     if (!phone || !otp) {
       return validationErrorResponse(
         res,
-        "Phone number, OTP all are required",
+        "Phone number and OTP are required",
         401
       );
     }
+
     if (otp !== "123456") {
       return validationErrorResponse(res, "Invalid or expired OTP", 400);
     }
+
     const user = await User.findOne({ phone: phone });
 
+    if (!user) {
+      return errorResponse(res, "User not found", 404);
+    }
 
     if (user?.deleted_at != null) {
       return errorResponse(res, "This account is blocked", 200);
+    }
+
+    if (fcmToken) {
+      user.fcmToken = fcmToken;   // single token
+      // user.fcmTokens = [...new Set([...(user.fcmTokens || []), fcmToken])];
+      await user.save();
     }
 
     const token = jwt.sign(
@@ -164,19 +222,10 @@ exports.Login = catchAsync(async (req, res) => {
     );
 
     return successResponse(res, "OTP verified successfully", 200, {
-      user: user,
-      token: token,
+      user,
+      token,
     });
 
-    // Verify OTP with Twilio
-    // const verificationCheck = await client.verify.v2
-    //   .services(process.env.TWILIO_VERIFY_SID)
-    //   .verificationChecks.create({ to: phone, code: otp });
-    // if (verificationCheck.status === "approved") {
-    //   return successResponse(res, "OTP verified successfully", 200);
-    // } else {
-    //   return validationErrorResponse(res, "Invalid or expired OTP", 400);
-    // }
   } catch (error) {
     console.error("VerifyOtp error:", error);
     return errorResponse(res, error.message || "Internal Server Error", 500);
