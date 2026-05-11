@@ -25,6 +25,8 @@ const OrderEmail = require("../EmailTemplate/Order");
 const ServicesSubCategory = require("../Model/ServicesSubCategory");
 const Lead = require("../Model/Lead");
 
+const axios = require("axios");
+
 // const twilio = require("twilio");
 
 // const client = twilio(
@@ -104,37 +106,77 @@ const buildCartResponse = async (cart) => {
 };
 
 
-exports.SendOtp = catchAsync(async (req, res) => {
+exports.SendOtp = async (req, res) => {
   try {
     const { phone } = req.body;
 
     if (!phone) {
-      return validationErrorResponse(res, "Phone number is required", 401);
-    }
-
-    // Find user by phone
-    const user = await User.findOne({ phone });
-
-    if (!user) {
-      return successResponse(res, "Phone not registered. Please sign up first.", 200, {
-        isNewUser: true
+      return res.status(400).json({
+        success: false,
+        message: "Phone number is required",
       });
     }
 
-    if (user?.deleted_at != null) {
-      return errorResponse(res, "This account is blocked", 403);
-    }
+    const response = await axios.post(
+      "https://control.msg91.com/api/v5/otp",
+      {
+        mobile: `91${phone}`,
+        template_id: process.env.MSG91_TEMPLATE_ID,
+        otp_length: 6,
+        otp_expiry: 5,
+      },
+      {
+        headers: {
+          authkey: process.env.MSG91_AUTH_KEY,
+          "Content-Type": "application/json",
+        },
+      }
+    );
 
-    return successResponse(res, "OTP sent successfully", 200, {
-      otp: 123456,
+      return successResponse(res, "OTP sent successfully", 200, {
+      otp:  response.data,
       isNewUser: false
     });
 
+
   } catch (error) {
-    console.error("SendOtp error:", error);
+    console.log(error.response?.data || error.message);
+     console.error("SendOtp error:", error);
     return errorResponse(res, error.message || "Internal Server Error", 500);
   }
-});
+};
+
+
+// exports.SendOtp = catchAsync(async (req, res) => {
+//   try {
+//     const { phone } = req.body;
+
+//     if (!phone) {
+//       return validationErrorResponse(res, "Phone number is required", 401);
+//     }
+
+//     // Find user by phone
+//     const user = await User.findOne({ phone });
+
+//     if (!user) {
+//       return successResponse(res, "Phone not registered. Please sign up first.", 200, {
+//         isNewUser: true
+//       });
+//     }
+
+//     if (user?.deleted_at != null) {
+//       return errorResponse(res, "This account is blocked", 403);
+//     }
+
+//     return successResponse(res, "OTP sent successfully", 200, {
+//       otp: 123456,
+//       isNewUser: false
+//     });
+
+//   } catch (error) {
+   
+//   }
+// });
 
 
 // exports.Login = catchAsync(async (req, res) => {
@@ -321,58 +363,160 @@ exports.profilegettoken = catchAsync(async (req, res, next) => {
   }
 });
 
+// exports.PhoneVerify = catchAsync(async (req, res) => {
+//   try {
+//     // console.log("req.body" ,req.body)
+//     const { phone } = req.body;
+//     if (!phone) {
+//       return validationErrorResponse(
+//         res,
+//         "Phone number all are required",
+//         401
+//       );
+//     }
+//     return successResponse(res, "OTP Send successfully", 200,
+//       123456,
+//     );
+
+//     // Verify OTP with Twilio
+//     // const verificationCheck = await client.verify.v2
+//     //   .services(process.env.TWILIO_VERIFY_SID)
+//     //   .verificationChecks.create({ to: phone, code: otp });
+//     // if (verificationCheck.status === "approved") {
+//     //   return successResponse(res, "OTP verified successfully", 200);
+//     // } else {
+//     //   return validationErrorResponse(res, "Invalid or expired OTP", 400);
+//     // }
+//   } catch (error) {
+//     console.error("VerifyOtp error:", error);
+//     return errorResponse(res, error.message || "Internal Server Error", 500);
+//   }
+// });
+
+
+
 exports.PhoneVerify = catchAsync(async (req, res) => {
   try {
-    // console.log("req.body" ,req.body)
     const { phone } = req.body;
+
+    // Validation
     if (!phone) {
       return validationErrorResponse(
         res,
-        "Phone number all are required",
-        401
+        "Phone number is required",
+        400
       );
     }
-    return successResponse(res, "OTP Send successfully", 200,
-      123456,
-    );
 
-    // Verify OTP with Twilio
-    // const verificationCheck = await client.verify.v2
-    //   .services(process.env.TWILIO_VERIFY_SID)
-    //   .verificationChecks.create({ to: phone, code: otp });
-    // if (verificationCheck.status === "approved") {
-    //   return successResponse(res, "OTP verified successfully", 200);
-    // } else {
-    //   return validationErrorResponse(res, "Invalid or expired OTP", 400);
-    // }
-  } catch (error) {
-    console.error("VerifyOtp error:", error);
-    return errorResponse(res, error.message || "Internal Server Error", 500);
-  }
-});
-
-exports.OTPVerify = catchAsync(async (req, res) => {
-  try {
-    // console.log("req.body" ,req.body)
-    const { phone, otp } = req.body;
-    if (!phone || !otp) {
+    // Mobile validation
+    if (phone.length !== 10) {
       return validationErrorResponse(
         res,
-        "Phone number, OTP all are required",
-        401
+        "Enter valid 10 digit phone number",
+        400
       );
     }
-    if (otp !== "123456") {
-      return validationErrorResponse(res, "Invalid or expired OTP", 400);
-    }
-    return successResponse(res, "OTP verified successfully", 200, 123456);
 
+    // ================= SEND OTP =================
+    const response = await axios.post(
+      "https://control.msg91.com/api/v5/otp",
+      {
+        mobile: `91${phone}`,
+        template_id: process.env.MSG91_TEMPLATE_ID,
+        otp_length: 6,
+        otp_expiry: 5,
+      },
+      {
+        headers: {
+          authkey: process.env.MSG91_AUTH_KEY,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    console.log("MSG91 RESPONSE:", response.data);
+
+    // ================= SUCCESS =================
+    return successResponse(
+      res,
+      "OTP sent successfully",
+      200,
+      response.data
+    );
 
   } catch (error) {
-    console.error("VerifyOtp error:", error);
-    return errorResponse(res, error.message || "Internal Server Error", 500);
+    console.error(
+      "PhoneVerify Error:",
+      error.response?.data || error.message
+    );
+
+    return errorResponse(
+      res,
+      error.response?.data?.message ||
+        error.message ||
+        "Internal Server Error",
+      500
+    );
   }
 });
+
+// exports.OTPVerify = catchAsync(async (req, res) => {
+//   try {
+//     // console.log("req.body" ,req.body)
+//     const { phone, otp } = req.body;
+//     if (!phone || !otp) {
+//       return validationErrorResponse(
+//         res,
+//         "Phone number, OTP all are required",
+//         401
+//       );
+//     }
+//     if (otp !== "123456") {
+//       return validationErrorResponse(res, "Invalid or expired OTP", 400);
+//     }
+//     return successResponse(res, "OTP verified successfully", 200, 123456);
+
+
+//   } catch (error) {
+//     console.error("VerifyOtp error:", error);
+//     return errorResponse(res, error.message || "Internal Server Error", 500);
+//   }
+// });
+
+
+exports.OTPVerify = async (req, res) => {
+  try {
+    const { phone, otp } = req.body;
+
+    const response = await axios.get(
+      "https://control.msg91.com/api/v5/otp/verify",
+      {
+        params: {
+          mobile: `91${phone}`,
+          otp,
+        },
+        headers: {
+          authkey: process.env.MSG91_AUTH_KEY,
+        },
+      }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "OTP verified successfully",
+      data: response.data,
+    });
+
+  } catch (error) {
+    console.log(error.response?.data || error.message);
+
+    return res.status(500).json({
+      success: false,
+      message: error.response?.data || error.message,
+    });
+  }
+};
+
 
 
 exports.AppOrder = catchAsync(async (req, res) => {

@@ -12,9 +12,9 @@ const AppRoute = require("express").Router();
 AppRoute.post("/app/signup", signup)
 AppRoute.post("/app/login", Login)
 AppRoute.post("/app/send_otp", SendOtp)
+AppRoute.post("/app/otp_verify", OTPVerify)
 AppRoute.get("/app/user_get", verifyToken, profilegettoken)
 AppRoute.post("/app/phone_verify", PhoneVerify)
-AppRoute.post("/app/otp_verify", OTPVerify)
 AppRoute.get("/app/product/:id", getProductById);
 AppRoute.post("/app/cart/add", verifyToken, AddToCart);
 AppRoute.post("/app/cart/update", verifyToken, updateCart);
