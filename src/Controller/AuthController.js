@@ -111,6 +111,13 @@ exports.OTPVerify = async (req, res) => {
   try {
     const { phone, otp } = req.body;
 
+    if (!phone || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: "Phone and OTP are required",
+      });
+    }
+
     const response = await axios.get(
       "https://control.msg91.com/api/v5/otp/verify",
       {
@@ -124,9 +131,20 @@ exports.OTPVerify = async (req, res) => {
       }
     );
 
-    return res.status(200).json({
-      success: true,
-      message: "OTP verified successfully",
+    console.log(response.data);
+
+    // MSG91 success check
+    if (response.data.type === "success") {
+      return res.status(200).json({
+        success: true,
+        message: "OTP verified successfully",
+        data: response.data,
+      });
+    }
+
+    return res.status(400).json({
+      success: false,
+      message: "Invalid OTP",
       data: response.data,
     });
 
@@ -135,7 +153,7 @@ exports.OTPVerify = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: error.response?.data || error.message,
+      message: error.response?.data?.message || error.message,
     });
   }
 };
