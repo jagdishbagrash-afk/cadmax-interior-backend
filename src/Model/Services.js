@@ -28,7 +28,6 @@ const ServicesSchema = mongoose.Schema({
     },
     Image: {
         type: String,
-        required: true
     },
     concept : {
         type :String ,
