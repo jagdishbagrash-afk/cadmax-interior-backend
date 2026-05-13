@@ -225,10 +225,60 @@ exports.SendOtp = async (req, res) => {
 //   }
 // });
 
+// exports.Login = catchAsync(async (req, res) => {
+//   try {
+//     const { phone, otp, fcmToken } = req.body;
+
+//     if (!phone || !otp) {
+//       return validationErrorResponse(
+//         res,
+//         "Phone number and OTP are required",
+//         401
+//       );
+//     }
+
+//     if (otp !== "123456") {
+//       return validationErrorResponse(res, "Invalid or expired OTP", 400);
+//     }
+
+//     const user = await User.findOne({ phone: phone });
+
+//     if (!user) {
+//       return errorResponse(res, "User not found", 404);
+//     }
+
+//     if (user?.deleted_at != null) {
+//       return errorResponse(res, "This account is blocked", 200);
+//     }
+
+//     if (fcmToken) {
+//       user.fcmToken = fcmToken;   // single token
+//       // user.fcmTokens = [...new Set([...(user.fcmTokens || []), fcmToken])];
+//       await user.save();
+//     }
+
+//     const token = jwt.sign(
+//       { id: user._id, role: user.role, email: user.email },
+//       process.env.JWT_SECRET,
+//       { expiresIn: process.env.JWT_EXPIRES_IN || "8760h" }
+//     );
+
+//     return successResponse(res, "OTP verified successfully", 200, {
+//       user,
+//       token,
+//     });
+
+//   } catch (error) {
+//     console.error("VerifyOtp error:", error);
+//     return errorResponse(res, error.message || "Internal Server Error", 500);
+//   }
+// });
+
 exports.Login = catchAsync(async (req, res) => {
   try {
     const { phone, otp, fcmToken } = req.body;
 
+    // ================= VALIDATION =================
     if (!phone || !otp) {
       return validationErrorResponse(
         res,
@@ -237,47 +287,90 @@ exports.Login = catchAsync(async (req, res) => {
       );
     }
 
-    if (otp !== "123456") {
-      return validationErrorResponse(res, "Invalid or expired OTP", 400);
+    // ================= VERIFY OTP WITH MSG91 =================
+    const verifyResponse = await axios.get(
+      "https://control.msg91.com/api/v5/otp/verify",
+      {
+        params: {
+          mobile: `91${phone}`,
+          otp: otp,
+        },
+        headers: {
+          authkey: process.env.MSG91_AUTH_KEY,
+        },
+      }
+    );
+
+    console.log("verifyResponse =>", verifyResponse.data);
+
+    // OTP invalid
+    if (verifyResponse.data.type !== "success") {
+  return validationErrorResponse(
+  res,
+  null,
+  "Invalid or expired OTP",
+  400
+);
     }
 
-    const user = await User.findOne({ phone: phone });
+    // ================= FIND USER =================
+    const user = await User.findOne({ phone });
 
     if (!user) {
       return errorResponse(res, "User not found", 404);
     }
 
+    // ================= BLOCKED USER =================
     if (user?.deleted_at != null) {
-      return errorResponse(res, "This account is blocked", 200);
+      return errorResponse(res, "This account is blocked", 403);
     }
 
+    // ================= SAVE FCM TOKEN =================
     if (fcmToken) {
-      user.fcmToken = fcmToken;   // single token
-      // user.fcmTokens = [...new Set([...(user.fcmTokens || []), fcmToken])];
+      user.fcmToken = fcmToken;
       await user.save();
     }
 
+    // ================= GENERATE JWT =================
     const token = jwt.sign(
-      { id: user._id, role: user.role, email: user.email },
+      {
+        id: user._id,
+        role: user.role,
+        email: user.email,
+      },
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || "8760h" }
+      {
+        expiresIn: process.env.JWT_EXPIRES_IN || "24h",
+      }
     );
 
-    return successResponse(res, "OTP verified successfully", 200, {
-      user,
-      token,
-    });
+    // ================= SUCCESS RESPONSE =================
+    return successResponse(
+      res,
+      "OTP verified successfully",
+      200,
+      {
+        user,
+        token,
+      }
+    );
 
   } catch (error) {
-    console.error("VerifyOtp error:", error);
-    return errorResponse(res, error.message || "Internal Server Error", 500);
+    console.error("Login error:", error);
+
+    return errorResponse(
+      res,
+      error?.response?.data?.message ||
+        error.message ||
+        "Internal Server Error",
+      500
+    );
   }
 });
 
 exports.signup = catchAsync(async (req, res) => {
   try {
     const { email, name, profileImage, role, phone, gender } = req.body;
-    // Check if user already exists
     const existingUser = await User.find({
       $or: [{ email }, { phone }],
     });
