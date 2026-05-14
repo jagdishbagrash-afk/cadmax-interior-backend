@@ -48,11 +48,11 @@ AppRoute.get("/app/project/list", GetAllProject);
 AppRoute.get("/app/concept/:id", GetServiceTypeId);
 AppRoute.get("/app/vendor/:id", GetVendorCategory);
 
-AppRoute.get("/app/vendor-get", AppAllVendors);  
+AppRoute.get("/app/vendor-get", AppAllVendors);
 AppRoute.get("/app/concept/details/:id", GetServicesDetails);
 AppRoute.get("/app/subcategory/:id", getSubCategoryByCategory);
 AppRoute.get("/app/product/subcategory/:id", getProductBySubCategory);
-AppRoute.get("/app/services/subcategory/list",GetAllRecordServicesSubCategorys);
+AppRoute.get("/app/services/subcategory/list", GetAllRecordServicesSubCategorys);
 AppRoute.get("/app/search-name", globalSearch);
 AppRoute.post("/app/lead-form", verifyToken, LeadApp);
 

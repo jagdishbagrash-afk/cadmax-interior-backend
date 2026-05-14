@@ -105,7 +105,6 @@ const buildCartResponse = async (cart) => {
   };
 };
 
-
 exports.SendOtp = async (req, res) => {
   try {
     const { phone } = req.body;
@@ -117,6 +116,42 @@ exports.SendOtp = async (req, res) => {
       });
     }
 
+    // Check user exists or not
+    const user = await User.findOne({ phone });
+
+    // User not found
+    if (!user) {
+      return successResponse(
+        res,
+        "Phone not registered. Please sign up first.",
+        200,
+        {
+          isNewUser: true,
+        }
+      );
+    }
+
+    // Blocked account check
+    if (user.deleted_at != null) {
+      return errorResponse(res, "This account is blocked", 403);
+    }
+
+    // Fixed OTP for specific number
+    if (phone === 9521343393) {
+      return successResponse(res, "OTP sent successfully", 200, {
+        otp: "123456",
+        isNewUser: false,
+      });
+    }
+
+    if (phone === "9521343393") {
+      return successResponse(res, "OTP sent successfully", 200, {
+        otp: "123456",
+        isNewUser: false,
+      });
+    }
+
+    // Normal MSG91 OTP
     const response = await axios.post(
       "https://control.msg91.com/api/v5/otp",
       {
@@ -133,16 +168,20 @@ exports.SendOtp = async (req, res) => {
       }
     );
 
-      return successResponse(res, "OTP sent successfully", 200, {
-      otp:  response.data,
-      isNewUser: false
+    return successResponse(res, "OTP sent successfully", 200, {
+      otp: response.data,
+      isNewUser: false,
     });
-
 
   } catch (error) {
     console.log(error.response?.data || error.message);
-     console.error("SendOtp error:", error);
-    return errorResponse(res, error.message || "Internal Server Error", 500);
+    console.error("SendOtp error:", error);
+
+    return errorResponse(
+      res,
+      error.message || "Internal Server Error",
+      500
+    );
   }
 };
 
@@ -174,7 +213,7 @@ exports.SendOtp = async (req, res) => {
 //     });
 
 //   } catch (error) {
-   
+
 //   }
 // });
 
@@ -274,9 +313,109 @@ exports.SendOtp = async (req, res) => {
 //   }
 // });
 
+
+// exports.Login = catchAsync(async (req, res) => {
+//   try {
+//     const { phone, otp, fcmToken } = req.body;
+
+//     // ================= VALIDATION =================
+//     if (!phone || !otp) {
+//       return validationErrorResponse(
+//         res,
+//         "Phone number and OTP are required",
+//         401
+//       );
+//     }
+
+//     // ================= VERIFY OTP WITH MSG91 =================
+//     const verifyResponse = await axios.get(
+//       "https://control.msg91.com/api/v5/otp/verify",
+//       {
+//         params: {
+//           mobile: `91${phone}`,
+//           otp: otp,
+//         },
+//         headers: {
+//           authkey: process.env.MSG91_AUTH_KEY,
+//         },
+//       }
+//     );
+
+//     console.log("verifyResponse =>", verifyResponse.data);
+
+//     // OTP invalid
+//     if (verifyResponse.data.type !== "success") {
+//   return validationErrorResponse(
+//   res,
+//   null,
+//   "Invalid or expired OTP",
+//   400
+// );
+//     }
+
+//     // ================= FIND USER =================
+//     const user = await User.findOne({ phone });
+
+//     if (!user) {
+//       return errorResponse(res, "User not found", 404);
+//     }
+
+//     // ================= BLOCKED USER =================
+//     if (user?.deleted_at != null) {
+//       return errorResponse(res, "This account is blocked", 403);
+//     }
+
+//     // ================= SAVE FCM TOKEN =================
+//     if (fcmToken) {
+//       user.fcmToken = fcmToken;
+//       await user.save();
+//     }
+
+//     // ================= GENERATE JWT =================
+//     const token = jwt.sign(
+//       {
+//         id: user._id,
+//         role: user.role,
+//         email: user.email,
+//       },
+//       process.env.JWT_SECRET,
+//       {
+//         expiresIn: process.env.JWT_EXPIRES_IN || "24h",
+//       }
+//     );
+
+//     // ================= SUCCESS RESPONSE =================
+//     return successResponse(
+//       res,
+//       "OTP verified successfully",
+//       200,
+//       {
+//         user,
+//         token,
+//       }
+//     );
+
+//   } catch (error) {
+//     console.error("Login error:", error);
+
+//     return errorResponse(
+//       res,
+//       error?.response?.data?.message ||
+//         error.message ||
+//         "Internal Server Error",
+//       500
+//     );
+//   }
+// });
+
+
 exports.Login = catchAsync(async (req, res) => {
   try {
-    const { phone, otp, fcmToken } = req.body;
+    let { phone, otp, fcmToken } = req.body;
+
+    // Convert to string
+    phone = String(phone);
+    otp = String(otp);
 
     // ================= VALIDATION =================
     if (!phone || !otp) {
@@ -287,30 +426,45 @@ exports.Login = catchAsync(async (req, res) => {
       );
     }
 
-    // ================= VERIFY OTP WITH MSG91 =================
-    const verifyResponse = await axios.get(
-      "https://control.msg91.com/api/v5/otp/verify",
-      {
-        params: {
-          mobile: `91${phone}`,
-          otp: otp,
-        },
-        headers: {
-          authkey: process.env.MSG91_AUTH_KEY,
-        },
+    if (phone === "9521343393") {
+
+      // Fixed OTP for this number
+      if (otp !== "123456") {
+        return validationErrorResponse(
+          res,
+          null,
+          "Invalid or expired OTP",
+          400
+        );
       }
-    );
 
-    console.log("verifyResponse =>", verifyResponse.data);
+    } else {
 
-    // OTP invalid
-    if (verifyResponse.data.type !== "success") {
-  return validationErrorResponse(
-  res,
-  null,
-  "Invalid or expired OTP",
-  400
-);
+      // ================= VERIFY OTP WITH MSG91 =================
+      const verifyResponse = await axios.get(
+        "https://control.msg91.com/api/v5/otp/verify",
+        {
+          params: {
+            mobile: `91${phone}`,
+            otp: otp,
+          },
+          headers: {
+            authkey: process.env.MSG91_AUTH_KEY,
+          },
+        }
+      );
+
+      console.log("verifyResponse =>", verifyResponse.data);
+
+      // OTP invalid
+      if (verifyResponse.data.type !== "success") {
+        return validationErrorResponse(
+          res,
+          null,
+          "Invalid or expired OTP",
+          400
+        );
+      }
     }
 
     // ================= FIND USER =================
@@ -361,8 +515,8 @@ exports.Login = catchAsync(async (req, res) => {
     return errorResponse(
       res,
       error?.response?.data?.message ||
-        error.message ||
-        "Internal Server Error",
+      error.message ||
+      "Internal Server Error",
       500
     );
   }
@@ -546,8 +700,8 @@ exports.PhoneVerify = catchAsync(async (req, res) => {
     return errorResponse(
       res,
       error.response?.data?.message ||
-        error.message ||
-        "Internal Server Error",
+      error.message ||
+      "Internal Server Error",
       500
     );
   }
@@ -731,7 +885,7 @@ exports.OrderList = catchAsync(async (req, res) => {
 exports.getAllCategorys = catchAsync(
   async (req, res) => {
     try {
-      const Categorys = await Category.find({status : true}).sort({ createdAt: -1 });
+      const Categorys = await Category.find({ status: true }).sort({ createdAt: -1 });
       return successResponse(res, "Categorys list successfully.", 201, Categorys);
     } catch (error) {
       return errorResponse(res, error.message || "Internal Server Error", 500);
@@ -848,8 +1002,8 @@ exports.getProductById = catchAsync(async (req, res) => {
 exports.AddToCart = catchAsync(async (req, res) => {
   try {
     const userId = req.user.id;
-    console.log("product" ,req.body)
-    const { product } = req.body; 
+    console.log("product", req.body)
+    const { product } = req.body;
     if (!product || !product.id || !product.quantity || !product.variant) {
       return errorResponse(res, "Invalid product payload", 400);
     }
@@ -1200,7 +1354,7 @@ exports.removeProductVariantFromCart = catchAsync(async (req, res) => {
 exports.GetAllProject = catchAsync(async (req, res) => {
   try {
     const projects = await Project.find(
-      {status : true}
+      { status: true }
     ).sort({ createdAt: -1 });
 
     return successResponse(
@@ -1765,20 +1919,20 @@ exports.globalSearch = catchAsync(async (req, res) => {
 
 exports.LeadApp = catchAsync(async (req, res) => {
   try {
-    const assignedTo = req.user.id; 
-    console.log("assignedTo" ,assignedTo)
-    const { title, message, services, type , category   } = req.body;
+    const assignedTo = req.user.id;
+    console.log("assignedTo", assignedTo)
+    const { title, message, services, type, category } = req.body;
     const record = await Lead.create({
       assignedTo,
       title,
       message,
       services,
-      category ,
+      category,
       type,
       source: "App"
     })
 
-    console.log("record" ,record)
+    console.log("record", record)
 
     res.json({
       status: true,
@@ -1796,13 +1950,13 @@ exports.LeadApp = catchAsync(async (req, res) => {
 
 
 exports.GetAllRecordServicesSubCategorys = catchAsync(
-    async (req, res) => {
-        try {
-         const SubCategorys = await ServicesSubCategory
-         .find().sort({ createdAt: -1 });
-            return successResponse(res, "SubCategorys list successfully.", 201, SubCategorys);
-        } catch (error) {
-            return errorResponse(res, error.message || "Internal Server Error", 500);
-        }
+  async (req, res) => {
+    try {
+      const SubCategorys = await ServicesSubCategory
+        .find().sort({ createdAt: -1 });
+      return successResponse(res, "SubCategorys list successfully.", 201, SubCategorys);
+    } catch (error) {
+      return errorResponse(res, error.message || "Internal Server Error", 500);
     }
+  }
 );
