@@ -184,14 +184,12 @@ exports.GetSubCategoryByNameCategory = CatchAsync(async (req, res) => {
         const { name } = req.params;
 
         const category = await Category.findOne({ slug: name });
-
-
         if (!category) {
             return validationErrorResponse(res, "Category not found.", 404);
         }
         const subCategories = await SubCategory.find({
             category: category._id,
-            deletedAt: null,
+            status : true
         });
 
         if (!subCategories || subCategories.length === 0) {

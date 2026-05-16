@@ -898,7 +898,7 @@ exports.getSubCategoryByCategory = catchAsync(async (req, res) => {
     const categoryId = req.params.id;
     const subCategories = await SubCategory.find({
       category: categoryId,
-      deletedAt: null
+      status : true
     }).populate("category");
 
     if (!subCategories || subCategories?.length === 0) {
