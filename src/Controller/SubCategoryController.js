@@ -183,7 +183,6 @@ exports.GetAllSubCategoryStatus = CatchAsync(
 exports.GetSubCategoryByNameCategory = CatchAsync(async (req, res) => {
     try {
         const { name } = req.params;
-
         const category = await Category.findOne({ slug: name });
         if (!category) {
             return validationErrorResponse(res, "Category not found.", 404);
