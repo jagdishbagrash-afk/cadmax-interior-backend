@@ -1,4 +1,7 @@
+const Categroy = require("../Model/Categroy");
 const Category = require("../Model/Categroy");
+const Product = require("../Model/Product");
+const SubCategory = require("../Model/SubCategory");
 const CatchAsync = require("../Utill/catchAsync");
 const { errorResponse, successResponse, validationErrorResponse } = require("../Utill/ErrorHandling");
 const { deleteFile } = require("../Utill/S3");
@@ -108,7 +111,7 @@ exports.updateCategory = CatchAsync(async (req, res) => {
 exports.getAllCategorys = CatchAsync(
     async (req, res) => {
         try {
-            const Categorys = await Category.find().sort({ createdAt: -1 });
+            const Categorys = await Category.find({status :  true}).sort({ createdAt: -1 });
             return successResponse(res, "Categorys list successfully.", 201, Categorys);
         } catch (error) {
             return errorResponse(res, error.message || "Internal Server Error", 500);
@@ -161,6 +164,56 @@ exports.getAllCategoryStatus = CatchAsync(
         try {
               const Categorys = await Category.find({status : true}).sort({ createdAt: -1 });
             return successResponse(res, "Categorys list successfully.", 201, Categorys);
+        } catch (error) {
+            return errorResponse(res, error.message || "Internal Server Error", 500);
+        }
+    }
+);
+
+
+exports.deleteCategory = CatchAsync(
+    async (req, res) => {
+        try {
+            const { id } = req.params;
+            
+            const subCategory = await Categroy.findById(id);
+            
+            if (!subCategory) {
+                return validationErrorResponse(res, "SubCategory not found.", 400);
+            }
+
+                 const productsSubCategory = await SubCategory.find({ category: id });
+            
+            if (productsSubCategory.length > 0) {
+                return validationErrorResponse(
+                    res, 
+                    400,
+                    `Cannot delete category "${subCategory.name}" because it is currently being used in ${productsSubCategory.length} Subcategory(s). Please remove or reassign these Subcategory first.`,
+                );
+            }
+            
+            
+            // Check if this subcategory is being used in any product
+            
+            const productsUsingSubCategory = await Product.find({ category: id });
+            
+            if (productsUsingSubCategory.length > 0) {
+                return validationErrorResponse(
+                    res, 
+                    400,
+                    `Cannot delete category "${subCategory.name}" because it is currently being used in ${productsUsingSubCategory.length} product(s). Please remove or reassign these products first.`,
+                );
+            }
+            
+            // Delete the subcategory
+            await Category.findByIdAndDelete(id);
+            
+            return successResponse(
+                res,
+                `Category "${subCategory.name}" deleted successfully.`,
+                200,
+                null
+            );
         } catch (error) {
             return errorResponse(res, error.message || "Internal Server Error", 500);
         }

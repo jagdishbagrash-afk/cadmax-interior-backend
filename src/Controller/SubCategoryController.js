@@ -1,4 +1,5 @@
 const Category = require("../Model/Categroy");
+const Product = require("../Model/Product");
 const SubCategory = require("../Model/SubCategory");
 const CatchAsync = require("../Utill/catchAsync");
 const { errorResponse, successResponse, validationErrorResponse } = require("../Utill/ErrorHandling");
@@ -182,7 +183,6 @@ exports.GetAllSubCategoryStatus = CatchAsync(
 exports.GetSubCategoryByNameCategory = CatchAsync(async (req, res) => {
     try {
         const { name } = req.params;
-
         const category = await Category.findOne({ slug: name });
         if (!category) {
             return validationErrorResponse(res, "Category not found.", 404);
@@ -204,3 +204,42 @@ exports.GetSubCategoryByNameCategory = CatchAsync(async (req, res) => {
         return errorResponse(res, error.message || "Internal Server Error", 500);
     }
 });
+
+
+exports.deleteSubCategory = CatchAsync(
+    async (req, res) => {
+        try {
+            const { id } = req.params;
+            
+            const subCategory = await SubCategory.findById(id).populate('category');
+            
+            if (!subCategory) {
+                return validationErrorResponse(res, "SubCategory not found.", 400);
+            }
+            
+            // Check if this subcategory is being used in any product
+            
+            const productsUsingSubCategory = await Product.find({ subcategory: id });
+            
+            if (productsUsingSubCategory.length > 0) {
+                return validationErrorResponse(
+                    res, 
+                    400,
+                    `Cannot delete SubCategory "${subCategory.name}" because it is currently being used in ${productsUsingSubCategory.length} product(s). Please remove or reassign these products first.`,
+                );
+            }
+            
+            // Delete the subcategory
+            await SubCategory.findByIdAndDelete(id);
+            
+            return successResponse(
+                res,
+                `SubCategory "${subCategory.name}" deleted successfully.`,
+                200,
+                null
+            );
+        } catch (error) {
+            return errorResponse(res, error.message || "Internal Server Error", 500);
+        }
+    }
+);

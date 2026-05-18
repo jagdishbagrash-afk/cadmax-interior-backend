@@ -22,7 +22,7 @@ const categorySchema = mongoose.Schema({
     },
     status: {
         type: Boolean,
-        default: false
+        default: true
     },
 
     slug: {
