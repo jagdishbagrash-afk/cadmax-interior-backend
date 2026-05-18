@@ -189,7 +189,7 @@ exports.GetSubCategoryByNameCategory = CatchAsync(async (req, res) => {
         }
         const subCategories = await SubCategory.find({
             category: category._id,
-            status : true
+            status: true
         });
 
         if (!subCategories || subCategories.length === 0) {
@@ -210,28 +210,28 @@ exports.deleteSubCategory = CatchAsync(
     async (req, res) => {
         try {
             const { id } = req.params;
-            
+
             const subCategory = await SubCategory.findById(id).populate('category');
-            
+
             if (!subCategory) {
                 return validationErrorResponse(res, "SubCategory not found.", 400);
             }
-            
+
             // Check if this subcategory is being used in any product
-            
+
             const productsUsingSubCategory = await Product.find({ subcategory: id });
-            
+
             if (productsUsingSubCategory.length > 0) {
                 return validationErrorResponse(
-                    res, 
+                    res,
                     400,
                     `Cannot delete SubCategory "${subCategory.name}" because it is currently being used in ${productsUsingSubCategory.length} product(s). Please remove or reassign these products first.`,
                 );
             }
-            
+
             // Delete the subcategory
             await SubCategory.findByIdAndDelete(id);
-            
+
             return successResponse(
                 res,
                 `SubCategory "${subCategory.name}" deleted successfully.`,
