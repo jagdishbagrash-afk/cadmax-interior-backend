@@ -16,6 +16,11 @@ const leadSchema = new mongoose.Schema(
       type: String,
       default: "Website",
     },
+    status :{
+      type :String,
+      default: "pending",
+      
+    },
     assignedTo: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
