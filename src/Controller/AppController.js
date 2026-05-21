@@ -3,6 +3,7 @@ const catchAsync = require("../Utill/catchAsync");
 const User = require("../Model/User");
 const SubCategory = require("../Model/SubCategory");
 const Category = require("../Model/Categroy")
+const Address =  require("../Model/MultipleAddress")
 const { v4: uuidv4 } = require("uuid");
 // const nodemailer = require("nodemailer");
 const { validationErrorResponse, errorResponse, successResponse } = require("../Utill/ErrorHandling");
@@ -584,26 +585,46 @@ exports.signup = catchAsync(async (req, res) => {
   }
 });
 
+
 exports.profilegettoken = catchAsync(async (req, res, next) => {
   try {
     const userId = req?.user?.id;
+
     if (!userId) {
-      return res.status(400).json({ msg: "User not authenticated" });
+      return res.status(401).json({
+        success: false,
+        msg: "User not authenticated",
+      });
     }
-    const userProfile = await User.findById(userId).select('-password');
+
+    // Get User Profile
+    const userProfile = await User.findById(userId).select("-password -OTP");
+
     if (!userProfile) {
-      return res.status(404).json({ msg: "User profile not found" });
+      return res.status(404).json({
+        success: false,
+        msg: "User profile not found",
+      });
     }
+
+    // Get User Addresses
+    const addresses = await Address.find({
+      userId,
+      deletedAt: null,
+    }).sort({ isDefault: -1, createdAt: -1 });
+
     return successResponse(
       res,
       "Profile retrieved successfully!!",
-      201,
+      200,
       {
         user: userProfile,
+        addresses,
       }
     );
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
+      success: false,
       msg: "Failed to fetch profile",
       error: error.message,
     });
@@ -1215,7 +1236,6 @@ exports.getCart = catchAsync(async (req, res) => {
   try {
     const userId = req.user.id;
 
-    // ✅ Only fetch active (pending) cart
     const cart = await Cart.findOne({
       user: userId,
       status: "pending"

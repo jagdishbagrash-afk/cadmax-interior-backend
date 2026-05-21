@@ -33,6 +33,21 @@ exports.addOrder = catchAsync(async (req, res) => {
     });
 
     const record = await newOrder.save();
+    const productIds = product.map(p => p.id); // req.body.product se ids nikalo
+    
+        const cart = await Cart.findOne({
+          user: userId,
+          status: { $ne: "done" },
+          "product.productId": { $in: productIds }
+        });
+    
+    
+    
+        if (cart && cart.status !== "done") {
+          cart.status = "done";
+          const record = await cart.save();
+        }
+
     const subject = `Welcome to Cadmax!🎉`;
     const emailHtml = OrderEmail(record?.name, record);
     await sendEmail({
@@ -106,6 +121,7 @@ exports.getAllOrders = catchAsync(async (req, res) => {
 
 const { sendPushNotification } = require("../Utill/notificationService");
 const User = require("../Model/User");
+const Cart = require("../Model/Cart");
 
 exports.updateStatus = catchAsync(async (req, res) => {
   try {
