@@ -435,7 +435,6 @@ exports.globalSearch = catchAsync(async (req, res) => {
   try {
     const { search } = req.query;
 
-    console.log("search", search)
 
     const regexFilter = search
       ? { $regex: search, $options: "i" }
@@ -443,7 +442,6 @@ exports.globalSearch = catchAsync(async (req, res) => {
 
   const productFilter = {
   deletedAt: null,
-  status: true,
 };
 
     if (regexFilter) {
