@@ -355,7 +355,6 @@ exports.updateProduct = CatchAsync(async (req, res) => {
     updatedProduct
   );
 });
-
 exports.deleteProduct = CatchAsync(async (req, res) => {
   try {
     const id = req.params.id;
