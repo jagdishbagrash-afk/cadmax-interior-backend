@@ -40,7 +40,51 @@ app.use("/api", require("./Routes/Paymentroute"));
 app.use("/api", require("./Routes/MutipleAddressRoute"));
 
 
+const Product = require("./Model/Product");
 
+/* ==============================
+   TEST ROUTE
+============================== */
+
+app.get("/test", async (req, res) => {
+  try {
+    const products = await Product.find();
+
+    for (const product of products) {
+      const amount = Number(product.amount || 0);
+
+      // default 10%
+      const discount = Number(product.discount_amount || 10);
+
+      // final amount
+      const finalAmount =
+        amount - (amount * discount) / 100;
+
+      await Product.updateOne(
+        { _id: product._id },
+        {
+          $set: {
+            discount_amount: discount,
+            final_amount: finalAmount,
+          },
+        }
+      );
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "All products updated successfully",
+    });
+  } catch (error) {
+    console.log(error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong",
+      error: error.message,
+    });
+  }
+});
 const server = app.listen(PORT, () => console.log("Server is running at port : " + PORT));
 server.timeout = 360000;
 

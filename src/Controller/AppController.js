@@ -1270,6 +1270,7 @@ exports.updateCart = catchAsync(async (req, res) => {
   }
 });
 
+
 exports.getCart = catchAsync(async (req, res) => {
   try {
     const userId = req.user.id;
@@ -1279,15 +1280,25 @@ exports.getCart = catchAsync(async (req, res) => {
       status: "pending"
     }).populate({
       path: "product.productId",
-      select: "title amount images variants"
+      // ✅ added discount fields
+      select: `
+        title 
+        amount 
+        final_amount
+        discount_amount
+        images 
+        variants
+      `
     });
 
-    // ✅ Empty cart check
+    // ✅ Empty cart
     if (!cart || !cart.product || cart.product.length === 0) {
       return successResponse(res, "Cart is empty", 200, {
         items: [],
         summary: {
           subtotal: 0,
+          originalSubtotal: 0,
+          savedAmount: 0,
           discountPercent: 0,
           discountAmount: 0,
           taxPercent: 0,
@@ -1298,20 +1309,48 @@ exports.getCart = catchAsync(async (req, res) => {
     }
 
     let subtotal = 0;
+    let originalSubtotal = 0;
 
     const items = cart.product
       .map((item) => {
         const product = item.productId;
+
         if (!product) return null;
 
         const selectedVariant = product.variants.find(
           (v) => v.color === item.variant
         );
 
-        const variantImages = selectedVariant?.images || [];
+        const variantImages =
+          selectedVariant?.images || [];
 
-        const itemTotal = item.quantity * product.amount;
+        // ✅ Original price
+        const originalPrice =
+          Number(product.amount || 0);
+
+        // ✅ Discounted price
+        const finalPrice =
+          Number(
+            product.final_amount ||
+            originalPrice -
+              (originalPrice *
+                (product.discount_amount || 10)) /
+                100
+          );
+
+        // ✅ Discount %
+        const discount =
+          Number(product.discount_amount || 10);
+
+        // ✅ Totals
+        const itemTotal =
+          item.quantity * finalPrice;
+
+        const originalItemTotal =
+          item.quantity * originalPrice;
+
         subtotal += itemTotal;
+        originalSubtotal += originalItemTotal;
 
         return {
           productId: product._id,
@@ -1319,35 +1358,76 @@ exports.getCart = catchAsync(async (req, res) => {
           images: variantImages,
           variant: item.variant,
           quantity: item.quantity,
-          unitPrice: product.amount,
-          itemTotal
+
+          // ✅ pricing
+          amount: originalPrice,
+          final_amount: finalPrice,
+          discount_amount: discount,
+
+          unitPrice: finalPrice,
+
+          itemTotal,
+          originalItemTotal,
         };
       })
       .filter(Boolean);
 
-    // ✅ Discount
-    const discountPercent = cart.discount || 0;
-    const discountAmount = +(subtotal * (discountPercent / 100));
-    const afterDiscount = subtotal - discountAmount;
+    // ✅ Saved Amount
+    const savedAmount =
+      originalSubtotal - subtotal;
+
+    // ✅ Cart Discount
+    const discountPercent =
+      cart.discount || 0;
+
+    const discountAmount = +(
+      subtotal *
+      (discountPercent / 100)
+    ).toFixed(2);
+
+    const afterDiscount =
+      subtotal - discountAmount;
 
     // ✅ Tax
     const taxPercent = cart.tax || 0;
-    const taxAmount = +(subtotal * (taxPercent / 100)).toFixed(2);
 
-    // ✅ Final Amount
-    const finalAmount = +(afterDiscount + taxAmount).toFixed(2);
+    const taxAmount = +(
+      afterDiscount *
+      (taxPercent / 100)
+    ).toFixed(2);
 
-    return successResponse(res, "Cart fetched successfully", 200, {
-      items,
-      summary: {
-        subtotal,
-        discountPercent,
-        discountAmount,
-        taxPercent,
-        taxAmount,
-        finalAmount
+    // ✅ Final
+    const finalAmount = +(
+      afterDiscount + taxAmount
+    ).toFixed(2);
+
+    return successResponse(
+      res,
+      "Cart fetched successfully",
+      200,
+      {
+        items,
+
+        summary: {
+          // ✅ old total
+          originalSubtotal,
+
+          // ✅ discounted subtotal
+          subtotal,
+
+          // ✅ total saved
+          savedAmount,
+
+          discountPercent,
+          discountAmount,
+
+          taxPercent,
+          taxAmount,
+
+          finalAmount
+        }
       }
-    });
+    );
 
   } catch (error) {
     return errorResponse(

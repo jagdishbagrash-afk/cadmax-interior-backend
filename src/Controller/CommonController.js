@@ -54,10 +54,6 @@ exports.bestSellerProducts = catchAsync(async (req, res) => {
   });
 });
 
-
-
-
-
 exports.latestProducts = catchAsync(async (req, res) => {
   const limit = parseInt(req.query.limit) || 10;
 
