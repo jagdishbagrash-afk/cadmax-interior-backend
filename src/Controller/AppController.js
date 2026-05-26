@@ -880,7 +880,9 @@ exports.AppOrder = catchAsync(async (req, res) => {
 
 
 exports.OrderList = catchAsync(async (req, res) => {
-  const orders = await Order.find()
+    const userId = req.user?.id;
+
+  const orders = await Order.find({ userId })
     .populate({
       path: "product.id",
       populate: [
@@ -904,14 +906,12 @@ exports.OrderList = catchAsync(async (req, res) => {
       const product = p.id;
 
       return {
-        // product fields
         _id: product._id,
         title: product.title,
         description: product.description,
         amount: product.amount,
         variants: product.variants,
 
-        // 👇 FULL DATA FROM OTHER TABLES
         category: product.category,
         subcategory: product.subcategory,
 

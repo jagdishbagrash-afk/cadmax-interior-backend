@@ -48,13 +48,13 @@ exports.addOrder = catchAsync(async (req, res) => {
           const record = await cart.save();
         }
 
-    const subject = `Welcome to Cadmax!🎉`;
-    const emailHtml = OrderEmail(record?.name, record);
-    await sendEmail({
-      email: req?.user?.email,
-      subject: subject,
-      emailHtml: emailHtml,
-    });
+    // const subject = `Welcome to Cadmax!🎉`;
+    // const emailHtml = OrderEmail(record?.name, record);
+    // await sendEmail({
+    //   email: req?.user?.email,
+    //   subject: subject,
+    //   emailHtml: emailHtml,
+    // });
 
     return successResponse(res, "Order added successfully", 201, record);
   } catch (error) {
