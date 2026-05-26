@@ -45,6 +45,10 @@ const ProductSchema = mongoose.Schema(
       type: Number,
       required: [true, "Amount is required"],
     },
+      discount_amount: {
+      type: Number,
+      required: [true, "discount_amount is required"],
+    },
     variants: {
       type: [ColorVariantSchema],
       required: true
