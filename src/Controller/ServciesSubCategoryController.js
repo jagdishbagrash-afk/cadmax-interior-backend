@@ -150,5 +150,3 @@ exports.UpdateServicesSubCategory = CatchAsync(
     }
   }
 );
-
-
