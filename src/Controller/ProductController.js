@@ -95,7 +95,8 @@ exports.addProduct = CatchAsync(async (req, res) => {
       material: req.body.material?.[0] || "",
       type: req.body.type?.[0] || "",
       terms: req.body.terms?.[0] || "",
-      variants: finalVariants
+      variants: finalVariants ,
+      discount_amount  :  req.body.discount_amount || 0 ,
     });
 
     const record = await newProduct.save();
@@ -226,6 +227,7 @@ exports.updateProduct = CatchAsync(async (req, res) => {
     "material",
     "type",
     "terms",
+    "discount_amount"
   ];
   let isTitleUpdated = false;
 
@@ -368,7 +370,6 @@ exports.updateProduct = CatchAsync(async (req, res) => {
     updatedProduct
   );
 });
-
 exports.deleteProduct = CatchAsync(async (req, res) => {
   try {
     const id = req.params.id;

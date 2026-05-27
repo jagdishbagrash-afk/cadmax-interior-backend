@@ -232,20 +232,20 @@ exports.SendUserOtp = async (req, res) => {
       return errorResponse(res, "This account is blocked", 403);
     }
 
-        if (phone === 9521343393) {
-          return successResponse(res, "OTP sent successfully", 200, {
-            otp: "123456",
-            isNewUser: false,
-          });
-        }
-    
-        if (phone === "9521343393") {
-          return successResponse(res, "OTP sent successfully", 200, {
-            otp: "123456",
-            isNewUser: false,
-          });
-        }
-    
+    if (phone === 9521343393) {
+      return successResponse(res, "OTP sent successfully", 200, {
+        otp: "123456",
+        isNewUser: false,
+      });
+    }
+
+    if (phone === "9521343393") {
+      return successResponse(res, "OTP sent successfully", 200, {
+        otp: "123456",
+        isNewUser: false,
+      });
+    }
+
 
     // Send OTP
     const response = await axios.post(
@@ -453,41 +453,41 @@ exports.UserLogin = catchAsync(async (req, res) => {
     }
 
     // ================= VERIFY OTP =================
-   if (phone === "9521343393") {
-  
-        // Fixed OTP for this number
-        if (otp !== "123456") {
-          return validationErrorResponse(
-            res,
-            null,
-            "Invalid or expired OTP",
-            400
-          );
-        }
-  
-      } else {
-        const verifyResponse = await axios.get(
-          "https://control.msg91.com/api/v5/otp/verify",
-          {
-            params: {
-              mobile: `91${phone}`,
-              otp: otp,
-            },
-            headers: {
-              authkey: process.env.MSG91_AUTH_KEY,
-            },
-          }
+    if (phone === "9521343393") {
+
+      // Fixed OTP for this number
+      if (otp !== "123456") {
+        return validationErrorResponse(
+          res,
+          null,
+          "Invalid or expired OTP",
+          400
         );
-        if (verifyResponse.data.type !== "success") {
-          return validationErrorResponse(
-            res,
-            null,
-            "Invalid or expired OTP",
-            400
-          );
-        }
       }
-  
+
+    } else {
+      const verifyResponse = await axios.get(
+        "https://control.msg91.com/api/v5/otp/verify",
+        {
+          params: {
+            mobile: `91${phone}`,
+            otp: otp,
+          },
+          headers: {
+            authkey: process.env.MSG91_AUTH_KEY,
+          },
+        }
+      );
+      if (verifyResponse.data.type !== "success") {
+        return validationErrorResponse(
+          res,
+          null,
+          "Invalid or expired OTP",
+          400
+        );
+      }
+    }
+
     // ================= GENERATE JWT =================
     const token = jwt.sign(
       {
