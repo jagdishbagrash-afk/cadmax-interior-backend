@@ -26,52 +26,63 @@ const ProductSchema = mongoose.Schema(
       type: String,
       required: [true, "Title is required"],
     },
+
     description: {
       type: String,
       required: [true, "Description is required"],
     },
-    // stock: {
-    //   type: Number,
-    //   required: [true, "Stock is required"],
-    // },
-    // image: {
-    //   type: String,
-    //   required: [true, "Image is required"],
-    // },
-    slug :{
-      type :String 
+
+    slug: {
+      type: String,
     },
+
     amount: {
       type: Number,
       required: [true, "Amount is required"],
     },
+
+    discount_amount: {
+      type: Number,
+      default: 10,
+    },
+
+    final_amount: {
+      type: Number,
+      default: 0,
+    },
+
     variants: {
       type: [ColorVariantSchema],
-      required: true
+      required: true,
     },
+
     subcategory: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "subCategory",
       required: [true, "Subcategory is required"],
     },
+
     category: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "category",
       required: [true, "Category is required"],
     },
-    // Newly Added Fields
+
     dimensions: {
       type: String,
       required: [true, "Dimensions is required"],
     },
+
     material: {
       type: String,
       required: [true, "Material is required"],
     },
+
     type: {
       type: String,
       required: [true, "Product is required"],
     },
+
     terms: {
       type: String,
       required: [true, "Terms is required"],
@@ -84,5 +95,21 @@ const ProductSchema = mongoose.Schema(
   },
   { timestamps: true }
 );
+
+/* =========================================
+   AUTO CALCULATE FINAL AMOUNT
+========================================= */
+
+ProductSchema.pre("save", function (next) {
+  const amount = Number(this.amount || 0);
+
+  // ✅ default 10%
+  const discount = Number(this.discount_amount || 10);
+
+  this.final_amount =
+    amount - (amount * discount) / 100;
+
+  next();
+});
 
 module.exports = mongoose.model("Product", ProductSchema);
