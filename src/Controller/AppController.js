@@ -1387,7 +1387,6 @@ exports.removeProductVariantFromCart = catchAsync(async (req, res) => {
     if (!cart) {
       return errorResponse(res, "Cart not found", 404);
     }
-
     const initialLength = cart.product.length;
 
     cart.product = cart.product.filter(
