@@ -74,6 +74,22 @@ const OrderSchema = new mongoose.Schema(
       type: Number,
       required: [true, "Amount is required"],
     },
+   tracking_number: {
+  type: String,
+},
+
+shipping_status: {
+  type: String,
+  default: "pending",
+},
+
+courier_name: {
+  type: String,
+},
+
+shipping_response: {
+  type: Object,
+},
   },
   { timestamps: true }
 );

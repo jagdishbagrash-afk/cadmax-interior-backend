@@ -4,23 +4,50 @@ const { v4: uuidv4 } = require("uuid");
 const { successResponse, errorResponse, validationErrorResponse } = require("../Utill/ErrorHandling");
 const sendEmail = require("../Utill/EmailMailler");
 const OrderEmail = require("../EmailTemplate/Order");
-
+const createDhlShipment = require("../Utill/createDhlShipment");
+const { sendPushNotification } = require("../Utill/notificationService");
+const User = require("../Model/User");
+const Cart = require("../Model/Cart");
+const { default: axios } = require("axios");
 
 exports.addOrder = catchAsync(async (req, res) => {
   try {
-    const { name, mobile, address, product, amount, addressId ,PaymentId } = req.body;
-    const userId = req.user?.id || "692dcfbd4816433146e11abd";
 
-    const orderId = `ORD-${uuidv4().slice(0, 8).toUpperCase()}`;
+    const {
+      name,
+      mobile,
+      address,
+      product,
+      amount,
+      addressId,
+      PaymentId,
+    } = req.body;
 
-    if (!name || !mobile || !product || !amount) {
+    const userId =
+      req.user?.id ||
+      "692dcfbd4816433146e11abd";
+
+    const orderId = `ORD-${uuidv4()
+      .slice(0, 8)
+      .toUpperCase()}`;
+
+    /* VALIDATION */
+
+    if (
+      !name ||
+      !mobile ||
+      !product ||
+      !amount
+    ) {
       return validationErrorResponse(
         res,
         "All fields (name, mobile, address, product, amount) are required"
       );
     }
 
-    const newOrder = await Order({
+    /* CREATE ORDER */
+
+    const newOrder = new Order({
       name,
       mobile,
       address,
@@ -28,23 +55,115 @@ exports.addOrder = catchAsync(async (req, res) => {
       addressId,
       amount,
       userId,
-      orderId ,
-      PaymentId
+      orderId,
+      PaymentId,
+      shipping_status: "pending",
+      courier_name: "DHL",
     });
 
     const record = await newOrder.save();
-    const subject = `Welcome to Cadmax!🎉`;
-    const emailHtml = OrderEmail(record?.name, record);
-    await sendEmail({
-      email: req?.user?.email,
-      subject: subject,
-      emailHtml: emailHtml,
+
+    /* -----------------------------
+       CREATE DHL SHIPMENT
+    ----------------------------- */
+
+    const shipment =
+      await createDhlShipment({
+        name,
+        mobile,
+        address,
+      });
+
+      console.log(shipment)
+
+    /* SUCCESS */
+
+    if (shipment.success) {
+
+      record.tracking_number =
+        shipment?.data
+          ?.shipmentTrackingNumber;
+
+      record.shipping_status =
+        "shipment_created";
+
+      record.shipping_response =
+        shipment?.data;
+
+    } else {
+
+      /* FAILED */
+
+      record.shipping_status =
+        "shipment_failed";
+
+      record.shipping_response =
+        shipment?.error;
+    }
+
+    await record.save();
+
+    /* -----------------------------
+       UPDATE CART
+    ----------------------------- */
+
+    const productIds = product.map(
+      (p) => p.id
+    );
+
+    const cart = await Cart.findOne({
+      user: userId,
+      status: { $ne: "done" },
+      "product.productId": {
+        $in: productIds,
+      },
     });
 
-    return successResponse(res, "Order added successfully", 201, record);
+    if (
+      cart &&
+      cart.status !== "done"
+    ) {
+      cart.status = "done";
+
+      await cart.save();
+    }
+
+    /* -----------------------------
+       EMAIL
+    ----------------------------- */
+
+    // const subject = `Welcome to Cadmax!🎉`;
+
+    // const emailHtml = OrderEmail(
+    //   record?.name,
+    //   record
+    // );
+
+    // await sendEmail({
+    //   email: req?.user?.email,
+    //   subject: subject,
+    //   emailHtml: emailHtml,
+    // });
+
+    /* RESPONSE */
+
+    return successResponse(
+      res,
+      "Order added successfully",
+      201,
+      record
+    );
+
   } catch (error) {
+
     console.error(error);
-    return errorResponse(res, error.message || "Internal Server Error", 500);
+
+    return errorResponse(
+      res,
+      error.message ||
+        "Internal Server Error",
+      500
+    );
   }
 });
 
@@ -104,8 +223,6 @@ exports.getAllOrders = catchAsync(async (req, res) => {
 // });
 
 
-const { sendPushNotification } = require("../Utill/notificationService");
-const User = require("../Model/User");
 
 exports.updateStatus = catchAsync(async (req, res) => {
   try {
@@ -209,3 +326,5 @@ exports.getOrdersByUser = catchAsync(async (req, res) => {
     return errorResponse(res, error.message || "Internal Server Error", 500);
   }
 });
+
+

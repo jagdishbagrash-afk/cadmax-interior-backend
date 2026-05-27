@@ -3,6 +3,7 @@ const Lead = require("../Model/Lead");
 const Order = require("../Model/Order");
 const Product = require("../Model/Product");
 const Project = require("../Model/Project");
+const Services = require("../Model/Services");
 const { errorResponse, successResponse, validationErrorResponse } = require("../Utill/ErrorHandling");
 const { deleteFile } = require("../Utill/S3");
 const catchAsync = require("../Utill/catchAsync");
@@ -52,10 +53,6 @@ exports.bestSellerProducts = catchAsync(async (req, res) => {
     data: bestSellers,
   });
 });
-
-
-
-
 
 exports.latestProducts = catchAsync(async (req, res) => {
   const limit = parseInt(req.query.limit) || 10;
@@ -429,3 +426,89 @@ exports.testNotification = async (req, res) => {
     });
   }
 };
+
+exports.globalSearch = catchAsync(async (req, res) => {
+  try {
+    const { search } = req.query;
+
+
+    const regexFilter = search
+      ? { $regex: search, $options: "i" }
+      : null;
+
+  const productFilter = {
+  deletedAt: null,
+};
+
+    if (regexFilter) {
+      productFilter.title = regexFilter;
+    }
+
+    const productsPromise = Product.find(productFilter)
+      .populate("subcategory")
+      .populate("category")
+      .sort({ createdAt: -1 });
+
+    const serviceMatch = {
+      status: true,
+    };
+
+    if (regexFilter) {
+      serviceMatch.title = regexFilter;
+    }
+
+    const servicesPromise = Services.aggregate([
+      {
+        $match: serviceMatch,
+      },
+      {
+        $group: {
+          _id: "$concept",
+          services: { $push: "$$ROOT" },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          k: "$_id",
+          v: "$services",
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          data: { $push: { k: "$k", v: "$v" } },
+        },
+      },
+      {
+        $replaceRoot: {
+          newRoot: { $arrayToObject: "$data" },
+        },
+      },
+    ]);
+
+    const [products, services] = await Promise.all([
+      productsPromise,
+      servicesPromise,
+    ]);
+
+    const defaultConcepts = {
+      contemporary: [],
+      modern: [],
+      classic: [],
+    };
+
+    const finalServices = {
+      ...defaultConcepts,
+      ...(services[0] || {}),
+    };
+
+    return successResponse(res, "Global search result", 200, {
+      products,
+      design: finalServices,
+    });
+
+  } catch (error) {
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});

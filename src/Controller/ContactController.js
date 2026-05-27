@@ -98,21 +98,26 @@ exports.createLead = catchAsync(async (req, res) => {
 
 
 exports.LeadGet = catchAsync(async (req, res, next) => {
-    try {
-        const leadget = await Lead.find({}).populate("assignedTo");
-        res.status(200).json({
-            data: leadget,
-            msg: "Contact Get",
-        });
-    } catch (error) {
-        // logger.error(error);
-        res.status(500).json({
-            msg: "Failed to fetch Contact get",
-            error: error.message,
-        });
-    }
-});
+  try {
 
+    const leadget = await Lead.find({})
+      .populate("assignedTo")
+      .sort({ createdAt: -1 }); // latest first
+
+    res.status(200).json({
+      data: leadget,
+      msg: "Contact Get",
+    });
+
+  } catch (error) {
+
+    res.status(500).json({
+      msg: "Failed to fetch Contact get",
+      error: error.message,
+    });
+
+  }
+});
 
 
 exports.ContactAddPost = catchAsync(async (req, res) => {
@@ -180,5 +185,94 @@ exports.ContactAddPost = catchAsync(async (req, res) => {
             message: "❌ Failed to send contact request.",
             error: error.message,
         });
+    }
+});
+
+
+
+
+
+// DELETE LEAD
+exports.LeadDelete = catchAsync(async (req, res, next) => {
+    try {
+        const { id } = req.params;
+
+        const lead = await Lead.findById(id);
+
+        if (!lead) {
+            return res.status(404).json({
+                status: false,
+                msg: "Lead not found",
+            });
+        }
+
+        await Lead.findByIdAndDelete(id);
+
+        res.status(200).json({
+            status: true,
+            msg: "Lead deleted successfully",
+        });
+
+    } catch (error) {
+
+        res.status(500).json({
+            status: false,
+            msg: "Failed to delete lead",
+            error: error.message,
+        });
+
+    }
+});
+
+
+// UPDATE LEAD STATUS
+exports.LeadStatusUpdate = catchAsync(async (req, res, next) => {
+    try {
+
+        const { id } = req.params;
+        const { status } = req.body;
+
+        // Allowed Status
+        const allowedStatus = [
+            "pending",
+            "contacted",
+            "completed",
+            "rejected",
+        ];
+
+        if (!allowedStatus.includes(status)) {
+            return res.status(400).json({
+                status: false,
+                msg: "Invalid status value",
+            });
+        }
+
+        const lead = await Lead.findById(id);
+
+        if (!lead) {
+            return res.status(404).json({
+                status: false,
+                msg: "Lead not found",
+            });
+        }
+
+        lead.status = status;
+
+        await lead.save();
+
+        res.status(200).json({
+            status: true,
+            msg: "Lead status updated successfully",
+            data: lead,
+        });
+
+    } catch (error) {
+
+        res.status(500).json({
+            status: false,
+            msg: "Failed to update lead status",
+            error: error.message,
+        });
+
     }
 });
