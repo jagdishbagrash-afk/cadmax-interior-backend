@@ -4,10 +4,7 @@ const { successResponse, errorResponse, validationErrorResponse } = require("../
 const { deleteFile } = require("../Utill/S3");
 const User = require("../Model/User");
 const sendNotification = require("./sendNotification");
-<<<<<<< HEAD
 const { sendPushNotification } = require("../Utill/notificationService");
-=======
->>>>>>> 55f5aab0e8be81f281a3fedfba40b3a02aa95258
 
 
 const makeSlug = (text) => {
@@ -101,7 +98,6 @@ exports.addProduct = CatchAsync(async (req, res) => {
 
     const record = await newProduct.save();
 
-<<<<<<< HEAD
     // const users = await User.find({
     //   role: "customer",
     //   status: "active",
@@ -115,21 +111,12 @@ const users = await User.find({
     }).select("fcmToken");
 
     
-=======
-    const users = await User.find({
-      role: "customer",
-      status: "active",
-      deleted_at: null,
-    });
-
->>>>>>> 55f5aab0e8be81f281a3fedfba40b3a02aa95258
     const admindata = await User.find({
       role: "admin",
       status: "active",
       deleted_at: null,
     });
 
-<<<<<<< HEAD
 
     const tokens = users.map(u => u.fcmToken).filter(Boolean);
 
@@ -148,8 +135,6 @@ const users = await User.find({
 
     console.log("Heelo")
 
-=======
->>>>>>> 55f5aab0e8be81f281a3fedfba40b3a02aa95258
     // await Promise.all(
     //   users.map(user =>
     //     sendNotification({
