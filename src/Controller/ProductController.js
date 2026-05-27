@@ -204,6 +204,7 @@ exports.getProductById = CatchAsync(async (req, res) => {
 });
 
 
+
 exports.updateProduct = CatchAsync(async (req, res) => {
   const productId = req.params.id;
 
