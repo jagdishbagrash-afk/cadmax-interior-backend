@@ -1323,14 +1323,17 @@ exports.getCart = catchAsync(async (req, res) => {
         const variantImages =
           selectedVariant?.images || [];
 
+        // ✅ Original price
         const originalPrice =
           Number(product.amount || 0);
 
+        // ✅ Discounted price
         const finalPrice =
           Number(
             product.final_amount 
           );
 
+        // ✅ Discount %
         const discount =
           Number(product.discount_amount || 10);
 
@@ -1378,8 +1381,13 @@ exports.getCart = catchAsync(async (req, res) => {
     // ✅ Tax
     const taxPercent = cart.tax || 0;
 
+    const taxAmount = +(
+      afterDiscount *
+      (taxPercent / 100)
+    ).toFixed(2);
+
     // ✅ Final
-    const finalAmount =subtotal;
+    const finalAmount = finalPrice;
 
     return successResponse(
       res,
