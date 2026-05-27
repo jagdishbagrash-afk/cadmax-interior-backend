@@ -1280,7 +1280,6 @@ exports.getCart = catchAsync(async (req, res) => {
       status: "pending"
     }).populate({
       path: "product.productId",
-      // ✅ added discount fields
       select: `
         title 
         amount 
@@ -1324,21 +1323,14 @@ exports.getCart = catchAsync(async (req, res) => {
         const variantImages =
           selectedVariant?.images || [];
 
-        // ✅ Original price
         const originalPrice =
           Number(product.amount || 0);
 
-        // ✅ Discounted price
         const finalPrice =
           Number(
-            product.final_amount ||
-            originalPrice -
-              (originalPrice *
-                (product.discount_amount || 10)) /
-                100
+            product.final_amount 
           );
 
-        // ✅ Discount %
         const discount =
           Number(product.discount_amount || 10);
 
@@ -1358,48 +1350,21 @@ exports.getCart = catchAsync(async (req, res) => {
           images: variantImages,
           variant: item.variant,
           quantity: item.quantity,
-
-          // ✅ pricing
           amount: originalPrice,
           final_amount: finalPrice,
           discount_amount: discount,
-
           unitPrice: finalPrice,
-
           itemTotal,
           originalItemTotal,
         };
       })
       .filter(Boolean);
-
-    // ✅ Saved Amount
     const savedAmount =
       originalSubtotal - subtotal;
 
-    // ✅ Cart Discount
     const discountPercent =
       cart.discount || 0;
-
-    const discountAmount = +(
-      subtotal *
-      (discountPercent / 100)
-    ).toFixed(2);
-
-    const afterDiscount =
-      subtotal - discountAmount;
-
-    // ✅ Tax
-    const taxPercent = cart.tax || 0;
-
-    const taxAmount = +(
-      afterDiscount *
-      (taxPercent / 100)
-    ).toFixed(2);
-
-    // ✅ Final
-    const finalAmount = +(
-      afterDiscount + taxAmount
-    ).toFixed(2);
+    const finalAmount =subtotal;
 
     return successResponse(
       res,
@@ -1409,21 +1374,11 @@ exports.getCart = catchAsync(async (req, res) => {
         items,
 
         summary: {
-          // ✅ old total
           originalSubtotal,
-
-          // ✅ discounted subtotal
           subtotal,
-
-          // ✅ total saved
           savedAmount,
-
           discountPercent,
           discountAmount,
-
-          taxPercent,
-          taxAmount,
-
           finalAmount
         }
       }
