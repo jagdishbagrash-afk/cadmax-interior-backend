@@ -1,10 +1,4 @@
-// createDhlShipment.js
-// utils/createDhlShipment.js
-
 const axios = require("axios");
-
-console.log(process.env.DHL_API_KEY);
-console.log(process.env.DHL_API_SECRET);
 
 const createDhlShipment = async ({
   name,
@@ -18,7 +12,7 @@ const createDhlShipment = async ({
     ).toString("base64");
 
     const response = await axios.post(
-      "https://api-ecom.dhl.com/track/shipments",
+      "https://express.api.dhl.com/mydhlapi/shipments",
 
       {
         plannedShippingDateAndTime:
@@ -40,7 +34,6 @@ const createDhlShipment = async ({
 
         customerDetails: {
 
-          /* SHIPPER */
           shipperDetails: {
             postalAddress: {
               cityName: "Jaipur",
@@ -56,7 +49,6 @@ const createDhlShipment = async ({
             },
           },
 
-          /* RECEIVER */
           receiverDetails: {
             postalAddress: {
               cityName:
@@ -112,7 +104,7 @@ const createDhlShipment = async ({
     console.log(
       "DHL ERROR",
       error?.response?.data ||
-        error.message
+      error.message
     );
 
     return {
