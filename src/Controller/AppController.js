@@ -1359,11 +1359,26 @@ exports.getCart = catchAsync(async (req, res) => {
         };
       })
       .filter(Boolean);
+
+    // ✅ Saved Amount
     const savedAmount =
       originalSubtotal - subtotal;
 
     const discountPercent =
       cart.discount || 0;
+
+    const discountAmount = +(
+      subtotal *
+      (discountPercent / 100)
+    ).toFixed(2);
+
+    const afterDiscount =
+      subtotal - discountAmount;
+
+    // ✅ Tax
+    const taxPercent = cart.tax || 0;
+
+    // ✅ Final
     const finalAmount =subtotal;
 
     return successResponse(
@@ -1374,11 +1389,21 @@ exports.getCart = catchAsync(async (req, res) => {
         items,
 
         summary: {
+          // ✅ old total
           originalSubtotal,
+
+          // ✅ discounted subtotal
           subtotal,
+
+          // ✅ total saved
           savedAmount,
+
           discountPercent,
           discountAmount,
+
+          taxPercent,
+          taxAmount,
+
           finalAmount
         }
       }
