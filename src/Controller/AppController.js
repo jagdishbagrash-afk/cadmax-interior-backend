@@ -1215,16 +1215,16 @@ exports.getCart = catchAsync(async (req, res) => {
   try {
     const userId = req.user.id;
 
-    // ✅ Only fetch active (pending) cart
+    // ✅ Fetch active cart
     const cart = await Cart.findOne({
       user: userId,
-      status: "pending"
+      status: "pending",
     }).populate({
       path: "product.productId",
-      select: "title amount images variants"
+      select: "title amount images variants",
     });
 
-    // ✅ Empty cart check
+    // ✅ Empty cart response
     if (!cart || !cart.product || cart.product.length === 0) {
       return successResponse(res, "Cart is empty", 200, {
         items: [],
@@ -1234,19 +1234,20 @@ exports.getCart = catchAsync(async (req, res) => {
           discountAmount: 0,
           taxPercent: 0,
           taxAmount: 0,
-          finalAmount: 0
-        }
+          finalAmount: 0,
+        },
       });
     }
 
     let subtotal = 0;
 
+    // ✅ Build cart items
     const items = cart.product
       .map((item) => {
         const product = item.productId;
         if (!product) return null;
 
-        const selectedVariant = product.variants.find(
+        const selectedVariant = product.variants?.find(
           (v) => v.color === item.variant
         );
 
@@ -1262,35 +1263,39 @@ exports.getCart = catchAsync(async (req, res) => {
           variant: item.variant,
           quantity: item.quantity,
           unitPrice: product.amount,
-          itemTotal
+          itemTotal,
         };
       })
       .filter(Boolean);
 
-    // ✅ Discount
+    // ✅ Discount calculation
     const discountPercent = cart.discount || 0;
-    const discountAmount = +(subtotal * (discountPercent / 100));
+    const discountAmount = Number(
+      (subtotal * discountPercent) / 100
+    ).toFixed(2);
+
     const afterDiscount = subtotal - discountAmount;
 
-    // ✅ Tax
+    // ✅ Tax calculation
     const taxPercent = cart.tax || 0;
-    const taxAmount = +(subtotal * (taxPercent / 100)).toFixed(2);
+    const taxAmount = Number((afterDiscount * taxPercent) / 100).toFixed(2);
 
-    // ✅ Final Amount
-    const finalAmount = +(afterDiscount + taxAmount).toFixed(2);
+    // ✅ Final amount (FIXED naming issue)
+    const finalAmount = Number(
+      (Number(afterDiscount) + Number(taxAmount)).toFixed(2)
+    );
 
     return successResponse(res, "Cart fetched successfully", 200, {
       items,
       summary: {
         subtotal,
         discountPercent,
-        discountAmount,
+        discountAmount: Number(discountAmount),
         taxPercent,
-        taxAmount,
-        finalAmount
-      }
+        taxAmount: Number(taxAmount),
+        finalAmount,
+      },
     });
-
   } catch (error) {
     return errorResponse(
       res,
