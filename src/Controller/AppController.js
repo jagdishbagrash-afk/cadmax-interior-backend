@@ -56,6 +56,7 @@ const buildCartResponse = async (cart) => {
 
   let subtotal = 0;
 
+
   const items = cart.product
     .map(item => {
       const product = item.productId;
@@ -1281,8 +1282,11 @@ exports.getCart = catchAsync(async (req, res) => {
       status: "pending",
     }).populate({
       path: "product.productId",
-      select: "title amount images variants",
+      select:
+        "title amount discount_amount final_amount images variants",
     });
+
+    console.log("cart", cart);
 
     // ✅ Empty cart response
     if (!cart || !cart.product || cart.product.length === 0) {
@@ -1290,21 +1294,24 @@ exports.getCart = catchAsync(async (req, res) => {
         items: [],
         summary: {
           subtotal: 0,
-          discountPercent: 0,
           discountAmount: 0,
+          finalAmount: 0,
           taxPercent: 0,
           taxAmount: 0,
-          finalAmount: 0,
+          grandTotal: 0,
         },
       });
     }
 
     let subtotal = 0;
+    let discountAmount = 0;
+    let finalAmount = 0;
 
     // ✅ Build cart items
     const items = cart.product
       .map((item) => {
         const product = item.productId;
+
         if (!product) return null;
 
         const selectedVariant = product.variants?.find(
@@ -1313,8 +1320,20 @@ exports.getCart = catchAsync(async (req, res) => {
 
         const variantImages = selectedVariant?.images || [];
 
-        const itemTotal = item.quantity * product.amount;
-        subtotal += itemTotal;
+        // ✅ Product values
+        const productAmount = Number(product.amount || 0);
+        const productDiscount = Number(product.discount_amount || 0);
+        const productFinal = Number(product.final_amount || 0);
+
+        // ✅ Quantity wise calculations
+        const subtotalPrice = productAmount * item.quantity;
+        const discountPrice = productDiscount * item.quantity;
+        const finalPrice = productFinal * item.quantity;
+
+        // ✅ Summary totals
+        subtotal += subtotalPrice;
+        discountAmount += discountPrice;
+        finalAmount += finalPrice;
 
         return {
           productId: product._id,
@@ -1322,38 +1341,39 @@ exports.getCart = catchAsync(async (req, res) => {
           images: variantImages,
           variant: item.variant,
           quantity: item.quantity,
-          unitPrice: product.amount,
-          itemTotal,
+
+          amount: productAmount,
+          discount_amount: productDiscount,
+          final_amount: productFinal,
+
+          subtotal: subtotalPrice,
+          discountTotal: discountPrice,
+          finalTotal: finalPrice,
         };
       })
       .filter(Boolean);
 
-    // ✅ Discount calculation
-    const discountPercent = cart.discount || 0;
-    const discountAmount = Number(
-      (subtotal * discountPercent) / 100
-    ).toFixed(2);
-
-    const afterDiscount = subtotal - discountAmount;
-
     // ✅ Tax calculation
-    const taxPercent = cart.tax || 0;
-    const taxAmount = Number((afterDiscount * taxPercent) / 100).toFixed(2);
+    const taxPercent = Number(cart.tax || 0);
 
-    // ✅ Final amount (FIXED naming issue)
-    const finalAmount = Number(
-      (Number(afterDiscount) + Number(taxAmount)).toFixed(2)
+    const taxAmount = Number(
+      ((finalAmount * taxPercent) / 100).toFixed(2)
+    );
+
+    // ✅ Grand Total
+    const grandTotal = Number(
+      (finalAmount + taxAmount).toFixed(2)
     );
 
     return successResponse(res, "Cart fetched successfully", 200, {
       items,
       summary: {
-        subtotal,
-        discountPercent,
-        discountAmount: Number(discountAmount),
+        subtotal: Number(subtotal.toFixed(2)),
+        discountAmount: Number(discountAmount.toFixed(2)),
+        finalAmount: Number(finalAmount.toFixed(2)),
         taxPercent,
-        taxAmount: Number(taxAmount),
-        finalAmount,
+        taxAmount,
+        grandTotal,
       },
     });
   } catch (error) {
@@ -1364,6 +1384,8 @@ exports.getCart = catchAsync(async (req, res) => {
     );
   }
 });
+
+
 exports.clearCart = catchAsync(async (req, res) => {
   try {
     const userId = req.user.id;
@@ -1387,7 +1409,6 @@ exports.removeProductVariantFromCart = catchAsync(async (req, res) => {
     if (!cart) {
       return errorResponse(res, "Cart not found", 404);
     }
-
     const initialLength = cart.product.length;
 
     cart.product = cart.product.filter(
