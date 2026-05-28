@@ -46,15 +46,29 @@ exports.addProduct = CatchAsync(async (req, res) => {
 
     // 2️⃣ Group images by color
     const variantImageMap = {};
-    req.files.forEach(file => {
-      // fieldname = variantImages_red
-      const color = file.fieldname.replace("variantImages_", "");
+
+    req.files.forEach((file) => {
+      // variantImages_red_0
+      const parts = file.fieldname.split("_");
+
+      const color = parts[1];
+      const index = Number(parts[2]);
 
       if (!variantImageMap[color]) {
         variantImageMap[color] = [];
       }
 
-      variantImageMap[color].push(file.location);
+      variantImageMap[color].push({
+        index,
+        url: file.location,
+      });
+    });
+
+    // ✅ Sort by index
+    Object.keys(variantImageMap).forEach((color) => {
+      variantImageMap[color] = variantImageMap[color]
+        .sort((a, b) => a.index - b.index)
+        .map((img) => img.url);
     });
 
     // 3️⃣ Attach images to variants
@@ -102,14 +116,14 @@ exports.addProduct = CatchAsync(async (req, res) => {
     //   status: "active",
     //   deleted_at: null,
     // });
-const users = await User.find({
+    const users = await User.find({
       role: "customer",
       status: "active",
       deleted_at: null,
       fcmToken: { $ne: null }
     }).select("fcmToken");
 
-    
+
     const admindata = await User.find({
       role: "admin",
       status: "active",
@@ -549,7 +563,6 @@ exports.productcolor = CatchAsync(async (req, res) => {
       });
 
     });
-
     const colors = [...uniqueColors];
 
     const highestPrice = prices.length ? Math.max(...prices) : 0;
