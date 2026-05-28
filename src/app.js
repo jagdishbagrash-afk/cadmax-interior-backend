@@ -46,45 +46,57 @@ const Product = require("./Model/Product");
    TEST ROUTE
 ============================== */
 
-app.get("/test", async (req, res) => {
+const DHL_CLIENT_ID = process.env.DHL_CLIENT_ID;
+const DHL_CLIENT_SECRET = process.env.DHL_CLIENT_SECRET;
+const DHL_API_BASE = "https://express.api.dhl.com/mydhlapi";
+
+// 1. Token लेने का function
+async function getDHLToken() {
+  const res = await fetch(`${DHL_API_BASE}/auth/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: `grant_type=client_credentials&client_id=${DHL_CLIENT_ID}&client_secret=${DHL_CLIENT_SECRET}`,
+  });
+  const data = await res.json();
+  return data.access_token;
+}
+
+// 2. Tracking API (सबसे ज़रूरी)
+app.get("/api/dhl/track/:trackingNumber", async (req, res) => {
   try {
-    const products = await Product.find();
+    const token = await getDHLToken();
+    const trackingNumber = req.params.trackingNumber;
 
-    for (const product of products) {
-      const amount = Number(product.amount || 0);
+    const response = await fetch(
+      `${DHL_API_BASE}/shipments/${trackingNumber}/tracking`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
 
-      // default 10%
-      const discount = Number(product.discount_amount || 10);
+    const trackingData = await response.json();
+    
+    // Simple format में बदलें
+    const events = trackingData.shipments[0]?.events.map(event => ({
+      status: event.description,
+      location: `${event.serviceArea?.city}, ${event.serviceArea?.countryCode}`,
+      timestamp: event.timestamp,
+    })) || [];
 
-      // final amount
-      const finalAmount =
-        amount - (amount * discount) / 100;
-
-      await Product.updateOne(
-        { _id: product._id },
-        {
-          $set: {
-            discount_amount: discount,
-            final_amount: finalAmount,
-          },
-        }
-      );
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: "All products updated successfully",
+    res.json({ 
+      trackingNumber, 
+      status: trackingData.shipments[0]?.status,
+      events 
     });
   } catch (error) {
-    console.log(error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Something went wrong",
-      error: error.message,
-    });
+    res.status(500).json({ error: "Tracking failed" });
   }
 });
+
+
+
+
+
 const server = app.listen(PORT, () => console.log("Server is running at port : " + PORT));
 server.timeout = 360000;
 
