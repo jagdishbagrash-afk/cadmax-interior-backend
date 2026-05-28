@@ -4,169 +4,246 @@ const { v4: uuidv4 } = require("uuid");
 const { successResponse, errorResponse, validationErrorResponse } = require("../Utill/ErrorHandling");
 const sendEmail = require("../Utill/EmailMailler");
 const OrderEmail = require("../EmailTemplate/Order");
-const createDhlShipment = require("../Utill/createDhlShipment");
 const { sendPushNotification } = require("../Utill/notificationService");
 const User = require("../Model/User");
 const Cart = require("../Model/Cart");
 const { default: axios } = require("axios");
 
+// exports.addOrder = catchAsync(async (req, res) => {
+//   try {
+
+//     const {
+//       name,
+//       mobile,
+//       address,
+//       product,
+//       amount,
+//       addressId,
+//       PaymentId,
+//     } = req.body;
+
+//     const userId =
+//       req.user?.id ||
+//       "692dcfbd4816433146e11abd";
+
+//     const orderId = `ORD-${uuidv4()
+//       .slice(0, 8)
+//       .toUpperCase()}`;
+
+//     /* VALIDATION */
+
+//     if (
+//       !name ||
+//       !mobile ||
+//       !product ||
+//       !amount
+//     ) {
+//       return validationErrorResponse(
+//         res,
+//         "All fields (name, mobile, address, product, amount) are required"
+//       );
+//     }
+
+//     /* CREATE ORDER */
+
+//     const newOrder = new Order({
+//       name,
+//       mobile,
+//       address,
+//       product,
+//       addressId,
+//       amount,
+//       userId,
+//       orderId,
+//       PaymentId,
+//       shipping_status: "pending",
+//       courier_name: "DHL",
+//     });
+
+//     const record = await newOrder.save();
+
+//     /* -----------------------------
+//        CREATE DHL SHIPMENT
+//     ----------------------------- */
+
+//     const shipment =
+//       await createDhlShipment({
+//         name,
+//         mobile,
+//         address,
+//       });
+
+//       console.log(shipment)
+
+//     /* SUCCESS */
+
+//     if (shipment.success) {
+
+//       record.tracking_number =
+//         shipment?.data
+//           ?.shipmentTrackingNumber;
+
+//       record.shipping_status =
+//         "shipment_created";
+
+//       record.shipping_response =
+//         shipment?.data;
+
+//     } else {
+
+//       /* FAILED */
+
+//       record.shipping_status =
+//         "shipment_failed";
+
+//       record.shipping_response =
+//         shipment?.error;
+//     }
+
+//     await record.save();
+
+//     /* -----------------------------
+//        UPDATE CART
+//     ----------------------------- */
+
+//     const productIds = product.map(
+//       (p) => p.id
+//     );
+
+//     const cart = await Cart.findOne({
+//       user: userId,
+//       status: { $ne: "done" },
+//       "product.productId": {
+//         $in: productIds,
+//       },
+//     });
+
+//     if (
+//       cart &&
+//       cart.status !== "done"
+//     ) {
+//       cart.status = "done";
+
+//       await cart.save();
+//     }
+
+//     /* -----------------------------
+//        EMAIL
+//     ----------------------------- */
+
+//     // const subject = `Welcome to Cadmax!🎉`;
+
+//     // const emailHtml = OrderEmail(
+//     //   record?.name,
+//     //   record
+//     // );
+
+//     // await sendEmail({
+//     //   email: req?.user?.email,
+//     //   subject: subject,
+//     //   emailHtml: emailHtml,
+//     // });
+
+//     /* RESPONSE */
+
+//     return successResponse(
+//       res,
+//       "Order added successfully",
+//       201,
+//       record
+//     );
+
+//   } catch (error) {
+
+//     console.error(error);
+
+//     return errorResponse(
+//       res,
+//       error.message ||
+//         "Internal Server Error",
+//       500
+//     );
+//   }
+// });
+
+
+// orderController.js के top पर जोड़ें
+const { createDhlShipment } = require("../Utill/dhlService");
+
 exports.addOrder = catchAsync(async (req, res) => {
-  try {
+  const {
+    name,
+    mobile,
+    address,
+    product,
+    amount,
+    addressId,
+    PaymentId,
+  } = req.body;
 
-    const {
-      name,
-      mobile,
-      address,
-      product,
-      amount,
-      addressId,
-      PaymentId,
-    } = req.body;
+  const userId = req.user?.id || "692dcfbd4816433146e11abd";
+  const orderId = `ORD-${uuidv4().slice(0, 8).toUpperCase()}`;
 
-    const userId =
-      req.user?.id ||
-      "692dcfbd4816433146e11abd";
-
-    const orderId = `ORD-${uuidv4()
-      .slice(0, 8)
-      .toUpperCase()}`;
-
-    /* VALIDATION */
-
-    if (
-      !name ||
-      !mobile ||
-      !product ||
-      !amount
-    ) {
-      return validationErrorResponse(
-        res,
-        "All fields (name, mobile, address, product, amount) are required"
-      );
-    }
-
-    /* CREATE ORDER */
-
-    const newOrder = new Order({
-      name,
-      mobile,
-      address,
-      product,
-      addressId,
-      amount,
-      userId,
-      orderId,
-      PaymentId,
-      shipping_status: "pending",
-      courier_name: "DHL",
-    });
-
-    const record = await newOrder.save();
-
-    /* -----------------------------
-       CREATE DHL SHIPMENT
-    ----------------------------- */
-
-    const shipment =
-      await createDhlShipment({
-        name,
-        mobile,
-        address,
-      });
-
-      console.log(shipment)
-
-    /* SUCCESS */
-
-    if (shipment.success) {
-
-      record.tracking_number =
-        shipment?.data
-          ?.shipmentTrackingNumber;
-
-      record.shipping_status =
-        "shipment_created";
-
-      record.shipping_response =
-        shipment?.data;
-
-    } else {
-
-      /* FAILED */
-
-      record.shipping_status =
-        "shipment_failed";
-
-      record.shipping_response =
-        shipment?.error;
-    }
-
-    await record.save();
-
-    /* -----------------------------
-       UPDATE CART
-    ----------------------------- */
-
-    const productIds = product.map(
-      (p) => p.id
-    );
-
-    const cart = await Cart.findOne({
-      user: userId,
-      status: { $ne: "done" },
-      "product.productId": {
-        $in: productIds,
-      },
-    });
-
-    if (
-      cart &&
-      cart.status !== "done"
-    ) {
-      cart.status = "done";
-
-      await cart.save();
-    }
-
-    /* -----------------------------
-       EMAIL
-    ----------------------------- */
-
-    // const subject = `Welcome to Cadmax!🎉`;
-
-    // const emailHtml = OrderEmail(
-    //   record?.name,
-    //   record
-    // );
-
-    // await sendEmail({
-    //   email: req?.user?.email,
-    //   subject: subject,
-    //   emailHtml: emailHtml,
-    // });
-
-    /* RESPONSE */
-
-    return successResponse(
+  // Validation
+  if (!name || !mobile || !product || !amount) {
+    return validationErrorResponse(
       res,
-      "Order added successfully",
-      201,
-      record
-    );
-
-  } catch (error) {
-
-    console.error(error);
-
-    return errorResponse(
-      res,
-      error.message ||
-        "Internal Server Error",
-      500
+      "All fields (name, mobile, address, product, amount) are required"
     );
   }
-});
 
+  // CREATE ORDER
+  const newOrder = new Order({
+    name,
+    mobile,
+    address,
+    product,
+    addressId,
+    amount,
+    userId,
+    orderId,
+    PaymentId,
+    shipping_status: "pending",
+    courier_name: "DHL",
+  });
+
+  const record = await newOrder.save();
+
+  const shipment = await createDhlShipment({ name, mobile, address });
+  console.log(shipment);
+
+  if (shipment.success) {
+    record.tracking_number = shipment.data?.shipmentTrackingNumber;
+    record.shipping_status = "shipment_created";
+    record.shipping_response = shipment.data;
+  } else {
+    record.shipping_status = "shipment_failed";
+    record.shipping_response = shipment.error;
+  }
+
+  await record.save();
+
+  // UPDATE CART
+  const productIds = product.map((p) => p.id);
+  const cart = await Cart.findOne({
+    user: userId,
+    status: { $ne: "done" },
+    "product.productId": { $in: productIds },
+  });
+
+  if (cart && cart.status !== "done") {
+    cart.status = "done";
+    await cart.save();
+  }
+
+  // RESPONSE
+  return successResponse(
+    res,
+    "Order added successfully",
+    201,
+    record
+  );
+});
 
 exports.getAllOrders = catchAsync(async (req, res) => {
   try {
