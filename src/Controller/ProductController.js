@@ -549,7 +549,6 @@ exports.productcolor = CatchAsync(async (req, res) => {
       });
 
     });
-
     const colors = [...uniqueColors];
 
     const highestPrice = prices.length ? Math.max(...prices) : 0;
