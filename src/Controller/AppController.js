@@ -1218,7 +1218,6 @@ exports.updateCart = catchAsync(async (req, res) => {
     if (quantity < 0) {
       return errorResponse(res, "Quantity cannot be negative", 400);
     }
-
    const cart = await Cart.findOne({ user: userId, status: "pending" });
 
     console.log("cart" , cart)
