@@ -146,7 +146,6 @@ exports.addProduct = CatchAsync(async (req, res) => {
       });
     }
 
-    console.log("Heelo")
 
     // await Promise.all(
     //   users.map(user =>

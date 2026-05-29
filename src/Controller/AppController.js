@@ -1064,7 +1064,6 @@ exports.getProductById = catchAsync(async (req, res) => {
 exports.AddToCart = catchAsync(async (req, res) => {
   try {
     const userId = req.user.id;
-    console.log("product", req.body)
     const { product } = req.body;
     if (!product || !product.id || !product.quantity || !product.variant) {
       return errorResponse(res, "Invalid product payload", 400);
@@ -1206,7 +1205,6 @@ exports.AddToCart = catchAsync(async (req, res) => {
 exports.updateCart = catchAsync(async (req, res) => {
   try {
     const userId = req.user.id;
-    console.log("userId" ,userId)
     const { product } = req.body;
 
     if (!product || !product.id || !product.variant || product.quantity === undefined) {
@@ -1220,7 +1218,6 @@ exports.updateCart = catchAsync(async (req, res) => {
     }
    const cart = await Cart.findOne({ user: userId, status: "pending" });
 
-    console.log("cart" , cart)
     if (!cart || cart.product.length === 0) {
       return errorResponse(res, "Cart is empty", 400);
     }
@@ -1287,10 +1284,9 @@ exports.getCart = catchAsync(async (req, res) => {
     }).populate({
       path: "product.productId",
       select:
-        "title amount discount_amount final_amount images variants",
+        "title amount discount_amount final_amount images variants stock",
     });
 
-    console.log("cart", cart);
 
     // ✅ Empty cart response
     if (!cart || !cart.product || cart.product.length === 0) {
@@ -1323,6 +1319,8 @@ exports.getCart = catchAsync(async (req, res) => {
         );
 
         const variantImages = selectedVariant?.images || [];
+        const variantStock = selectedVariant?.stock || [];
+
 
         // ✅ Product values
         const productAmount = Number(product.amount || 0);
@@ -1342,14 +1340,13 @@ exports.getCart = catchAsync(async (req, res) => {
         return {
           productId: product._id,
           title: product.title,
+          stock: variantStock,
           images: variantImages,
           variant: item.variant,
           quantity: item.quantity,
-
           amount: productAmount,
           discount_amount: productDiscount,
           final_amount: productFinal,
-
           subtotal: subtotalPrice,
           discountTotal: discountPrice,
           finalTotal: finalPrice,
@@ -1917,7 +1914,6 @@ exports.globalSearch = catchAsync(async (req, res) => {
   try {
     const { search } = req.query;
 
-    console.log("search", search)
 
     // common condition
     const regexFilter = search
@@ -2009,7 +2005,6 @@ exports.globalSearch = catchAsync(async (req, res) => {
 exports.LeadApp = catchAsync(async (req, res) => {
   try {
     const assignedTo = req.user.id;
-    console.log("assignedTo", assignedTo)
     const { title, message, services, type, category } = req.body;
     const record = await Lead.create({
       assignedTo,
@@ -2021,7 +2016,6 @@ exports.LeadApp = catchAsync(async (req, res) => {
       source: "App"
     })
 
-    console.log("record", record)
 
     res.json({
       status: true,

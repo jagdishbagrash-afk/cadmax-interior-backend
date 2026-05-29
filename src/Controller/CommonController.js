@@ -111,7 +111,6 @@ exports.deleteImage = async (req, res) => {
         }
 
    const record=      await deleteFile(imageUrl);
-console.log("record" ,record)
         return res.status(200).json({
             success: true,
             message: "Image deleted successfully"
@@ -131,7 +130,6 @@ console.log("record" ,record)
 exports.LeadWebsite = catchAsync(async (req, res) => {
   try {
     const assignedTo = req.user.id; 
-    console.log("assignedTo" ,assignedTo)
     const { title, message, services, type , category   } = req.body;
     
     const record = await Lead.create({
@@ -144,7 +142,6 @@ exports.LeadWebsite = catchAsync(async (req, res) => {
       source: "Website"
     })
 
-    console.log("record" ,record)
 
     res.json({
       status: true,
@@ -164,7 +161,6 @@ exports.LeadWebsite = catchAsync(async (req, res) => {
 exports.CommonAddToCart = catchAsync(async (req, res) => {
   try {
     const userId = req.user.id;
-    console.log("req", req.body);
 
     const { productId ,  quantity , variant  } = req.body;
 
@@ -365,7 +361,6 @@ const cart = await Cart.findOne({
   user: userId,
   status: "pending"
 });
-    console.log("cart" ,cart)
 
     if (!cart) {
       return errorResponse(res, "Cart not found", 404);

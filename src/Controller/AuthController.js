@@ -664,7 +664,6 @@ exports.AdminDeleteUser = catchAsync(async (req, res) => {
     userrecord.deleted_at = new Date();
     userrecord.status = "inactive"
     const record = await userrecord.save();
-    console.log("record", record)
     return successResponse(res, "User deleted successfully", 200);
 
   } catch (error) {
@@ -692,7 +691,6 @@ exports.DeleteUser = catchAsync(async (req, res) => {
     userrecord.deleted_at = new Date();
     userrecord.status = "inactive"
     const record = await userrecord.save();
-    console.log("record", record)
     return successResponse(res, "User deleted successfully", 200);
 
   } catch (error) {

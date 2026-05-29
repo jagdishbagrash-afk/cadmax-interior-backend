@@ -273,7 +273,6 @@ const deleteFile = async (fileUrl) => {
       })
     );
 
-    console.log("✅ Delete success:", result);
 
     return true;
   } catch (error) {
