@@ -1206,6 +1206,7 @@ exports.AddToCart = catchAsync(async (req, res) => {
 exports.updateCart = catchAsync(async (req, res) => {
   try {
     const userId = req.user.id;
+    console.log("userId" ,userId)
     const { product } = req.body;
 
     if (!product || !product.id || !product.variant || product.quantity === undefined) {
@@ -1218,7 +1219,9 @@ exports.updateCart = catchAsync(async (req, res) => {
       return errorResponse(res, "Quantity cannot be negative", 400);
     }
 
-    const cart = await Cart.findOne({ user: userId });
+   const cart = await Cart.findOne({ user: userId, status: "pending" });
+
+    console.log("cart" , cart)
     if (!cart || cart.product.length === 0) {
       return errorResponse(res, "Cart is empty", 400);
     }

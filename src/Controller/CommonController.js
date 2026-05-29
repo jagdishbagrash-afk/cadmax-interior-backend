@@ -11,39 +11,51 @@ const catchAsync = require("../Utill/catchAsync");
 exports.bestSellerProducts = catchAsync(async (req, res) => {
   const limit = parseInt(req.query.limit) || 10;
 
-  const bestSellers = await Order.aggregate([
-    { $unwind: "$product" },
-    {
-      $group: {
-        _id: "$product.id",
-        totalQuantity: { $sum: "$product.quantity" },
-        totalOrders: { $sum: 1 },
-      },
-    },
+const bestSellers = await Order.aggregate([
+  { $unwind: "$product" },
 
-    {
-      $match: {
-        totalOrders: { $gt: 1 },
-      },
+  {
+    $group: {
+      _id: "$product.id",
+      totalQuantity: { $sum: "$product.quantity" },
+      totalOrders: { $sum: 1 },
     },
+  },
 
-    { $sort: { totalQuantity: -1 } },
-    { $limit: limit },
-    {
-      $lookup: {
-        from: "products",
-        localField: "_id",
-        foreignField: "_id",
-        as: "product",
-      },
+  {
+    $match: {
+      totalOrders: { $gt: 1 },
     },
-    { $unwind: "$product" },
-    {
-      $project: {
-        product: "$product",  
-      },
+  },
+
+  { $sort: { totalQuantity: -1 } },
+
+  { $limit: limit },
+
+  {
+    $lookup: {
+      from: "products",
+      localField: "_id",
+      foreignField: "_id",
+      as: "product",
     },
-  ]);
+  },
+
+  { $unwind: "$product" },
+
+  // ✅ Only active products
+  {
+    $match: {
+      "product.deletedAt": null,
+    },
+  },
+
+  {
+    $project: {
+      product: "$product",
+    },
+  },
+]);
 
   
 
@@ -58,7 +70,7 @@ exports.latestProducts = catchAsync(async (req, res) => {
   const limit = parseInt(req.query.limit) || 10;
 
   const products = await Product.find({
-    deletedAt: null,
+    deletedAt : null
   })
     .sort({ createdAt: -1 })
     .limit(limit)
