@@ -2015,8 +2015,6 @@ exports.LeadApp = catchAsync(async (req, res) => {
       type,
       source: "App"
     })
-
-
     res.json({
       status: true,
       message: " Request submitted & emails sent successfully.",
