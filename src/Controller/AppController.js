@@ -2029,7 +2029,7 @@ exports.LeadApp = catchAsync(async (req, res) => {
   }
 });
 
-exports.GetAllRecordServicesSubCategorys = CatchAsync(async (req, res) => {
+exports.GetAllRecordServicesSubCategorys = catchAsync(async (req, res) => {
   try {
     const orderMap = {
       facades: 1,
