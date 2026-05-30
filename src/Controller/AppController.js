@@ -1744,63 +1744,63 @@ exports.GetVendorCategory = catchAsync(async (req, res) => {
 exports.bestSellerProducts = catchAsync(async (req, res) => {
   const limit = parseInt(req.query.limit) || 10;
 
-  const bestSellers = await Order.aggregate([
-    { $unwind: "$product" },
-    {
-      $group: {
-        _id: "$product.id",
-        totalQuantity: { $sum: "$product.quantity" },
-        totalOrders: { $sum: 1 },
-      },
-    },
+const bestSellers = await Order.aggregate([
+  { $unwind: "$product" },
 
-    {
-      $match: {
-        totalOrders: { $gt: 1 },
-      },
+  {
+    $group: {
+      _id: "$product.id",
+      totalQuantity: { $sum: "$product.quantity" },
+      totalOrders: { $sum: 1 },
     },
+  },
 
-    { $sort: { totalQuantity: -1 } },
-    { $limit: limit },
-    {
-      $lookup: {
-        from: "products",
-        localField: "_id",
-        foreignField: "_id",
-        as: "product",
-      },
+  {
+    $match: {
+      totalOrders: { $gt: 1 },
     },
-    { $unwind: "$product" },
-    {
-      $project: {
-        product: "$product",
-      },
+  },
+
+  { $sort: { totalQuantity: -1 } },
+
+  { $limit: limit },
+
+  {
+    $lookup: {
+      from: "products",
+      localField: "_id",
+      foreignField: "_id",
+      as: "product",
     },
-  ]);
+  },
 
-  const record = bestSellers.map(item => item.product);
+  { $unwind: "$product" },
 
+  {
+    $match: {
+      "product.deletedAt": null,
+    },
+  },
+
+  {
+    $project: {
+      product: "$product",
+    },
+  },
+]);
+
+  
 
   res.status(200).json({
     success: true,
     message: "Best seller products fetched successfully",
-    data: record,
+    data: bestSellers,
   });
 });
 
 
 
 
-exports.AppAllVendors = catchAsync(
-  async (req, res) => {
-    try {
-      const Categorys = await Vendor.find().sort({ createdAt: -1 }).populate("VendorCategory");
-      return successResponse(res, "Vendor Categorys list successfully.", 201, Categorys);
-    } catch (error) {
-      return errorResponse(res, error.message || "Internal Server Error", 500);
-    }
-  }
-);
 
 
 
@@ -1808,7 +1808,7 @@ exports.latestProducts = catchAsync(async (req, res) => {
   const limit = parseInt(req.query.limit) || 10;
 
   const products = await Product.find({
-    deletedAt: null,
+    deletedAt : null
   })
     .sort({ createdAt: -1 })
     .limit(limit)
@@ -2036,8 +2036,20 @@ exports.GetAllRecordServicesSubCategorys = catchAsync(
   async (req, res) => {
     try {
       const SubCategorys = await ServicesSubCategory
-        .find().sort({ createdAt: -1 });
+        .find({deleteAt : null}).sort({ createdAt: -1 });
       return successResponse(res, "SubCategorys list successfully.", 201, SubCategorys);
+    } catch (error) {
+      return errorResponse(res, error.message || "Internal Server Error", 500);
+    }
+  }
+);
+
+
+exports.AppAllVendors = catchAsync(
+  async (req, res) => {
+    try {
+      const Categorys = await Vendor.find({deletedAt : null}).sort({ createdAt: -1 }).populate("VendorCategory");
+      return successResponse(res, "Vendor Categorys list successfully.", 201, Categorys);
     } catch (error) {
       return errorResponse(res, error.message || "Internal Server Error", 500);
     }

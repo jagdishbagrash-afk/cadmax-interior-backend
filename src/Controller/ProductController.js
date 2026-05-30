@@ -538,7 +538,9 @@ exports.getProductByName = CatchAsync(async (req, res) => {
 exports.productcolor = CatchAsync(async (req, res) => {
   try {
 
-    const products = await Product.find().select("variants amount");
+    const products = await Product.find().select(
+      "variants amount discount_amount final_amount"
+    );
 
     if (!products || products.length === 0) {
       return errorResponse(res, "Product not found", 404);
@@ -549,9 +551,9 @@ exports.productcolor = CatchAsync(async (req, res) => {
 
     products.forEach((product) => {
 
-      // price collect
-      if (product.amount || product.amount === 0) {
-        prices.push(product.amount);
+      // final price collect
+      if (product.final_amount || product.final_amount === 0) {
+        prices.push(product.final_amount);
       }
 
       // color collect
@@ -562,18 +564,28 @@ exports.productcolor = CatchAsync(async (req, res) => {
       });
 
     });
+
     const colors = [...uniqueColors];
 
-    const highestPrice = prices.length ? Math.max(...prices) : 0;
-    const lowestPrice = prices.length ? Math.min(...prices) : 0;
+    const highestPrice = prices.length
+      ? Math.max(...prices)
+      : 0;
+
+    const lowestPrice = prices.length
+      ? Math.min(...prices)
+      : 0;
 
     return successResponse(res, "Data fetched successfully", 200, {
       colors,
       highestPrice,
-      lowestPrice
+      lowestPrice,
     });
 
   } catch (error) {
-    return errorResponse(res, error.message || "Internal Server Error", 500);
+    return errorResponse(
+      res,
+      error.message || "Internal Server Error",
+      500
+    );
   }
 });
