@@ -2031,18 +2031,52 @@ exports.LeadApp = catchAsync(async (req, res) => {
   }
 });
 
+exports.GetAllRecordServicesSubCategorys = CatchAsync(async (req, res) => {
+  try {
+    const orderMap = {
+      facades: 1,
+      "landscaping & gazebo": 2,
+      "living room": 3,
+      "drwaing room": 4,
+      bedroom: 5,
+      kitchen: 6,
+      staircase: 7,
+      "pooja room": 8,
+      washroom: 9,
+    };
 
-exports.GetAllRecordServicesSubCategorys = catchAsync(
-  async (req, res) => {
-    try {
-      const SubCategorys = await ServicesSubCategory
-        .find({deleteAt : null}).sort({ createdAt: -1 });
-      return successResponse(res, "SubCategorys list successfully.", 201, SubCategorys);
-    } catch (error) {
-      return errorResponse(res, error.message || "Internal Server Error", 500);
-    }
+    const subCategories = await ServicesType.find({
+      status: true,
+    });
+
+    subCategories.sort((a, b) => {
+      const titleA = (a.title || "").trim().toLowerCase();
+      const titleB = (b.title || "").trim().toLowerCase();
+
+      const orderA = orderMap[titleA] || 999;
+      const orderB = orderMap[titleB] || 999;
+
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
+
+      return titleA.localeCompare(titleB);
+    });
+
+    return successResponse(
+      res,
+      "SubCategorys list successfully.",
+      200,
+      subCategories
+    );
+  } catch (error) {
+    return errorResponse(
+      res,
+      error.message || "Internal Server Error",
+      500
+    );
   }
-);
+});
 
 
 exports.AppAllVendors = catchAsync(
