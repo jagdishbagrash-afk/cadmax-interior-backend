@@ -92,6 +92,11 @@ const ProductSchema = mongoose.Schema(
       type: Date,
       default: null,
     },
+    status :  {
+      type : String ,
+            default: true,
+
+    }
   },
   { timestamps: true }
 );

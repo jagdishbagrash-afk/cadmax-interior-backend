@@ -61,7 +61,7 @@ exports.AddServicesSubCategory = CatchAsync(async (req, res) => {
 exports.GetAllServicesSubCategorys = CatchAsync(
     async (req, res) => {
         try {
-         const SubCategorys = await ServicesType.find().sort({ createdAt: -1 });
+         const SubCategorys = await ServicesType.find({status : true}).sort({ createdAt: -1 });
             return successResponse(res, "SubCategorys list successfully.", 201, SubCategorys);
         } catch (error) {
             return errorResponse(res, error.message || "Internal Server Error", 500);
@@ -150,3 +150,31 @@ exports.UpdateServicesSubCategory = CatchAsync(
     }
   }
 );
+
+
+exports.DeleteServicesSubCategory = CatchAsync(async (req, res) => {
+  try {
+    const id = req.params.id;
+    const servicedelete = await ServicesSubCategory.findById(id);
+console.log("servicedelete", servicedelete)
+    if (!servicedelete) {
+      return validationErrorResponse(res, "Services ServicesSubCategory not found", 404);
+    }
+
+    if (servicedelete.deletedAt) {
+      servicedelete.deletedAt = null;
+      servicedelete.status = true;
+      await servicedelete.save();
+      return successResponse(res, "Services ServicesSubCategory  restored successfully", 200);
+    }
+
+    servicedelete.deletedAt = new Date();
+    servicedelete.status = false;
+    await servicedelete.save();
+
+    return successResponse(res, "Services ServicesSubCategory deleted successfully", 200);
+
+  } catch (error) {
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});

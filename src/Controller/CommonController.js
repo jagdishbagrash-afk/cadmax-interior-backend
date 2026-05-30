@@ -11,39 +11,51 @@ const catchAsync = require("../Utill/catchAsync");
 exports.bestSellerProducts = catchAsync(async (req, res) => {
   const limit = parseInt(req.query.limit) || 10;
 
-  const bestSellers = await Order.aggregate([
-    { $unwind: "$product" },
-    {
-      $group: {
-        _id: "$product.id",
-        totalQuantity: { $sum: "$product.quantity" },
-        totalOrders: { $sum: 1 },
-      },
-    },
+const bestSellers = await Order.aggregate([
+  { $unwind: "$product" },
 
-    {
-      $match: {
-        totalOrders: { $gt: 1 },
-      },
+  {
+    $group: {
+      _id: "$product.id",
+      totalQuantity: { $sum: "$product.quantity" },
+      totalOrders: { $sum: 1 },
     },
+  },
 
-    { $sort: { totalQuantity: -1 } },
-    { $limit: limit },
-    {
-      $lookup: {
-        from: "products",
-        localField: "_id",
-        foreignField: "_id",
-        as: "product",
-      },
+  {
+    $match: {
+      totalOrders: { $gt: 1 },
     },
-    { $unwind: "$product" },
-    {
-      $project: {
-        product: "$product",  
-      },
+  },
+
+  { $sort: { totalQuantity: -1 } },
+
+  { $limit: limit },
+
+  {
+    $lookup: {
+      from: "products",
+      localField: "_id",
+      foreignField: "_id",
+      as: "product",
     },
-  ]);
+  },
+
+  { $unwind: "$product" },
+
+  // ✅ Only active products
+  {
+    $match: {
+      "product.deletedAt": null,
+    },
+  },
+
+  {
+    $project: {
+      product: "$product",
+    },
+  },
+]);
 
   
 
@@ -58,7 +70,7 @@ exports.latestProducts = catchAsync(async (req, res) => {
   const limit = parseInt(req.query.limit) || 10;
 
   const products = await Product.find({
-    deletedAt: null,
+    deletedAt : null
   })
     .sort({ createdAt: -1 })
     .limit(limit)
@@ -99,7 +111,6 @@ exports.deleteImage = async (req, res) => {
         }
 
    const record=      await deleteFile(imageUrl);
-console.log("record" ,record)
         return res.status(200).json({
             success: true,
             message: "Image deleted successfully"
@@ -119,7 +130,6 @@ console.log("record" ,record)
 exports.LeadWebsite = catchAsync(async (req, res) => {
   try {
     const assignedTo = req.user.id; 
-    console.log("assignedTo" ,assignedTo)
     const { title, message, services, type , category   } = req.body;
     
     const record = await Lead.create({
@@ -132,7 +142,6 @@ exports.LeadWebsite = catchAsync(async (req, res) => {
       source: "Website"
     })
 
-    console.log("record" ,record)
 
     res.json({
       status: true,
@@ -152,7 +161,6 @@ exports.LeadWebsite = catchAsync(async (req, res) => {
 exports.CommonAddToCart = catchAsync(async (req, res) => {
   try {
     const userId = req.user.id;
-    console.log("req", req.body);
 
     const { productId ,  quantity , variant  } = req.body;
 
@@ -353,7 +361,6 @@ const cart = await Cart.findOne({
   user: userId,
   status: "pending"
 });
-    console.log("cart" ,cart)
 
     if (!cart) {
       return errorResponse(res, "Cart not found", 404);
