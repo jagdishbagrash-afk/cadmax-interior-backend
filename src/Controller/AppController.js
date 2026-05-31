@@ -1590,7 +1590,7 @@ exports.GetServicesDetails = catchAsync(async (req, res) => {
 exports.ConceptUserPost = catchAsync(async (req, res) => {
   try {
     const userId = req?.user?.id;
-    const { User, ServicesType, Services, concept } = req.body;
+    const {  ServicesType, Services, concept } = req.body;
 
     if (!User || !ServicesType || !Services) {
       return validationErrorResponse(res, "All fields (services, user, typeservices) are required.", 401);
