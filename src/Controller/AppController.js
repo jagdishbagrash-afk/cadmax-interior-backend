@@ -1461,10 +1461,36 @@ exports.GetAllProject = catchAsync(async (req, res) => {
 exports.GetServicesType = catchAsync(
   async (req, res) => {
     try {
-      const Residentialservices = await ServicesType.find({ TypeServices: "Residential" }).sort({ createdAt: -1 });
+       const residentialRaw = await ServicesType.find({
+            TypeServices: "Residential",
+          });
+      
+          const orderMap = {
+            facades: 1,
+            "landscaping & gazebo": 2,
+            "living room": 3,
+            "drwaing room": 4,
+            bedroom: 5,
+            kitchen: 6,
+            staircase: 7,
+            "pooja room": 8,
+            washroom: 9,
+          };
+      
+          const residentialServices = residentialRaw.sort((a, b) => {
+            const titleA = (a.title || "").trim().toLowerCase();
+            const titleB = (b.title || "").trim().toLowerCase();
+      
+            const orderA = orderMap[titleA] ?? 999;
+            const orderB = orderMap[titleB] ?? 999;
+      
+            if (orderA !== orderB) return orderA - orderB;
+      
+            return titleA.localeCompare(titleB);
+          });
       const Commercialservices = await ServicesType.find({ TypeServices: "Commercial" }).sort({ createdAt: -1 });
       return successResponse(res, "Services Type list successfully.", 201, {
-        Residentialservices, Commercialservices
+        Residentialservices :  residentialServices, Commercialservices
       });
     } catch (error) {
       return errorResponse(res, error.message || "Internal Server Error", 500);
