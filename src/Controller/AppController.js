@@ -604,13 +604,19 @@ exports.signup = catchAsync(async (req, res) => {
       { expiresIn: process.env.JWT_EXPIRES_IN || "365d" }
     );
 
-    const subject = `Welcome to Cadmax!🎉`;
-    const emailHtml = Welcome(result?.name);
-    await sendEmail({
-      email: result?.email,
-      subject: subject,
-      emailHtml: emailHtml,
-    });
+  try {
+  const subject = "Welcome to Cadmax! 🎉";
+  const emailHtml = Welcome(result.name);
+
+  await sendEmail({
+    email: result.email,
+    subject,
+    emailHtml,
+  });
+} catch (err) {
+  console.error("Email Error:", err.message);
+}
+
     return successResponse(
       res,
       "You have been registered successfully !!",

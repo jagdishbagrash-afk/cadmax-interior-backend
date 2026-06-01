@@ -54,13 +54,7 @@ exports.signup = catchAsync(async (req, res) => {
 
     const result = await record.save();
 
-    const subject = `Welcome to Cadmax!🎉`;
-    const emailHtml = Welcome(result?.name);
-    await sendEmail({
-      email: result?.email,
-      subject: subject,
-      emailHtml: emailHtml,
-    });
+
 
     // console.log("result", result)
     const token = jwt.sign(
@@ -68,6 +62,21 @@ exports.signup = catchAsync(async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || "24h" }
     );
+
+        try {
+  const subject = "Welcome to Cadmax! 🎉";
+  const emailHtml = Welcome(result.name);
+
+  await sendEmail({
+    email: result.email,
+    subject,
+    emailHtml,
+  });
+} catch (err) {
+  console.error("Email Error:", err.message);
+}
+
+
     return successResponse(
       res,
       "You have been registered successfully !!",
