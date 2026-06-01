@@ -46,15 +46,29 @@ exports.addProduct = CatchAsync(async (req, res) => {
 
     // 2️⃣ Group images by color
     const variantImageMap = {};
-    req.files.forEach(file => {
-      // fieldname = variantImages_red
-      const color = file.fieldname.replace("variantImages_", "");
+
+    req.files.forEach((file) => {
+      // variantImages_red_0
+      const parts = file.fieldname.split("_");
+
+      const color = parts[1];
+      const index = Number(parts[2]);
 
       if (!variantImageMap[color]) {
         variantImageMap[color] = [];
       }
 
-      variantImageMap[color].push(file.location);
+      variantImageMap[color].push({
+        index,
+        url: file.location,
+      });
+    });
+
+    // ✅ Sort by index
+    Object.keys(variantImageMap).forEach((color) => {
+      variantImageMap[color] = variantImageMap[color]
+        .sort((a, b) => a.index - b.index)
+        .map((img) => img.url);
     });
 
     // 3️⃣ Attach images to variants
@@ -103,14 +117,14 @@ exports.addProduct = CatchAsync(async (req, res) => {
     //   status: "active",
     //   deleted_at: null,
     // });
-const users = await User.find({
+    const users = await User.find({
       role: "customer",
       status: "active",
       deleted_at: null,
       fcmToken: { $ne: null }
     }).select("fcmToken");
 
-    
+
     const admindata = await User.find({
       role: "admin",
       status: "active",
@@ -133,7 +147,6 @@ const users = await User.find({
       });
     }
 
-    console.log("Heelo")
 
     // await Promise.all(
     //   users.map(user =>
@@ -526,7 +539,9 @@ exports.getProductByName = CatchAsync(async (req, res) => {
 exports.productcolor = CatchAsync(async (req, res) => {
   try {
 
-    const products = await Product.find().select("variants amount");
+    const products = await Product.find().select(
+      "variants amount discount_amount final_amount"
+    );
 
     if (!products || products.length === 0) {
       return errorResponse(res, "Product not found", 404);
@@ -537,9 +552,9 @@ exports.productcolor = CatchAsync(async (req, res) => {
 
     products.forEach((product) => {
 
-      // price collect
-      if (product.amount || product.amount === 0) {
-        prices.push(product.amount);
+      // final price collect
+      if (product.final_amount || product.final_amount === 0) {
+        prices.push(product.final_amount);
       }
 
       // color collect
@@ -553,16 +568,25 @@ exports.productcolor = CatchAsync(async (req, res) => {
 
     const colors = [...uniqueColors];
 
-    const highestPrice = prices.length ? Math.max(...prices) : 0;
-    const lowestPrice = prices.length ? Math.min(...prices) : 0;
+    const highestPrice = prices.length
+      ? Math.max(...prices)
+      : 0;
+
+    const lowestPrice = prices.length
+      ? Math.min(...prices)
+      : 0;
 
     return successResponse(res, "Data fetched successfully", 200, {
       colors,
       highestPrice,
-      lowestPrice
+      lowestPrice,
     });
 
   } catch (error) {
-    return errorResponse(res, error.message || "Internal Server Error", 500);
+    return errorResponse(
+      res,
+      error.message || "Internal Server Error",
+      500
+    );
   }
 });

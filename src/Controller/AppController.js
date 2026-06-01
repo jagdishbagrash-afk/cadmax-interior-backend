@@ -1,6 +1,8 @@
 const jwt = require("jsonwebtoken");
 const catchAsync = require("../Utill/catchAsync");
 const User = require("../Model/User");
+
+
 const SubCategory = require("../Model/SubCategory");
 const Category = require("../Model/Categroy")
 const Address =  require("../Model/MultipleAddress")
@@ -1062,7 +1064,6 @@ exports.getProductById = catchAsync(async (req, res) => {
 exports.AddToCart = catchAsync(async (req, res) => {
   try {
     const userId = req.user.id;
-    console.log("product", req.body)
     const { product } = req.body;
     if (!product || !product.id || !product.quantity || !product.variant) {
       return errorResponse(res, "Invalid product payload", 400);
@@ -1215,8 +1216,8 @@ exports.updateCart = catchAsync(async (req, res) => {
     if (quantity < 0) {
       return errorResponse(res, "Quantity cannot be negative", 400);
     }
+   const cart = await Cart.findOne({ user: userId, status: "pending" });
 
-    const cart = await Cart.findOne({ user: userId });
     if (!cart || cart.product.length === 0) {
       return errorResponse(res, "Cart is empty", 400);
     }
@@ -1283,10 +1284,9 @@ exports.getCart = catchAsync(async (req, res) => {
     }).populate({
       path: "product.productId",
       select:
-        "title amount discount_amount final_amount images variants",
+        "title amount discount_amount final_amount images variants stock",
     });
 
-    console.log("cart", cart);
 
     // ✅ Empty cart response
     if (!cart || !cart.product || cart.product.length === 0) {
@@ -1319,6 +1319,8 @@ exports.getCart = catchAsync(async (req, res) => {
         );
 
         const variantImages = selectedVariant?.images || [];
+        const variantStock = selectedVariant?.stock || [];
+
 
         // ✅ Product values
         const productAmount = Number(product.amount || 0);
@@ -1338,14 +1340,13 @@ exports.getCart = catchAsync(async (req, res) => {
         return {
           productId: product._id,
           title: product.title,
+          stock: variantStock,
           images: variantImages,
           variant: item.variant,
           quantity: item.quantity,
-
           amount: productAmount,
           discount_amount: productDiscount,
           final_amount: productFinal,
-
           subtotal: subtotalPrice,
           discountTotal: discountPrice,
           finalTotal: finalPrice,
@@ -1460,10 +1461,36 @@ exports.GetAllProject = catchAsync(async (req, res) => {
 exports.GetServicesType = catchAsync(
   async (req, res) => {
     try {
-      const Residentialservices = await ServicesType.find({ TypeServices: "Residential" }).sort({ createdAt: -1 });
+       const residentialRaw = await ServicesType.find({
+            TypeServices: "Residential",
+          });
+      
+          const orderMap = {
+            facades: 1,
+            "landscaping & gazebo": 2,
+            "living room": 3,
+            "drwaing room": 4,
+            bedroom: 5,
+            kitchen: 6,
+            staircase: 7,
+            "pooja room": 8,
+            washroom: 9,
+          };
+      
+          const residentialServices = residentialRaw.sort((a, b) => {
+            const titleA = (a.title || "").trim().toLowerCase();
+            const titleB = (b.title || "").trim().toLowerCase();
+      
+            const orderA = orderMap[titleA] ?? 999;
+            const orderB = orderMap[titleB] ?? 999;
+      
+            if (orderA !== orderB) return orderA - orderB;
+      
+            return titleA.localeCompare(titleB);
+          });
       const Commercialservices = await ServicesType.find({ TypeServices: "Commercial" }).sort({ createdAt: -1 });
       return successResponse(res, "Services Type list successfully.", 201, {
-        Residentialservices, Commercialservices
+        Residentialservices :  residentialServices, Commercialservices
       });
     } catch (error) {
       return errorResponse(res, error.message || "Internal Server Error", 500);
@@ -1743,63 +1770,63 @@ exports.GetVendorCategory = catchAsync(async (req, res) => {
 exports.bestSellerProducts = catchAsync(async (req, res) => {
   const limit = parseInt(req.query.limit) || 10;
 
-  const bestSellers = await Order.aggregate([
-    { $unwind: "$product" },
-    {
-      $group: {
-        _id: "$product.id",
-        totalQuantity: { $sum: "$product.quantity" },
-        totalOrders: { $sum: 1 },
-      },
-    },
+const bestSellers = await Order.aggregate([
+  { $unwind: "$product" },
 
-    {
-      $match: {
-        totalOrders: { $gt: 1 },
-      },
+  {
+    $group: {
+      _id: "$product.id",
+      totalQuantity: { $sum: "$product.quantity" },
+      totalOrders: { $sum: 1 },
     },
+  },
 
-    { $sort: { totalQuantity: -1 } },
-    { $limit: limit },
-    {
-      $lookup: {
-        from: "products",
-        localField: "_id",
-        foreignField: "_id",
-        as: "product",
-      },
+  {
+    $match: {
+      totalOrders: { $gt: 1 },
     },
-    { $unwind: "$product" },
-    {
-      $project: {
-        product: "$product",
-      },
+  },
+
+  { $sort: { totalQuantity: -1 } },
+
+  { $limit: limit },
+
+  {
+    $lookup: {
+      from: "products",
+      localField: "_id",
+      foreignField: "_id",
+      as: "product",
     },
-  ]);
+  },
 
-  const record = bestSellers.map(item => item.product);
+  { $unwind: "$product" },
 
+  {
+    $match: {
+      "product.deletedAt": null,
+    },
+  },
+
+  {
+    $project: {
+      product: "$product",
+    },
+  },
+]);
+
+  
 
   res.status(200).json({
     success: true,
     message: "Best seller products fetched successfully",
-    data: record,
+    data: bestSellers,
   });
 });
 
 
 
 
-exports.AppAllVendors = catchAsync(
-  async (req, res) => {
-    try {
-      const Categorys = await Vendor.find().sort({ createdAt: -1 }).populate("VendorCategory");
-      return successResponse(res, "Vendor Categorys list successfully.", 201, Categorys);
-    } catch (error) {
-      return errorResponse(res, error.message || "Internal Server Error", 500);
-    }
-  }
-);
 
 
 
@@ -1807,7 +1834,7 @@ exports.latestProducts = catchAsync(async (req, res) => {
   const limit = parseInt(req.query.limit) || 10;
 
   const products = await Product.find({
-    deletedAt: null,
+    deletedAt : null
   })
     .sort({ createdAt: -1 })
     .limit(limit)
@@ -1823,12 +1850,50 @@ exports.latestProducts = catchAsync(async (req, res) => {
 
 exports.GetAllServicesSubCategorys = catchAsync(
   async (req, res) => {
-    try {
-      const SubCategorys = await ServicesType.find().sort({ createdAt: -1 });
-      return successResponse(res, "SubCategorys list successfully.", 201, SubCategorys);
-    } catch (error) {
-      return errorResponse(res, error.message || "Internal Server Error", 500);
-    }
+  try {
+    const orderMap = {
+      facades: 1,
+      "landscaping & gazebo": 2,
+      "living room": 3,
+      "drwaing room": 4,
+      bedroom: 5,
+      kitchen: 6,
+      staircase: 7,
+      "pooja room": 8,
+      washroom: 9,
+    };
+
+    const subCategories = await ServicesType.find({
+      status: true,
+    });
+
+    subCategories.sort((a, b) => {
+      const titleA = (a.title || "").trim().toLowerCase();
+      const titleB = (b.title || "").trim().toLowerCase();
+
+      const orderA = orderMap[titleA] || 999;
+      const orderB = orderMap[titleB] || 999;
+
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
+
+      return titleA.localeCompare(titleB);
+    });
+
+    return successResponse(
+      res,
+      "SubCategorys list successfully.",
+      200,
+      subCategories
+    );
+  } catch (error) {
+    return errorResponse(
+      res,
+      error.message || "Internal Server Error",
+      500
+    );
+  }
   }
 );
 
@@ -1913,7 +1978,6 @@ exports.globalSearch = catchAsync(async (req, res) => {
   try {
     const { search } = req.query;
 
-    console.log("search", search)
 
     // common condition
     const regexFilter = search
@@ -2005,7 +2069,6 @@ exports.globalSearch = catchAsync(async (req, res) => {
 exports.LeadApp = catchAsync(async (req, res) => {
   try {
     const assignedTo = req.user.id;
-    console.log("assignedTo", assignedTo)
     const { title, message, services, type, category } = req.body;
     const record = await Lead.create({
       assignedTo,
@@ -2016,9 +2079,6 @@ exports.LeadApp = catchAsync(async (req, res) => {
       type,
       source: "App"
     })
-
-    console.log("record", record)
-
     res.json({
       status: true,
       message: " Request submitted & emails sent successfully.",
@@ -2033,13 +2093,59 @@ exports.LeadApp = catchAsync(async (req, res) => {
   }
 });
 
+exports.GetAllRecordServicesSubCategorys = catchAsync(async (req, res) => {
+  try {
+    const orderMap = {
+      facades: 1,
+      "landscaping & gazebo": 2,
+      "living room": 3,
+      "drwaing room": 4,
+      bedroom: 5,
+      kitchen: 6,
+      staircase: 7,
+      "pooja room": 8,
+      washroom: 9,
+    };
 
-exports.GetAllRecordServicesSubCategorys = catchAsync(
+    const subCategories = await ServicesType.find({
+      status: true,
+    });
+
+    subCategories.sort((a, b) => {
+      const titleA = (a.title || "").trim().toLowerCase();
+      const titleB = (b.title || "").trim().toLowerCase();
+
+      const orderA = orderMap[titleA] || 999;
+      const orderB = orderMap[titleB] || 999;
+
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
+
+      return titleA.localeCompare(titleB);
+    });
+
+    return successResponse(
+      res,
+      "SubCategorys list successfully.",
+      200,
+      subCategories
+    );
+  } catch (error) {
+    return errorResponse(
+      res,
+      error.message || "Internal Server Error",
+      500
+    );
+  }
+});
+
+
+exports.AppAllVendors = catchAsync(
   async (req, res) => {
     try {
-      const SubCategorys = await ServicesSubCategory
-        .find().sort({ createdAt: -1 });
-      return successResponse(res, "SubCategorys list successfully.", 201, SubCategorys);
+      const Categorys = await Vendor.find({deletedAt : null}).sort({ createdAt: -1 }).populate("VendorCategory");
+      return successResponse(res, "Vendor Categorys list successfully.", 201, Categorys);
     } catch (error) {
       return errorResponse(res, error.message || "Internal Server Error", 500);
     }

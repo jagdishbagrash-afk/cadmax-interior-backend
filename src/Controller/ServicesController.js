@@ -163,11 +163,13 @@ exports.AddService = CatchAsync(
       if (!title || !content || !ServicesType) {
         return validationErrorResponse(res, "All fields are required", 400,);
       }
-      const service = new Services({ title, content,
-         multiple_images: imageUrls,
-         Image: list_image,
-          ServicesType, slug: slug, concept,  material_details, timeline, cost, 
-          ServicesSubCategory });
+      const service = new Services({
+        title, content,
+        multiple_images: imageUrls,
+        Image: list_image,
+        ServicesType, slug: slug, concept, material_details, timeline, cost,
+        ServicesSubCategory
+      });
       const record = await service.save();
       // const users = await User.find({
       //   role: "customer",
@@ -322,20 +324,54 @@ exports.getServiceById = CatchAsync(
 
 // fortend 
 
-exports.gettypeservices = CatchAsync(
-  async (req, res) => {
-    try {
-      const Residentialservices = await ServicesType.find({ TypeServices: "Residential" }).sort({ createdAt: -1 });
-      const Commercialservices = await ServicesType.find({ TypeServices: "Commercial" }).sort({ createdAt: -1 });
+exports.gettypeservices = CatchAsync(async (req, res) => {
+  try {
+    const residentialRaw = await ServicesType.find({
+      TypeServices: "Residential",
+    });
 
-      return successResponse(res, "Services Type list successfully.", 201, {
-        Residentialservices, Commercialservices
-      });
-    } catch (error) {
-      return errorResponse(res, error.message || "Internal Server Error", 500);
-    }
+    const orderMap = {
+      facades: 1,
+      "landscaping & gazebo": 2,
+      "living room": 3,
+      "drwaing room": 4,
+      bedroom: 5,
+      kitchen: 6,
+      staircase: 7,
+      "pooja room": 8,
+      washroom: 9,
+    };
+
+    const residentialServices = residentialRaw.sort((a, b) => {
+      const titleA = (a.title || "").trim().toLowerCase();
+      const titleB = (b.title || "").trim().toLowerCase();
+
+      const orderA = orderMap[titleA] ?? 999;
+      const orderB = orderMap[titleB] ?? 999;
+
+      if (orderA !== orderB) return orderA - orderB;
+
+      return titleA.localeCompare(titleB);
+    });
+
+    const commercialServices = await ServicesType.find({
+      TypeServices: "Commercial",
+    }).sort({ createdAt: -1 });
+
+
+    return successResponse(
+      res,
+      "Services fetched successfully.",
+      200,
+      {
+        residentialServices,
+        commercialServices,
+      }
+    );
+  } catch (error) {
+    return errorResponse(res, error.message || "Internal Server Error", 500);
   }
-);
+});
 
 exports.GetServiceTypeId = CatchAsync(
   async (req, res) => {
@@ -531,7 +567,7 @@ exports.ServicesUserPost = CatchAsync(async (req, res) => {
     // ]);
 
 
-   
+
     const result = await record.save();
 
     if (!result) {
@@ -596,3 +632,6 @@ exports.ServciesUserGet = CatchAsync(async (req, res) => {
     });
   }
 });
+
+
+

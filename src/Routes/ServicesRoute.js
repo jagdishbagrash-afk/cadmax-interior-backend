@@ -53,6 +53,7 @@ router.post("/services/subcategory/add", upload.single("Image"),  ServciesSubCat
 router.get("/services/subcategory/list", ServciesSubCategoryController.GetAllServicesSubCategorys);    
 router.post("/services/subcategory/edit/:id", upload.single("Image"),   ServciesSubCategoryController.UpdateServicesSubCategory);  
 
+router.get("/services/subcategory/delete/:id", ServciesSubCategoryController.DeleteServicesSubCategory);
 
 
 module.exports = router;

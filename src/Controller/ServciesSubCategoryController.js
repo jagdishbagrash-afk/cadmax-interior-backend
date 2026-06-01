@@ -58,16 +58,52 @@ exports.AddServicesSubCategory = CatchAsync(async (req, res) => {
     }
 });
 
-exports.GetAllServicesSubCategorys = CatchAsync(
-    async (req, res) => {
-        try {
-         const SubCategorys = await ServicesType.find().sort({ createdAt: -1 });
-            return successResponse(res, "SubCategorys list successfully.", 201, SubCategorys);
-        } catch (error) {
-            return errorResponse(res, error.message || "Internal Server Error", 500);
-        }
-    }
-);
+exports.GetAllServicesSubCategorys = CatchAsync(async (req, res) => {
+  try {
+    const orderMap = {
+      facades: 1,
+      "landscaping & gazebo": 2,
+      "living room": 3,
+      "drwaing room": 4,
+      bedroom: 5,
+      kitchen: 6,
+      staircase: 7,
+      "pooja room": 8,
+      washroom: 9,
+    };
+
+    const subCategories = await ServicesType.find({
+      status: true,
+    });
+
+    subCategories.sort((a, b) => {
+      const titleA = (a.title || "").trim().toLowerCase();
+      const titleB = (b.title || "").trim().toLowerCase();
+
+      const orderA = orderMap[titleA] || 999;
+      const orderB = orderMap[titleB] || 999;
+
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
+
+      return titleA.localeCompare(titleB);
+    });
+
+    return successResponse(
+      res,
+      "SubCategorys list successfully.",
+      200,
+      subCategories
+    );
+  } catch (error) {
+    return errorResponse(
+      res,
+      error.message || "Internal Server Error",
+      500
+    );
+  }
+});
 
 exports.GetServicesSubCategoryById = CatchAsync(
     async (req, res) => {
@@ -150,3 +186,31 @@ exports.UpdateServicesSubCategory = CatchAsync(
     }
   }
 );
+
+
+exports.DeleteServicesSubCategory = CatchAsync(async (req, res) => {
+  try {
+    const id = req.params.id;
+    const servicedelete = await ServicesSubCategory.findById(id);
+console.log("servicedelete", servicedelete)
+    if (!servicedelete) {
+      return validationErrorResponse(res, "Services ServicesSubCategory not found", 404);
+    }
+
+    if (servicedelete.deletedAt) {
+      servicedelete.deletedAt = null;
+      servicedelete.status = true;
+      await servicedelete.save();
+      return successResponse(res, "Services ServicesSubCategory  restored successfully", 200);
+    }
+
+    servicedelete.deletedAt = new Date();
+    servicedelete.status = false;
+    await servicedelete.save();
+
+    return successResponse(res, "Services ServicesSubCategory deleted successfully", 200);
+
+  } catch (error) {
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});
