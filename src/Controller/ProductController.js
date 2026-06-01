@@ -6,7 +6,6 @@ const User = require("../Model/User");
 const sendNotification = require("./sendNotification");
 const { sendPushNotification } = require("../Utill/notificationService");
 
-
 const makeSlug = (text) => {
   return text
     .toString()
