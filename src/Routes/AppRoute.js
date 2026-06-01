@@ -56,4 +56,6 @@ AppRoute.get("/app/services/subcategory/list", GetAllRecordServicesSubCategorys)
 AppRoute.get("/app/search-name", globalSearch);
 AppRoute.post("/app/lead-form", verifyToken, LeadApp);
 
+
+
 module.exports = AppRoute;

@@ -598,19 +598,26 @@ exports.signup = catchAsync(async (req, res) => {
     });
 
     const result = await record.save();
+    console.log("rs",result)
     const token = jwt.sign(
       { id: result._id, role: result.role, email: result.email },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || "365d" }
     );
 
-    const subject = `Welcome to Cadmax!🎉`;
-    const emailHtml = Welcome(result?.name);
-    await sendEmail({
-      email: result?.email,
-      subject: subject,
-      emailHtml: emailHtml,
-    });
+   try {
+  const subject = "Welcome to Cadmax! 🎉";
+  const emailHtml = Welcome(result.name);
+
+  await sendEmail({
+    email: result.email,
+    subject,
+    emailHtml,
+  });
+} catch (err) {
+  console.error("Email Error:", err.message);
+}
+
     return successResponse(
       res,
       "You have been registered successfully !!",
@@ -1590,7 +1597,7 @@ exports.GetServicesDetails = catchAsync(async (req, res) => {
 exports.ConceptUserPost = catchAsync(async (req, res) => {
   try {
     const userId = req?.user?.id;
-    const { User, ServicesType, Services, concept } = req.body;
+    const {  ServicesType, Services, concept } = req.body;
 
     if (!User || !ServicesType || !Services) {
       return validationErrorResponse(res, "All fields (services, user, typeservices) are required.", 401);

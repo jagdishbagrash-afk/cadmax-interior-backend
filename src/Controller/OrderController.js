@@ -168,8 +168,6 @@ const { default: axios } = require("axios");
 
 
 // orderController.js के top पर जोड़ें
-const { createDhlShipment } = require("../Utill/dhlService");
-
 exports.addOrder = catchAsync(async (req, res) => {
   const {
     name,
@@ -209,17 +207,6 @@ exports.addOrder = catchAsync(async (req, res) => {
 
   const record = await newOrder.save();
 
-  const shipment = await createDhlShipment({ name, mobile, address });
-  console.log(shipment);
-
-  if (shipment.success) {
-    record.tracking_number = shipment.data?.shipmentTrackingNumber;
-    record.shipping_status = "shipment_created";
-    record.shipping_response = shipment.data;
-  } else {
-    record.shipping_status = "shipment_failed";
-    record.shipping_response = shipment.error;
-  }
 
   await record.save();
 
