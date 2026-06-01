@@ -817,7 +817,7 @@ exports.OTPVerify = async (req, res) => {
     );
 
     return res.status(200).json({
-      success: true,
+      status: true,
       message: "OTP verified successfully",
       data: response.data,
     });
@@ -826,7 +826,7 @@ exports.OTPVerify = async (req, res) => {
     console.log(error.response?.data || error.message);
 
     return res.status(500).json({
-      success: false,
+      status: false,
       message: error.response?.data || error.message,
     });
   }
