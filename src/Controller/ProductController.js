@@ -124,8 +124,7 @@ exports.addProduct = CatchAsync(async (req, res) => {
       fcmToken: { $ne: null }
     }).select("fcmToken");
 
-    
->>>>>>> 3b09937b7c8b224fc88bfec238bd4ecceb1fda59
+
     const admindata = await User.find({
       role: "admin",
       status: "active",
