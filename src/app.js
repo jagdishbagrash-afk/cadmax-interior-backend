@@ -17,10 +17,7 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '10000mb' }));
 app.use(express.urlencoded({ extended: true, limit: "10000mb" }));
 app.get("/", (req, res) => {
-  res.json({
-    msg: 'Hello World',
-    status: 200,
-  });
+  res.json({ message: "Server is running fine 🚀" });
 });
 
 const PORT = process.env.REACT_APP_SERVER_DOMAIN || 5000;

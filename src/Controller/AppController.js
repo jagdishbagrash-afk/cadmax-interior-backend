@@ -598,13 +598,14 @@ exports.signup = catchAsync(async (req, res) => {
     });
 
     const result = await record.save();
+    console.log("rs",result)
     const token = jwt.sign(
       { id: result._id, role: result.role, email: result.email },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || "365d" }
     );
 
-  try {
+   try {
   const subject = "Welcome to Cadmax! 🎉";
   const emailHtml = Welcome(result.name);
 
