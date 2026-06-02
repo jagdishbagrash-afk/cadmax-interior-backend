@@ -1,62 +1,71 @@
 const Payment = require("../Model/Payment");
 const Razorpay = require('razorpay');
 const catchAsync = require("../Utill/catchAsync");
-require('dotenv').config(); 
+require('dotenv').config();
 
 
 const razorpayInstance = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID,
-    key_secret: process.env.RAZORPAY_KEY_SECRET,
-  });
-  
-  exports.createOrder = async (req, res) => {
-    const { amount, currency = 'INR', receipt } = req.body; 
-    try {
-      const options = {
-        amount: amount*100, 
-        currency,
-        receipt,
-        payment_capture: 1, 
-      };
-  
-      const order = await razorpayInstance.orders.create(options);
-  
-      res.status(200).json({
-        success: true,
-        orderId: order.id,
-        currency: order.currency,
-        amount: order.amount,
-      });
-    } catch (error) {
-      console.error('Order creation error:', error); 
-      res.status(500).json({ success: false, message: 'Order creation failed', error: error.message });
-    }
-  };
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
 
-  exports.paymentAdd = catchAsync(async (req, res) => {
-    const  user_id =  req.user.id
-    const { order_id, payment_id, amount, currency, payment_status, product_name,type ,product_id  , OrderID } = req.body;
-    const status = payment_status === 'failed' ? 'failed' : 'success';
-    const paymentdata = new Payment({
-        order_id: order_id,
-        currency: currency, 
-        user_id :user_id ,
-        payment_id: payment_id,
-        amount: amount,
-        payment_status: payment_status,
-        product_name,
-        type,
-        status: status, 
-        product_id ,
-        OrderID
+exports.createOrder = async (req, res) => {
+  const { amount, currency = 'INR', receipt } = req.body;
+  const numericAmount = Number(amount.replace(/,/g, ""));
+
+  if (isNaN(numericAmount)) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid amount"
     });
+  }
 
-    const record = await paymentdata.save();
-    if (payment_status === 'failed') {
-        return res.status(200).json({ status: 'failed', message: 'Payment failed and saved successfully' , record});
-    } else {
-        return res.status(200).json({ status: 'success', message: 'Payment verified and saved successfully' , record});
-    }
+  try {
+    const options = {
+      amount: Math.round(numericAmount * 100), // convert ₹ to paise
+      currency,
+      receipt,
+      payment_capture: 1,
+    };
+
+    const order = await razorpayInstance.orders.create(options);
+
+    res.status(200).json({
+      success: true,
+      orderId: order.id,
+      currency: order.currency,
+      amount: order.amount,
+    });
+  } catch (error) {
+    console.error('Order creation error:', error);
+    res.status(500).json({ success: false, message: 'Order creation failed', error: error.message });
+  }
+};
+
+exports.paymentAdd = catchAsync(async (req, res) => {
+  const user_id = req.user.id
+  const { order_id, payment_id, amount, currency, payment_status, product_name, type, product_id, OrderID } = req.body;
+  const status = payment_status === 'failed' ? 'failed' : 'success';
+  const paymentdata = new Payment({
+    order_id: order_id,
+    currency: currency,
+    user_id: user_id,
+    payment_id: payment_id,
+    amount: amount,
+    payment_status: payment_status,
+    product_name,
+    type,
+    status: status,
+    product_id,
+    OrderID
+  });
+
+  const record = await paymentdata.save();
+  if (payment_status === 'failed') {
+    return res.status(200).json({ status: 'failed', message: 'Payment failed and saved successfully', record });
+  } else {
+    return res.status(200).json({ status: 'success', message: 'Payment verified and saved successfully', record });
+  }
 });
 
 
@@ -64,8 +73,8 @@ const razorpayInstance = new Razorpay({
 exports.PaymentGet = catchAsync(async (req, res, next) => {
   try {
     const payment = await Payment.find({})
-      .populate("OrderID")   
-      .populate("user_id") 
+      .populate("OrderID")
+      .populate("user_id")
       .sort({ payment_date: -1 });
 
     if (!payment || payment.length === 0) {
