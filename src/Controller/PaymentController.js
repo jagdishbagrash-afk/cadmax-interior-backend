@@ -46,12 +46,16 @@ exports.paymentAdd = catchAsync(async (req, res) => {
   const user_id = req.user.id
   const { order_id, payment_id, amount, currency, payment_status, product_name, type, product_id, OrderID } = req.body;
   const status = payment_status === 'failed' ? 'failed' : 'success';
+ const numericAmount = Number(
+    String(amount).replace(/,/g, "")
+  );
+ 
   const paymentdata = new Payment({
     order_id: order_id,
     currency: currency,
     user_id: user_id,
     payment_id: payment_id,
-    amount: amount,
+    amount: numericAmount,
     payment_status: payment_status,
     product_name,
     type,

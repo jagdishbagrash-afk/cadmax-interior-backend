@@ -8,6 +8,7 @@ const { sendPushNotification } = require("../Utill/notificationService");
 const User = require("../Model/User");
 const Cart = require("../Model/Cart");
 const { default: axios } = require("axios");
+const Product = require("../Model/Product");
 
 // exports.addOrder = catchAsync(async (req, res) => {
 //   try {
@@ -167,7 +168,6 @@ const { default: axios } = require("axios");
 // });
 
 
-// orderController.js के top पर जोड़ें
 exports.addOrder = catchAsync(async (req, res) => {
   const {
     name,
@@ -189,22 +189,24 @@ exports.addOrder = catchAsync(async (req, res) => {
       "All fields (name, mobile, address, product, amount) are required"
     );
   }
-
   // CREATE ORDER
+  const numericAmount = Number(
+    String(amount).replace(/,/g, "")
+  );
+
   const newOrder = new Order({
     name,
     mobile,
     address,
     product,
     addressId,
-    amount,
+    amount: numericAmount,
     userId,
     orderId,
     PaymentId,
     shipping_status: "pending",
     courier_name: "DHL",
   });
-
   const record = await newOrder.save();
 
 
@@ -221,6 +223,31 @@ exports.addOrder = catchAsync(async (req, res) => {
   if (cart && cart.status !== "done") {
     cart.status = "done";
     await cart.save();
+  }
+
+  for (const item of product) {
+    const productData = await Product.findById(item.id);
+
+    if (!productData) {
+      return validationErrorResponse(res, "Product not found");
+    }
+
+    const currentStock = productData.variants[0].stock;
+
+    if (currentStock < item.quantity) {
+      return validationErrorResponse(
+        res,
+        `${productData.title} is out of stock`
+      );
+    }
+
+    productData.variants[0].stock -= item.quantity;
+
+    if (productData.variants[0].stock <= 0) {
+      productData.stock_status = "out_of_stock";
+    }
+
+    await productData.save();
   }
 
   // RESPONSE
