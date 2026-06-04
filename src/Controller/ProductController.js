@@ -5,7 +5,6 @@ const { deleteFile } = require("../Utill/S3");
 const User = require("../Model/User");
 const sendNotification = require("./sendNotification");
 const { sendPushNotification } = require("../Utill/notificationService");
-
 const makeSlug = (text) => {
   return text
     .toString()
@@ -356,6 +355,15 @@ exports.updateProduct = CatchAsync(async (req, res) => {
   }
 
   product.variants = finalVariants;
+  const totalStock = finalVariants.reduce(
+  (sum, variant) => sum + (Number(variant.stock) || 0),
+  0
+);
+
+// Stock status update
+product.stock_status =
+  totalStock > 0 ? "in_stock" : "out_of_stock";
+
 
   /* ================= 7️⃣ SAVE ================= */
   const updatedProduct = await product.save();
@@ -367,6 +375,8 @@ exports.updateProduct = CatchAsync(async (req, res) => {
     updatedProduct
   );
 });
+
+
 exports.deleteProduct = CatchAsync(async (req, res) => {
   try {
     const id = req.params.id;

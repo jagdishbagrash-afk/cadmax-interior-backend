@@ -92,11 +92,17 @@ const ProductSchema = mongoose.Schema(
       type: Date,
       default: null,
     },
-    status :  {
-      type : String ,
-            default: true,
+    status: {
+      type: String,
+      default: true,
+    },
 
+    stock_status: {
+      type: String,
+      enum: ["in_stock", "out_of_stock"],
+      default: "in_stock"
     }
+
   },
   { timestamps: true }
 );
