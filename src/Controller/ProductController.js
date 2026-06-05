@@ -48,21 +48,17 @@ exports.addProduct = CatchAsync(async (req, res) => {
     req.files.forEach((file) => {
       // variantImages_red_0
       const parts = file.fieldname.split("_");
-
       const color = parts[1];
       const index = Number(parts[2]);
-
       if (!variantImageMap[color]) {
         variantImageMap[color] = [];
       }
-
       variantImageMap[color].push({
         index,
         url: file.location,
       });
     });
 
-    // ✅ Sort by index
     Object.keys(variantImageMap).forEach((color) => {
       variantImageMap[color] = variantImageMap[color]
         .sort((a, b) => a.index - b.index)
@@ -105,7 +101,6 @@ exports.addProduct = CatchAsync(async (req, res) => {
       type: req.body.type?.[0] || "",
       terms: req.body.terms?.[0] || "",
       variants: finalVariants ,
-      discount_amount  :  req.body.discount_amount || 0 ,
     });
 
     const record = await newProduct.save();

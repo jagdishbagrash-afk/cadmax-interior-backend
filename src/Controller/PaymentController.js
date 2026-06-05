@@ -11,7 +11,9 @@ const razorpayInstance = new Razorpay({
 
 exports.createOrder = async (req, res) => {
   const { amount, currency = 'INR', receipt } = req.body;
-  const numericAmount = Number(amount.replace(/,/g, ""));
+  const numericAmount = Number(
+  typeof amount === "string" ? amount.replace(/,/g, "") : amount
+);
 
   if (isNaN(numericAmount)) {
     return res.status(400).json({
