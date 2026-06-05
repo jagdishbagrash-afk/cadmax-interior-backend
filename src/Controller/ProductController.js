@@ -105,7 +105,6 @@ exports.addProduct = CatchAsync(async (req, res) => {
       type: req.body.type?.[0] || "",
       terms: req.body.terms?.[0] || "",
       variants: finalVariants ,
-      discount_amount  :  req.body.discount_amount || 0 ,
     });
 
     const record = await newProduct.save();
