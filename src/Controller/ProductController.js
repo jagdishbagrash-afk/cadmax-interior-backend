@@ -598,4 +598,4 @@ exports.productcolor = CatchAsync(async (req, res) => {
       500
     );
   }
-});
+}); 
