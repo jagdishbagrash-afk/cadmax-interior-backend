@@ -189,11 +189,10 @@ exports.addOrder = catchAsync(async (req, res) => {
       "All fields (name, mobile, address, product, amount) are required"
     );
   }
-  // CREATE ORDER
-  const numericAmount = Number(
-    String(amount).replace(/,/g, "")
-  );
 
+  const numericAmount = Number(
+  typeof amount === "string" ? amount.replace(/,/g, "") : amount
+);
   const newOrder = new Order({
     name,
     mobile,
