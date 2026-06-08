@@ -1,7 +1,6 @@
-const Categroy = require("../Model/Categroy");
-const Category = require("../Model/Categroy");
+const ProductSubSubCategory = require("../Model/ProductSubSubCategory");
 const Product = require("../Model/Product");
-const SubCategory = require("../Model/SubCategory");
+const SubCategory = require("../Model/SubProductCategory");
 const CatchAsync = require("../Utill/catchAsync");
 const { errorResponse, successResponse, validationErrorResponse } = require("../Utill/ErrorHandling");
 const { deleteFile } = require("../Utill/S3");
@@ -31,14 +30,14 @@ const generateUniqueSlug = async (Model, title) => {
     return slug;
 };
 
-exports.addCategory = CatchAsync(async (req, res) => {
+exports.addProductSubSubCategory = CatchAsync(async (req, res) => {
     try {
         const { name } = req.body;
         if (!name) {
-            return validationErrorResponse(res, "Category name is required", 400);
+            return validationErrorResponse(res, "ProductSubSubCategory name is required", 400);
         }
 
-        const slug = await generateUniqueSlug(Category, req.body.name);
+        const slug = await generateUniqueSlug(ProductSubSubCategory, req.body.name);
 
         let imageUrl = null;
 
@@ -53,14 +52,17 @@ exports.addCategory = CatchAsync(async (req, res) => {
             }
         }
 
-        const categoryData = new Category({
+        const productSubSubCategoryData = new ProductSubSubCategory({
             name,
             Image: imageUrl,
-            slug
+            slug,
+            category: req.body.category,
+            subcategory: req.body.subcategory
+
         });
 
-        const record = await categoryData.save();
-        return successResponse(res, "Category created successfully.", 201, record);
+        const record = await productSubSubCategoryData.save();
+        return successResponse(res, "ProductSubSubCategory created successfully.", 201, record);
 
     } catch (error) {
         console.log(error);
@@ -68,38 +70,40 @@ exports.addCategory = CatchAsync(async (req, res) => {
     }
 });
 
-exports.updateCategory = CatchAsync(async (req, res) => {
+exports.UpdateProductSubSubCategory = CatchAsync(async (req, res) => {
     try {
         const { id } = req.params;
         const { name } = req.body;
 
-        const category = await Category.findById(id);
-        if (!category) {
-            return validationErrorResponse(res, "Category not found", 404);
+        const productSubSubCategory = await ProductSubSubCategory.findById(id);
+        if (!productSubSubCategory) {
+            return validationErrorResponse(res, "ProductSubSubCategory not found", 404);
         }
 
         if (name) {
-            category.name = name;
-            category.slug = await generateUniqueSlug(Category, name, id);
+            productSubSubCategory.name = name;
+            productSubSubCategory.slug = await generateUniqueSlug(ProductSubSubCategory, name, id);
         }
 
         // Update image if new file uploaded
         if (req.file && req.file.location) {
             // Delete old image from S3 (optional)
-            if (category.Image) {
+            if (productSubSubCategory.Image) {
                 try {
                     const { deleteFile } = require('../Utill/S3');
-                    await deleteFile(category.Image);
+                    await deleteFile(productSubSubCategory.Image);
                     console.log("Old image deleted from S3");
                 } catch (err) {
                     console.error("Error deleting old image:", err);
                 }
             }
-            category.Image = req.file.location;
+            productSubSubCategory.Image = req.file.location;
+            productSubSubCategory.category = req.body.category;
+            productSubSubCategory.subcategory = req.body.subcategory;
         }
 
-        const updatedCategory = await category.save();
-        return successResponse(res, "Category updated successfully.", 200, updatedCategory);
+        const updatedProductSubSubCategory = await productSubSubCategory.save();
+        return successResponse(res, "ProductSubSubCategory updated successfully.", 200, updatedProductSubSubCategory);
 
     } catch (error) {
         console.log(error);
@@ -108,25 +112,25 @@ exports.updateCategory = CatchAsync(async (req, res) => {
 });
 
 
-exports.getAllCategorys = CatchAsync(
+exports.getAllProductSubSubCategorys = CatchAsync(
     async (req, res) => {
         try {
-            const Categorys = await Category.find({status :  true}).sort({ createdAt: -1 });
-            return successResponse(res, "Categorys list successfully.", 201, Categorys);
+            const ProductSubSubCategorys = await ProductSubSubCategory.find({status :  true}).sort({ createdAt: -1 });
+            return successResponse(res, "ProductSubSubCategorys list successfully.", 201, ProductSubSubCategorys);
         } catch (error) {
             return errorResponse(res, error.message || "Internal Server Error", 500);
         }
     }
 );
 
-exports.getCategoryById = CatchAsync(
+exports.getProductSubSubCategoryById = CatchAsync(
     async (req, res) => {
         try {
-            const Category = await Category.findById(req.params.id);
-            if (!Category) {
-                return validationErrorResponse(res, "Category not found.", 400, Category);
+            const ProductSubSubCategory = await ProductSubSubCategory.findById(req.params.id);
+            if (!ProductSubSubCategory) {
+                return validationErrorResponse(res, "ProductSubSubCategory not found.", 400, ProductSubSubCategory);
             }
-            return successResponse(res, "Categorys Details successfully.", 201, Category);
+            return successResponse(res, "ProductSubSubCategory Details successfully.", 201, ProductSubSubCategory);
         } catch (error) {
             return errorResponse(res, error.message || "Internal Server Error", 500);
 
@@ -162,8 +166,8 @@ exports.toggleCategoryStatus = CatchAsync(
 exports.getAllCategoryStatus = CatchAsync(
     async (req, res) => {
         try {
-              const Categorys = await Category.find({status : true}).sort({ createdAt: -1 });
-            return successResponse(res, "Categorys list successfully.", 201, Categorys);
+              const ProductSubSubCategorys = await ProductSubSubCategory.find({status : true}).sort({ createdAt: -1 });
+            return successResponse(res, "ProductSubSubCategorys list successfully.", 201, ProductSubSubCategorys);
         } catch (error) {
             return errorResponse(res, error.message || "Internal Server Error", 500);
         }
@@ -176,13 +180,13 @@ exports.deleteCategory = CatchAsync(
         try {
             const { id } = req.params;
             
-            const subCategory = await Categroy.findById(id);
+            const subCategory = await ProductSubSubCategory.findById(id);
             
             if (!subCategory) {
-                return validationErrorResponse(res, "SubCategory not found.", 400);
+                return validationErrorResponse(res, "ProductSubSubCategory not found.", 400);
             }
 
-                 const productsSubCategory = await SubCategory.find({ category: id });
+                 const productsSubCategory = await ProductSubSubCategory.find({ category: id });
             
             if (productsSubCategory.length > 0) {
                 return validationErrorResponse(

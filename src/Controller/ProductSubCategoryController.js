@@ -1,6 +1,6 @@
-const Category = require("../Model/Categroy");
+const Category = require("../Model/ProductCategroy");
 const Product = require("../Model/Product");
-const SubCategory = require("../Model/SubCategory");
+const SubCategory = require("../Model/SubProductCategory");
 const CatchAsync = require("../Utill/catchAsync");
 const { errorResponse, successResponse, validationErrorResponse } = require("../Utill/ErrorHandling");
 const { deleteFile } = require("../Utill/S3");

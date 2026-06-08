@@ -1,7 +1,8 @@
 const express = require('express');
-const { addCategory, getAllCategorys, getCategoryById, updateCategory, toggleCategoryStatus, getAllCategoryStatus, deleteCategory } = require('../Controller/CategoryControlller');
-const { AddSubCategory, GetAllSubCategorys, GetAllSubCategoryStatus, GetSubCategoryById, UpdateSubCategory, ToggleSubCategoryStatus, getSubCategoryByCategory, GetSubCategoryByNameCategory, deleteSubCategory } = require('../Controller/SubCategoryController');
+const { addCategory, getAllCategorys, getCategoryById, updateCategory, toggleCategoryStatus, getAllCategoryStatus, deleteCategory } = require('../Controller/ProductCategoryControlller');
+const { AddSubCategory, GetAllSubCategorys, GetAllSubCategoryStatus, GetSubCategoryById, UpdateSubCategory, ToggleSubCategoryStatus, getSubCategoryByCategory, GetSubCategoryByNameCategory, deleteSubCategory } = require('../Controller/ProductSubCategoryController');
 const { upload } = require("../Utill/S3");
+const { addProductSubSubCategory, getAllProductSubSubCategorys, getProductSubSubCategoryById ,UpdateProductSubSubCategory } = require('../Controller/ProductSubSubCategory');
 
 const router = express.Router();
 
@@ -56,6 +57,15 @@ router.get("/subcategory/delete/:id", deleteSubCategory);
 
 router.get("/category/delete/:id", deleteCategory);
 
+
+
+router.post("/productsubsubcategory/add", upload.single("Image"), addProductSubSubCategory);
+
+router.get("/productsubsubcategory/get", getAllProductSubSubCategorys);
+
+router.get("/productsubsubcategory/get/:id", getProductSubSubCategoryById);
+
+router.post("/productsubsubcategory/update/:id", upload.single("Image"), UpdateProductSubSubCategory)
 
 
 module.exports = router;
