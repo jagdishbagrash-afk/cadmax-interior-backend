@@ -214,7 +214,6 @@ exports.GetAllConcept = CatchAsync(async (req, res) => {
 
   const record = await ServicesSubCategory.findOne({ slug });
 
-  console.log(record)
 
   if (!record) {
     return errorResponse(res, "Sub category not found", 404);
@@ -226,8 +225,6 @@ exports.GetAllConcept = CatchAsync(async (req, res) => {
     .sort({ createdAt: -1 })
     .populate("ServicesSubCategory");
 
-  console.log("Record ID:", record._id);
-  console.log("Services:", services.length);
 
   return successResponse(
     res,
