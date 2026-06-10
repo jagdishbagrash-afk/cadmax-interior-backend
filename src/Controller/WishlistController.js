@@ -10,20 +10,57 @@ exports.getWishlist = catchAsync(async (req, res) => {
   const wishlist = await Wishlist.findOne({ userId }).populate({
     path: "productIds",
     select:
-      "title slug amount final_amount discount_amount variants thumbnail",
+      "title slug amount final_amount discount_amount variants stock_status category",
+    populate: { path: "category", select: "name slug" }
   });
 
-  return successResponse(
-    res,
-    "Wishlist fetched successfully 100",
-    200,
-    {
-      userId,
-      productIds: wishlist?.productIds || [],
-      count: wishlist?.productIds?.length || 0,
+  const products = wishlist?.productIds || [];
+
+  //  Recommendations: Last 6 recently added products
+  let recommendations = [];
+  if (products.length > 0) {
+    const wishlistedIds = products.map((p) => p._id.toString());
+
+    recommendations = await Product.find({
+      _id: { $nin: wishlistedIds },
+      deletedAt: null,
+    })
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .select(
+        "title slug amount final_amount discount_amount variants stock_status"
+      );
+  }
+
+  // Calculate stats
+  let totalSavings = 0;
+  let lowStockCount = 0;
+
+  products.forEach((p) => {
+    if (p.amount && p.final_amount) {
+      totalSavings += p.amount - p.final_amount;
     }
-  );
+    if (
+      p.stock_status === "out_of_stock" ||
+      p.variants?.some((v) => v.stock < 5)
+    ) {
+      lowStockCount++;
+    }
+  });
+
+  return successResponse(res, "Wishlist fetched successfully", 200, {
+    userId,
+    count: products.length,
+    products,
+    recommendations,
+    stats: {
+      totalItems: products.length,
+      totalSavings,
+      lowStockCount,
+    },
+  });
 });
+
 // ADD product to wishlist
 exports.addToWishlist = catchAsync(async (req, res) => {
   const userId = req.user.id;
