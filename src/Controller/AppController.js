@@ -27,6 +27,7 @@ const ServicesSubCategory = require("../Model/ServicesSubCategory");
 const Lead = require("../Model/Lead");
 
 const axios = require("axios");
+const Wishlist = require("../Model/Wishlist");
 
 // const twilio = require("twilio");
 
@@ -2158,3 +2159,23 @@ exports.AppAllVendors = catchAsync(
 );
 
 
+exports.getWishlist = catchAsync(async (req, res) => {
+  const userId = req.user.id;
+
+  const wishlist = await Wishlist.findOne({ userId }).populate({
+    path: "productIds",
+    select:
+      "title slug amount final_amount discount_amount variants thumbnail",
+  });
+
+  return successResponse(
+    res,
+    "Wishlist fetched successfully 100",
+    200,
+    {
+      userId,
+      productIds: wishlist?.productIds || [],
+      count: wishlist?.productIds?.length || 0,
+    }
+  );
+});

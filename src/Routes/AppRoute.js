@@ -57,5 +57,6 @@ AppRoute.get("/app/search-name", globalSearch);
 AppRoute.post("/app/lead-form", verifyToken, LeadApp);
 
 
+router.get("/app/wishlist/get", verifyToken, getWishlist);
 
 module.exports = AppRoute;
