@@ -100,6 +100,7 @@ exports.addProduct = CatchAsync(async (req, res) => {
       amount: Number(req.body.amount?.[0]) || "",
       category: req.body.category?.[0] || "",
       subcategory: req.body.subcategory?.[0] || "",
+      subsubcategory: req.body.subsubcategory?.[0] || "",
       dimensions: req.body.dimensions?.[0] || "",
       material: req.body.material?.[0] || "",
       type: req.body.type?.[0] || "",
@@ -174,6 +175,7 @@ exports.getAllProducts = CatchAsync(async (req, res) => {
   try {
     const products = await Product.find()
       .populate("subcategory")
+      .populate("subsubcategory")
       .populate("category")
       .sort({ createdAt: -1 });
 
@@ -188,6 +190,7 @@ exports.getProductById = CatchAsync(async (req, res) => {
   try {
     const product = await Product.findById(req.params.id)
       .populate("subcategory")
+      .populate("subsubcategory")
       .populate("category");
 
     if (!product) {
@@ -217,6 +220,7 @@ exports.updateProduct = CatchAsync(async (req, res) => {
     "description",
     "amount",
     "subcategory",
+    "subsubcategory",
     "category",
     "dimensions",
     "material",

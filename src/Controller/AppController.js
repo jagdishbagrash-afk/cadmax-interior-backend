@@ -1,8 +1,8 @@
 const jwt = require("jsonwebtoken");
 const catchAsync = require("../Utill/catchAsync");
 const User = require("../Model/User");
-const SubCategory = require("../Model/SubCategory");
-const Category = require("../Model/Categroy")
+const SubCategory = require("../Model/SubProductCategory");
+const Category = require("../Model/ProductCategroy")
 const Address =  require("../Model/MultipleAddress")
 const { v4: uuidv4 } = require("uuid");
 // const nodemailer = require("nodemailer");
