@@ -5,7 +5,7 @@ const MultipleAddressController = require("../Controller/MultipleAddressControll
 
 const { upload } = require("../Utill/S3");
 const { verifyToken } = require("../Utill/tokenVerify");
-const { removeFromWishlist, removeFromWishlistByProductId, getWishlist } = require("../Controller/WishlistController.js");
+const { removeFromWishlist, removeFromWishlistByProductId, getWishlist, addToWishlist } = require("../Controller/WishlistController.js");
 const AppRoute = require("express").Router();
 
 
@@ -63,6 +63,7 @@ AppRoute.get("/app/wishlist/get", verifyToken, getWishlist);
 AppRoute.post("/app/wishlist/remove", verifyToken, removeFromWishlist);
 
 AppRoute.delete("/app/wishlist/delete/:productId", verifyToken, removeFromWishlistByProductId);
+AppRoute.post("/app/wishlist/add", verifyToken, addToWishlist);
 
 
 
