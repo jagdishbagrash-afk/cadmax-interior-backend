@@ -36,6 +36,7 @@ app.use("/api", require("./Routes/CommonRoute"));
 app.use("/api", require("./Routes/Paymentroute"));
 app.use("/api", require("./Routes/MutipleAddressRoute"));
 app.use("/api", require("./Routes/WishlistRoute"));
+app.use("/api", require("./Routes/ReviewRoute"));
 
 
 const Product = require("./Model/Product");
