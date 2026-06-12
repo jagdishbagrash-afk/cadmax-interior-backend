@@ -326,7 +326,7 @@ exports.updateCommonCart = catchAsync(async (req, res) => {
       const product = item.productId;
 
       const variantData = product.variants.find(
-        (v) => v.color === item.variant
+        (v) => v.title.toLowerCase().trim() === item.variant
       );
 
       return {
