@@ -106,7 +106,28 @@ const ProductSchema = mongoose.Schema(
       type: String,
       enum: ["in_stock", "out_of_stock"],
       default: "in_stock"
-    }
+    },
+
+    /* --- Rating & Review Aggregation --- */
+    totalRating: {
+      type: Number,
+      default: 0,
+    },
+    averageRating: {
+      type: Number,
+      default: 0,
+    },
+    totalReviews: {
+      type: Number,
+      default: 0,
+    },
+    ratingBreakdown: {
+      star1: { type: Number, default: 0 },
+      star2: { type: Number, default: 0 },
+      star3: { type: Number, default: 0 },
+      star4: { type: Number, default: 0 },
+      star5: { type: Number, default: 0 },
+    },
 
   },
   { timestamps: true }

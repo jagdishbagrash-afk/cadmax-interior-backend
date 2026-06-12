@@ -6,6 +6,20 @@ const MultipleAddressController = require("../Controller/MultipleAddressControll
 const { upload } = require("../Utill/S3");
 const { verifyToken } = require("../Utill/tokenVerify");
 const { removeFromWishlist, removeFromWishlistByProductId, getWishlist } = require("../Controller/WishlistController.js");
+const {
+  addReview,
+  updateReview,
+  deleteReview,
+  getProductReviews,
+  getProductRatingSummary,
+  markHelpful,
+  markNotHelpful,
+  checkReviewEligibility,
+} = require("../Controller/ReviewController");
+const {
+  uploadReviewImages,
+  deleteReviewImage,
+} = require("../Controller/ReviewImageController");
 const AppRoute = require("express").Router();
 
 
@@ -65,5 +79,20 @@ AppRoute.post("/app/wishlist/remove", verifyToken, removeFromWishlist);
 AppRoute.delete("/app/wishlist/delete/:productId", verifyToken, removeFromWishlistByProductId);
 
 
+
+// ========== APP REVIEW ROUTES ==========
+// Public
+AppRoute.get("/app/review/product/:productId", getProductReviews);
+AppRoute.get("/app/review/rating-summary/:productId", getProductRatingSummary);
+
+// Authenticated
+AppRoute.post("/app/review/add", verifyToken, addReview);
+AppRoute.post("/app/review/update/:reviewId", verifyToken, updateReview);
+AppRoute.post("/app/review/delete/:reviewId", verifyToken, deleteReview);
+AppRoute.post("/app/review/helpful/:reviewId", verifyToken, markHelpful);
+AppRoute.post("/app/review/not-helpful/:reviewId", verifyToken, markNotHelpful);
+AppRoute.get("/app/review/eligibility/:productId", verifyToken, checkReviewEligibility);
+AppRoute.post("/app/review/images/upload/:reviewId", verifyToken, upload.array("reviewImages", 5), uploadReviewImages);
+AppRoute.post("/app/review/images/delete/:reviewId/:imageIndex", verifyToken, deleteReviewImage);
 
 module.exports = AppRoute;
