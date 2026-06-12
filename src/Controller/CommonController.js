@@ -161,7 +161,7 @@ exports.LeadWebsite = catchAsync(async (req, res) => {
 exports.CommonAddToCart = catchAsync(async (req, res) => {
   try {
     const userId = req.user.id;
-
+console.log("Add to cart payload:", req.body);
     const { productId ,  quantity , variant  } = req.body;
 
 
@@ -182,8 +182,8 @@ exports.CommonAddToCart = catchAsync(async (req, res) => {
     const normalizedVariant = variant.toLowerCase().trim();
 
     const matchedVariant = dbProduct.variants.find(
-      v => v.color.toLowerCase() === normalizedVariant
-    );
+  v => v.title.toLowerCase().trim() === normalizedVariant
+);
 
     if (!matchedVariant) {
       return errorResponse(res, `Variant '${variant}' not available`, 400);
@@ -281,7 +281,7 @@ exports.updateCommonCart = catchAsync(async (req, res) => {
     const normalizedVariant = variant.toLowerCase().trim();
 
     const matchedVariant = dbProduct.variants.find(
-      (v) => v.color === normalizedVariant
+      (v) => v.title.toLowerCase().trim() === normalizedVariant
     );
 
     if (!matchedVariant) {

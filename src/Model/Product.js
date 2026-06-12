@@ -2,20 +2,42 @@ const mongoose = require("mongoose");
 
 const ColorVariantSchema = new mongoose.Schema(
   {
+    title: {
+      type: String,
+      default: "Default Variant",
+    },
+
     color: {
       type: String,
       required: true,
-      lowercase: true, // "Red" → "red"
-      trim: true
+      lowercase: true,
+      trim: true,
     },
-    images: {
-      type: [String], // array of image URLs
-      validate: v => v.length > 0
-    },
-    stock: {
+
+    amount: {
       type: Number,
       default: 0
-    }
+    },
+
+    discount_amount: {
+      type: Number,
+      default: 10,
+    },
+
+    final_amount: {
+      type: Number,
+      default: 0,
+    },
+
+    images: {
+      type: [String],
+      validate: (v) => v.length > 0,
+    },
+
+    stock: {
+      type: Number,
+      default: 0,
+    },
   },
   { _id: false }
 );
@@ -117,13 +139,26 @@ const ProductSchema = mongoose.Schema(
 ========================================= */
 
 ProductSchema.pre("save", function (next) {
+  // Product Level Price
   const amount = Number(this.amount || 0);
-
-  // ✅ default 10%
   const discount = Number(this.discount_amount || 10);
 
   this.final_amount =
     amount - (amount * discount) / 100;
+
+  // Variant Level Price
+  if (this.variants && this.variants.length > 0) {
+    this.variants.forEach((variant) => {
+      const variantAmount = Number(variant.amount || 0);
+      const variantDiscount = Number(
+        variant.discount_amount || 10
+      );
+
+      variant.final_amount =
+        variantAmount -
+        (variantAmount * variantDiscount) / 100;
+    });
+  }
 
   next();
 });

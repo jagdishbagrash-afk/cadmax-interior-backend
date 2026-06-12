@@ -73,8 +73,17 @@ exports.addProduct = CatchAsync(async (req, res) => {
     const finalVariants = variants.map(v => {
       const colorKey = v.color.toLowerCase();
 
+      const amount = Number(v.amount || 0);
+      const discount = Number(v.discount_amount || 10);
+
       return {
         color: colorKey,
+        title: v.title || "",
+        amount,
+        discount_amount: discount,
+        final_amount:
+          amount - (amount * discount) / 100,
+
         stock: Number(v.stock) || 0,
         images: variantImageMap[colorKey] || []
       };
@@ -95,17 +104,23 @@ exports.addProduct = CatchAsync(async (req, res) => {
 
     const newProduct = new Product({
       title: req.body.title?.[0] || "",
-      slug: slug,
+      slug,
       description: req.body.description?.[0] || "",
-      amount: Number(req.body.amount?.[0]) || "",
+
+      amount: Number(req.body.amount?.[0]) || 0,
+      discount_amount:
+        Number(req.body.discount_amount?.[0]) || 10,
+
       category: req.body.category?.[0] || "",
       subcategory: req.body.subcategory?.[0] || "",
       subsubcategory: req.body.subsubcategory?.[0] || "",
+
       dimensions: req.body.dimensions?.[0] || "",
       material: req.body.material?.[0] || "",
       type: req.body.type?.[0] || "",
       terms: req.body.terms?.[0] || "",
-      variants: finalVariants ,
+
+      variants: finalVariants
     });
 
     const record = await newProduct.save();
@@ -263,14 +278,23 @@ exports.updateProduct = CatchAsync(async (req, res) => {
   /* ================= 3️⃣ PARSE VARIANTS ================= */
   let incomingVariants = [];
 
+
   if (req.body.variants) {
     try {
       incomingVariants = JSON.parse(req.body.variants).map((v) => ({
         ...v,
-        color: v.color.toLowerCase(),
+        color: (v.color || "").toLowerCase(),
+        title: v.title || "",
+        amount: Number(v.amount || 0),
+        discount_amount: Number(v.discount_amount || 10),
+        stock: Number(v.stock || 0),
       }));
-    } catch {
-      return validationErrorResponse(res, "Invalid variants data", 400);
+    } catch (error) {
+      return validationErrorResponse(
+        res,
+        "Invalid variants data",
+        400
+      );
     }
   }
 
@@ -304,6 +328,7 @@ exports.updateProduct = CatchAsync(async (req, res) => {
     );
   }
 
+
   /* ================= 6️⃣ BUILD FINAL VARIANTS ================= */
   const finalVariants = [];
 
@@ -314,25 +339,21 @@ exports.updateProduct = CatchAsync(async (req, res) => {
 
     const existingImages = existing?.images || [];
 
-    // ✅ safe kept images
     const keptImages = Array.isArray(incoming.images)
       ? incoming.images.filter(Boolean)
       : [];
 
-    // ✅ new uploaded images
-    const newImages = uploadedImagesByColor[incoming.color] || [];
+    const newImages =
+      uploadedImagesByColor[incoming.color] || [];
 
-    // ✅ FINAL MERGE LOGIC (VERY IMPORTANT)
-    let finalImages;
+    let finalImages = [];
 
     if (keptImages.length > 0) {
       finalImages = [...keptImages, ...newImages];
     } else {
-      // if frontend didn't send images → keep old
       finalImages = [...existingImages, ...newImages];
     }
 
-    // remove duplicates
     finalImages = [...new Set(finalImages)];
 
     if (!finalImages.length) {
@@ -343,29 +364,65 @@ exports.updateProduct = CatchAsync(async (req, res) => {
       );
     }
 
-    /* ===== DELETE REMOVED IMAGES ===== */
     await Promise.all(
       existingImages
         .filter((img) => !finalImages.includes(img))
         .map((img) => deleteFile(img))
     );
 
+    const amount = Number(incoming.amount || 0);
+    const discount = Number(
+      incoming.discount_amount || 10
+    );
+
+    const finalAmount =
+      amount - (amount * discount) / 100;
+
     finalVariants.push({
+      title: incoming.title || "",
       color: incoming.color,
+
+      amount,
+      discount_amount: discount,
+      final_amount: finalAmount,
+
       stock: Number(incoming.stock) || 0,
+
       images: finalImages,
     });
   }
 
+  /* ================= UPDATE VARIANTS ================= */
   product.variants = finalVariants;
-  const totalStock = finalVariants.reduce(
-  (sum, variant) => sum + (Number(variant.stock) || 0),
-  0
-);
 
-// Stock status update
-product.stock_status =
-  totalStock > 0 ? "in_stock" : "out_of_stock";
+  /* ================= PRODUCT PRICE ================= */
+  if (finalVariants.length > 0) {
+    const lowestVariant = finalVariants.reduce(
+      (min, current) =>
+        current.final_amount < min.final_amount
+          ? current
+          : min
+    );
+
+    product.amount = lowestVariant.amount;
+    product.discount_amount =
+      lowestVariant.discount_amount;
+
+    product.final_amount =
+      lowestVariant.final_amount;
+  }
+
+  /* ================= STOCK STATUS ================= */
+  const totalStock = finalVariants.reduce(
+    (sum, variant) =>
+      sum + (Number(variant.stock) || 0),
+    0
+  );
+
+  product.stock_status =
+    totalStock > 0
+      ? "in_stock"
+      : "out_of_stock";
 
 
   /* ================= 7️⃣ SAVE ================= */
@@ -535,6 +592,7 @@ exports.getProductByName = CatchAsync(async (req, res) => {
   try {
     const product = await Product.findOne({ slug: req.params.id })
       .populate("subcategory")
+      .populate("subsubcategory")
       .populate("category");
     if (!product) {
       return errorResponse(res, "Product not found", 404);

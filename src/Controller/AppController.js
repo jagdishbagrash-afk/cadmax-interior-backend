@@ -1321,17 +1321,27 @@ exports.getCart = catchAsync(async (req, res) => {
         if (!product) return null;
 
         const selectedVariant = product.variants?.find(
-          (v) => v.color === item.variant
-        );
-
+  (v) => v.title?.toLowerCase().trim() === item.variant?.toLowerCase().trim()
+);
         const variantImages = selectedVariant?.images || [];
         const variantStock = selectedVariant?.stock || [];
 
 
         // ✅ Product values
-        const productAmount = Number(product.amount || 0);
-        const productDiscount = Number(product.discount_amount || 0);
-        const productFinal = Number(product.final_amount || 0);
+        const productAmount = Number(
+  selectedVariant?.amount || product.amount || 0
+);
+
+const productDiscount = Number(
+  selectedVariant?.discount_amount || product.discount_amount || 0
+);
+
+const productFinal = Number(
+  selectedVariant?.final_amount ||
+  product.final_amount ||
+  product.amount ||
+  0
+);
 
         // ✅ Quantity wise calculations
         const subtotalPrice = productAmount * item.quantity;
