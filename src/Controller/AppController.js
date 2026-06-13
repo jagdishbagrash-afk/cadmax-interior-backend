@@ -1290,7 +1290,7 @@ exports.getCart = catchAsync(async (req, res) => {
     }).populate({
       path: "product.productId",
       select:
-        "title amount discount_amount final_amount images variants stock",
+        "title amount discount_amount final_amount images variants stock ",
     });
 
 

@@ -8,8 +8,18 @@ const ProductSchema = new mongoose.Schema(
       ref: "Product",
       required: true,
     },
-
-
+    price: {
+      type: Number,
+      required: true
+    },
+    originalPrice: {
+      type: Number,
+      required: true
+    },
+    discount: {
+      type: Number,
+      default: 0
+    },
     variant: {
       type: String, // color
       required: true,
@@ -19,7 +29,17 @@ const ProductSchema = new mongoose.Schema(
       min: 1,
       required: true,
     },
-  }, { _id: false }
+    priceSection: {
+      type: {
+        title: String,
+        amount: Number,
+        discount_amount: Number,
+        final_amount: Number
+      },
+      default: null
+    }
+  }, 
+  { _id: false }
 );
 
 const CartSchema = mongoose.Schema(
@@ -34,6 +54,14 @@ const CartSchema = mongoose.Schema(
       type: [ProductSchema],
       required: [true, "Product is required"],
     },
+    subtotal: {
+      type: Number,
+      default: 0
+    },
+    totalAmount: {
+      type: Number,
+      default: 0
+    },
     tax: {
       type: Number,
       default: 2
@@ -43,11 +71,26 @@ const CartSchema = mongoose.Schema(
       default: 2
     },
     status: {
-      type: String, // color,
-      default :"pending"
+      type: String,
+      enum: ["pending", "completed", "cancelled"],
+      default: "pending"
     },
   },
   { timestamps: true }
 );
+
+// Pre-save middleware to calculate totals
+CartSchema.pre("save", function(next) {
+  if (this.product && this.product.length > 0) {
+    this.subtotal = this.product.reduce((total, item) => {
+      return total + ((item.price || 0) * (item.quantity || 0));
+    }, 0);
+    
+    const discountAmount = (this.subtotal * (this.discount || 0)) / 100;
+    const taxAmount = (this.subtotal * (this.tax || 0)) / 100;
+    this.totalAmount = this.subtotal - discountAmount + taxAmount;
+  }
+  next();
+});
 
 module.exports = mongoose.model("Cart", CartSchema);
