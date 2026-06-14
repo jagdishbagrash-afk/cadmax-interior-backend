@@ -482,14 +482,14 @@ exports.getProductBySubCategory = CatchAsync(async (req, res) => {
 
     /* ==================== PRICE FILTER ==================== */
     if (lowPrice || highPrice) {
-      filter.amount = {};
+      filter.final_amount = {};
 
       if (lowPrice) {
-        filter.amount.$gte = Number(lowPrice);
+        filter.final_amount.$gte = Number(lowPrice);
       }
 
       if (highPrice) {
-        filter.amount.$lte = Number(highPrice);
+        filter.final_amount.$lte = Number(highPrice);
       }
     }
 
