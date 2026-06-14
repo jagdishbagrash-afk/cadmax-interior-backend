@@ -1,6 +1,5 @@
-const { AddToCart, updateCart, getCart, clearCart } = require("../Controller/AppController");
 const { GetAllBanner } = require("../Controller/BannerController");
-const { bestSellerProducts, latestProducts, GetAllCommonProject, deleteImage, LeadWebsite , CommonAddToCart, updateCommonCart, removeProductVariantFromCart, testNotification, globalSearch} = require("../Controller/CommonController");
+const { bestSellerProducts, latestProducts, GetAllCommonProject, getCart ,clearCart ,deleteImage, LeadWebsite , CommonAddToCart, updateCommonCart, removeProductVariantFromCart, testNotification, globalSearch} = require("../Controller/CommonController");
 const { verifyToken } = require("../Utill/tokenVerify");
 const CommonRoute = require("express").Router();
 CommonRoute.get("/common/bestseller", bestSellerProducts);

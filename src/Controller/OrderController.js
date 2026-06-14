@@ -215,12 +215,12 @@ exports.addOrder = catchAsync(async (req, res) => {
   const productIds = product.map((p) => p.id);
   const cart = await Cart.findOne({
     user: userId,
-    status: { $ne: "done" },
+    status: { $ne: "completed" },
     "product.productId": { $in: productIds },
   });
 
-  if (cart && cart.status !== "done") {
-    cart.status = "done";
+  if (cart && cart.status !== "completed") {
+    cart.status = "completed";
     await cart.save();
   }
 
