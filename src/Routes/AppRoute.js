@@ -77,11 +77,11 @@ AppRoute.get("/app/wishlist/get", verifyToken, getWishlist);
 AppRoute.post("/app/wishlist/remove", verifyToken, removeFromWishlist);
 
 AppRoute.delete("/app/wishlist/delete/:productId", verifyToken, removeFromWishlistByProductId);
-AppRoute.post("/app/wishlist/add", verifyToken, addToWishlist);
 
 
 
 // ========== APP REVIEW ROUTES ==========
+// ========== APP RATING AND REVIEW ROUTES ==========
 // Public
 AppRoute.get("/app/review/product/:productId", getProductReviews);
 AppRoute.get("/app/review/rating-summary/:productId", getProductRatingSummary);
