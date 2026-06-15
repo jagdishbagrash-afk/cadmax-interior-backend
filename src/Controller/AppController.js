@@ -1023,6 +1023,7 @@ exports.getProductByCategory = catchAsync(async (req, res) => {
 exports.getProductBySubCategory = catchAsync(async (req, res) => {
   try {
     const { id } = req.params;
+    const {userid} = req.query 
     const filter = {
       subcategory: id,
       deletedAt: null,
@@ -1031,17 +1032,7 @@ exports.getProductBySubCategory = catchAsync(async (req, res) => {
       .populate("subcategory")
       .populate("category")
       .sort({ createdAt: -1 })
-    // const totalRecords = await Product.countDocuments(filter);
-    // const totalPages = Math.ceil(totalRecords / limit);
-    // return successResponse(res, "Products fetched by category", 200, {
-    //   data: products,
-    //   pagination: {
-    //     page,
-    //     limit,
-    //     totalRecords,
-    //     totalPages,
-    //   },
-    // });
+    
 
     return successResponse(res, "Products fetched by category", 200,
       products);
