@@ -1,17 +1,14 @@
 const Review = require("../Model/Review");
 const Product = require("../Model/Product");
-const Order = require("../Model/Order");
 const { successResponse, errorResponse } = require("../Utill/ErrorHandling");
 const catchAsync = require("../Utill/catchAsync");
 const mongoose = require("mongoose");
 const { deleteFile } = require("../Utill/S3");
 
-
-  //  HELPER: Recalculate product rating
-
+//  HELPER: Recalculate product rating (only approved reviews)
 async function recalculateProductRating(productId) {
   const result = await Review.aggregate([
-    { $match: { product: new mongoose.Types.ObjectId(productId), isDeleted: false, status: "active" } },
+    { $match: { product: new mongoose.Types.ObjectId(productId), isDeleted: false, status: "approved" } },
     {
       $group: {
         _id: null,
@@ -52,21 +49,7 @@ async function recalculateProductRating(productId) {
   });
 }
 
-
-  //  HELPER: Check if user purchased product
-
-async function checkVerifiedPurchase(userId, productId) {
-  const order = await Order.findOne({
-    userId,
-    "product.id": productId,
-    status: "delivered",
-  });
-  return !!order;
-}
-
-
-  //  1. ADD REVIEW
-
+//  1. ADD REVIEW (any logged-in user, product purchase NOT required)
 exports.addReview = catchAsync(async (req, res) => {
   const userId = req.user.id;
   const { productId, rating, title, message } = req.body;
@@ -88,33 +71,36 @@ exports.addReview = catchAsync(async (req, res) => {
     return errorResponse(res, "Product not found", 404);
   }
 
-  // Check verified purchase
-  const verifiedPurchase = await checkVerifiedPurchase(userId, productId);
+  // Check if user already has a review for this product (not soft-deleted)
+  const existingReview = await Review.findOne({
+    product: productId,
+    user: userId,
+    isDeleted: false,
+  });
+  if (existingReview) {
+    return errorResponse(res, "You have already reviewed this product. You can edit or delete your existing review.", 400);
+  }
 
+  // Create review with status "pending" by default (schema default)
   const review = await Review.create({
     product: productId,
     user: userId,
     rating,
     title: title || "",
     message,
-    verifiedPurchase,
   });
 
-  // Recalculate product rating
-  await recalculateProductRating(productId);
+  // DO NOT recalculate rating for pending reviews - only approved reviews count
+  // Rating will be recalculated when admin approves
 
   const populatedReview = await Review.findById(review._id)
     .populate("user", "name profileImage")
     .lean();
 
-  return successResponse(res, "Review added successfully", 201, {
-    ...populatedReview,
-    verifiedPurchase,
-  });
+  return successResponse(res, "Review added successfully", 201, populatedReview);
 });
 
-  //  2. UPDATE REVIEW
-
+//  2. UPDATE REVIEW
 exports.updateReview = catchAsync(async (req, res) => {
   const userId = req.user.id;
   const { reviewId } = req.params;
@@ -139,9 +125,11 @@ exports.updateReview = catchAsync(async (req, res) => {
   if (title !== undefined) review.title = title;
   if (message !== undefined) review.message = message;
 
+  // Reset status to pending on edit so admin can re-review
+  review.status = "pending";
   await review.save();
 
-  // Recalculate product rating
+  // Recalculate product rating only if previously approved
   await recalculateProductRating(review.product);
 
   const updatedReview = await Review.findById(review._id)
@@ -151,9 +139,7 @@ exports.updateReview = catchAsync(async (req, res) => {
   return successResponse(res, "Review updated successfully", 200, updatedReview);
 });
 
-
-  //  3. DELETE REVIEW (soft delete)
-
+//  3. DELETE REVIEW (soft delete)
 exports.deleteReview = catchAsync(async (req, res) => {
   const userId = req.user.id;
   const { reviewId } = req.params;
@@ -177,9 +163,7 @@ exports.deleteReview = catchAsync(async (req, res) => {
   return successResponse(res, "Review deleted successfully", 200);
 });
 
-
-  //  4. GET PRODUCT REVIEWS (with pagination, sorting, filtering)
-
+//  4. GET PRODUCT REVIEWS (with visibility logic)
 exports.getProductReviews = catchAsync(async (req, res) => {
   const { productId } = req.params;
   let { page = 1, limit = 10, sort = "latest", rating } = req.query;
@@ -192,8 +176,30 @@ exports.getProductReviews = catchAsync(async (req, res) => {
   limit = parseInt(limit);
   const skip = (page - 1) * limit;
 
+  // Get the requesting user's ID from query param (passed by frontend for logged-in users)
+  // If no userId provided, treat as guest - show only approved reviews
+  const currentUserId = req.query.userId || null;
+
   // Build filter
-  const filter = { product: productId, isDeleted: false, status: { $ne: "hidden" } };
+  // For non-owners: only show approved reviews
+  // For owners: show all their reviews regardless of status
+  const filter = {
+    product: productId,
+    isDeleted: false,
+  };
+
+  if (currentUserId) {
+    // If user is logged in, show approved reviews + their own reviews (any status)
+    filter.$or = [
+      { status: "approved" },
+      { user: new mongoose.Types.ObjectId(currentUserId) },
+    ];
+  } else {
+    // Guest users: only approved reviews
+    filter.status = "approved";
+  }
+
+  // Additional rating filter if specified
   if (rating) {
     const ratingNum = parseInt(rating);
     if (ratingNum >= 1 && ratingNum <= 5) {
@@ -230,7 +236,7 @@ exports.getProductReviews = catchAsync(async (req, res) => {
       break;
     case "relevant":
     default:
-      sortOption = { verifiedPurchase: -1, helpfulCount: -1, createdAt: -1 };
+      sortOption = { createdAt: -1 };
       break;
   }
 
@@ -257,7 +263,7 @@ exports.getProductReviews = catchAsync(async (req, res) => {
   });
 });
 
-  //  5. GET PRODUCT RATING SUMMARY
+//  5. GET PRODUCT RATING SUMMARY
 exports.getProductRatingSummary = catchAsync(async (req, res) => {
   const { productId } = req.params;
 
@@ -294,7 +300,7 @@ exports.getProductRatingSummary = catchAsync(async (req, res) => {
   });
 });
 
-  //  6. MARK HELPFUL
+//  6. MARK HELPFUL
 exports.markHelpful = catchAsync(async (req, res) => {
   const userId = req.user.id;
   const { reviewId } = req.params;
@@ -336,7 +342,7 @@ exports.markHelpful = catchAsync(async (req, res) => {
   });
 });
 
-  //  7. MARK NOT HELPFUL
+//  7. MARK NOT HELPFUL
 exports.markNotHelpful = catchAsync(async (req, res) => {
   const userId = req.user.id;
   const { reviewId } = req.params;
@@ -378,8 +384,7 @@ exports.markNotHelpful = catchAsync(async (req, res) => {
   });
 });
 
-  //  8. CHECK REVIEW ELIGIBILITY
-  
+//  8. CHECK REVIEW ELIGIBILITY (simplified: any logged-in user can review)
 exports.checkReviewEligibility = catchAsync(async (req, res) => {
   const userId = req.user.id;
   const { productId } = req.params;
@@ -393,25 +398,181 @@ exports.checkReviewEligibility = catchAsync(async (req, res) => {
     return errorResponse(res, "Product not found", 404);
   }
 
-  // Check if purchased
-  const hasPurchased = await checkVerifiedPurchase(userId, productId);
-
-  // Check if user already has an active review for this product
+  // Any logged-in user can review (purchase not required)
+  // Check if user already has an existing review for this product
   const existingReview = await Review.findOne({
     product: productId,
     user: userId,
     isDeleted: false,
-  }).select("_id");
+  }).select("_id status");
 
   const hasReviewed = !!existingReview;
 
-  // User can review if they purchased the product
-  // They can always write a new review (multiple reviews allowed per schema)
   return successResponse(res, "Eligibility checked", 200, {
-    canReview: hasPurchased,
-    hasPurchased,
+    canReview: true, // Any logged-in user can review
+    hasPurchased: false, // Not tracking purchase for review eligibility
     hasReviewed,
     existingReviewId: hasReviewed ? existingReview._id : null,
+    existingReviewStatus: hasReviewed ? existingReview.status : null,
   });
 });
 
+// ========== ADMIN REVIEW FUNCTIONS ==========
+
+//  9. GET ALL REVIEWS (admin) with filters
+exports.getAllReviews = catchAsync(async (req, res) => {
+  let { page = 1, limit = 20, status, productId, userId } = req.query;
+
+  page = parseInt(page);
+  limit = parseInt(limit);
+  const skip = (page - 1) * limit;
+
+  const filter = { isDeleted: false };
+
+  if (status && ["pending", "approved", "rejected"].includes(status)) {
+    filter.status = status;
+  }
+
+  if (productId && mongoose.Types.ObjectId.isValid(productId)) {
+    filter.product = new mongoose.Types.ObjectId(productId);
+  }
+
+  if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+    filter.user = new mongoose.Types.ObjectId(userId);
+  }
+
+  const [reviews, total] = await Promise.all([
+    Review.find(filter)
+      .populate("user", "name email phone profileImage")
+      .populate("product", "title slug amount final_amount images")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    Review.countDocuments(filter),
+  ]);
+
+  return successResponse(res, "Admin reviews fetched successfully", 200, {
+    reviews,
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      hasNextPage: page * limit < total,
+      hasPrevPage: page > 1,
+    },
+  });
+});
+
+//  10. APPROVE REVIEW (admin)
+exports.approveReview = catchAsync(async (req, res) => {
+  const { reviewId } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(reviewId)) {
+    return errorResponse(res, "Invalid review ID", 400);
+  }
+
+  const review = await Review.findOne({ _id: reviewId, isDeleted: false });
+  if (!review) {
+    return errorResponse(res, "Review not found", 404);
+  }
+
+  if (review.status === "approved") {
+    return errorResponse(res, "Review is already approved", 400);
+  }
+
+  review.status = "approved";
+  await review.save();
+
+  // Recalculate product rating (only approved reviews count)
+  await recalculateProductRating(review.product);
+
+  const populatedReview = await Review.findById(review._id)
+    .populate("user", "name email phone profileImage")
+    .populate("product", "title slug amount final_amount images")
+    .lean();
+
+  return successResponse(res, "Review approved successfully", 200, populatedReview);
+});
+
+//  11. REJECT REVIEW (admin)
+exports.rejectReview = catchAsync(async (req, res) => {
+  const { reviewId } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(reviewId)) {
+    return errorResponse(res, "Invalid review ID", 400);
+  }
+
+  const review = await Review.findOne({ _id: reviewId, isDeleted: false });
+  if (!review) {
+    return errorResponse(res, "Review not found", 404);
+  }
+
+  if (review.status === "rejected") {
+    return errorResponse(res, "Review is already rejected", 400);
+  }
+
+  review.status = "rejected";
+  await review.save();
+
+  // Recalculate product rating (removes rejected review from rating)
+  await recalculateProductRating(review.product);
+
+  const populatedReview = await Review.findById(review._id)
+    .populate("user", "name email phone profileImage")
+    .populate("product", "title slug amount final_amount images")
+    .lean();
+
+  return successResponse(res, "Review rejected successfully", 200, populatedReview);
+});
+
+//  12. DELETE REVIEW (admin - soft delete)
+exports.adminDeleteReview = catchAsync(async (req, res) => {
+  const { reviewId } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(reviewId)) {
+    return errorResponse(res, "Invalid review ID", 400);
+  }
+
+  const review = await Review.findOne({ _id: reviewId, isDeleted: false });
+  if (!review) {
+    return errorResponse(res, "Review not found", 404);
+  }
+
+  review.isDeleted = true;
+  review.deletedAt = new Date();
+  await review.save();
+
+  // Recalculate product rating
+  await recalculateProductRating(review.product);
+
+  return successResponse(res, "Review deleted by admin", 200);
+});
+
+//  13. GET REVIEW STATISTICS (admin dashboard)
+exports.getReviewStats = catchAsync(async (req, res) => {
+  const stats = await Review.aggregate([
+    { $match: { isDeleted: false } },
+    {
+      $group: {
+        _id: "$status",
+        count: { $sum: 1 },
+      },
+    },
+  ]);
+
+  const result = {
+    total: 0,
+    pending: 0,
+    approved: 0,
+    rejected: 0,
+  };
+
+  stats.forEach((s) => {
+    result.total += s.count;
+    result[s._id] = s.count;
+  });
+
+  return successResponse(res, "Review stats fetched", 200, result);
+});

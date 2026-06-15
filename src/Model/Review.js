@@ -31,10 +31,6 @@ const ReviewSchema = new mongoose.Schema(
       maxlength: [2000, "Message cannot exceed 2000 characters"],
       required: [true, "Review message is required"],
     },
-    verifiedPurchase: {
-      type: Boolean,
-      default: false,
-    },
     helpfulCount: {
       type: Number,
       default: 0,
@@ -57,8 +53,8 @@ const ReviewSchema = new mongoose.Schema(
     ],
     status: {
       type: String,
-      enum: ["active", "hidden", "abusive"],
-      default: "active",
+      enum: ["pending", "approved", "rejected"],
+      default: "pending",
     },
     images: {
       type: [String],
