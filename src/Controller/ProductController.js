@@ -573,7 +573,7 @@ let product =[]
     product = await Product.findOne({
         subcategory,
         subsubcategory,
-        deletedAt : null
+        deletedAt: null
       })
       .populate("category")
       .populate("subcategory");
@@ -588,7 +588,7 @@ let product =[]
     if (!product) {
       return errorResponse(
         res,
-        `Product not found with filter: ${JSON.stringify(filter)}`,
+        `Product not found with filter: ${JSON.stringify(product)}`,
         404
       );
     }
@@ -609,6 +609,8 @@ let product =[]
     );
   }
 });
+
+
 
 
 
