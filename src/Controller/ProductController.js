@@ -279,7 +279,7 @@ exports.updateProduct = CatchAsync(async (req, res) => {
   if (req.body.product_price_section) {
     try {
       incomingPriceSections = JSON.parse(req.body.product_price_section);
-      
+
       // Validate each section
       for (const section of incomingPriceSections) {
         if (!section.title) {
@@ -385,7 +385,7 @@ exports.updateProduct = CatchAsync(async (req, res) => {
   }
 
   product.variants = finalVariants;
-  
+
   const totalStock = finalVariants.reduce(
     (sum, variant) => sum + (Number(variant.stock) || 0),
     0
@@ -565,25 +565,25 @@ exports.getProductByName = CatchAsync(async (req, res) => {
     } = req.query;
 
     const slug = req.params.id;
-let product =[]
+    let product = []
 
-    if( type === "subsubcategory" &&
+    if (type === "subsubcategory" &&
       subcategory &&
-      subsubcategory){
-    product = await Product.findOne({
+      subsubcategory) {
+      product = await Product.findOne({
         subcategory,
         subsubcategory,
         deletedAt: null
       })
-      .populate("category")
-      .populate("subcategory");
-      }else{
-            product = await Product.findOne({slug})
-      .populate("category")
-      .populate("subcategory");
-      }
+        .populate("category")
+        .populate("subcategory");
+    } else {
+      product = await Product.findOne({ slug })
+        .populate("category")
+        .populate("subcategory");
+    }
 
- 
+
 
     if (!product) {
       return errorResponse(
