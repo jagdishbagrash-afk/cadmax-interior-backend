@@ -17,6 +17,7 @@ const { verifyToken } = require("../Utill/tokenVerify");
 const { upload } = require("../Utill/S3");
 
 // ========== PUBLIC ROUTES ==========
+// Note: userId is passed as optional query param for logged-in users (visibility logic)
 router.get("/review/product/:productId", getProductReviews);
 router.get("/review/rating-summary/:productId", getProductRatingSummary);
 
