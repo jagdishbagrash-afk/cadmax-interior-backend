@@ -558,16 +558,55 @@ exports.getProductBySubCategory = CatchAsync(async (req, res) => {
 
 exports.getProductByName = CatchAsync(async (req, res) => {
   try {
-    const product = await Product.findOne({ slug: req.params.id })
-      .populate("subcategory")
-      .populate("category");
+    const {
+      subcategory,
+      subsubcategory,
+      type,
+    } = req.query;
+
+    const slug = req.params.id;
+let product =[]
+
+    if( type === "subsubcategory" &&
+      subcategory &&
+      subsubcategory){
+    product = await Product.findOne({
+        subcategory,
+        subsubcategory,
+        deletedAt : null
+      })
+      .populate("category")
+      .populate("subcategory");
+      }else{
+            product = await Product.findOne({slug})
+      .populate("category")
+      .populate("subcategory");
+      }
+
+ 
+
     if (!product) {
-      return errorResponse(res, "Product not found", 404);
+      return errorResponse(
+        res,
+        `Product not found with filter: ${JSON.stringify(filter)}`,
+        404
+      );
     }
 
-    return successResponse(res, "Product fetched successfully", 200, product);
+    return successResponse(
+      res,
+      "Product fetched successfully",
+      200,
+      product
+    );
   } catch (error) {
-    return errorResponse(res, error.message || "Internal Server Error", 500);
+    console.log(error);
+
+    return errorResponse(
+      res,
+      error.message || "Internal Server Error",
+      500
+    );
   }
 });
 
