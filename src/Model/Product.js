@@ -98,6 +98,12 @@ const ProductSchema = mongoose.Schema(
       default : 0
     },
 
+    label_category :{
+      type :String
+    },
+    label_size:{
+      type : String
+    },
     discount_amount: {
       type: Number,
       default: 10,
