@@ -20,6 +20,7 @@ const {
   uploadReviewImages,
   deleteReviewImage,
 } = require("../Controller/ReviewImageController");
+const { getStates, getCitiesByState } = require("../Controller/LocationController.js");
 const AppRoute = require("express").Router();
 
 
@@ -95,5 +96,9 @@ AppRoute.post("/app/review/not-helpful/:reviewId", verifyToken, markNotHelpful);
 AppRoute.get("/app/review/eligibility/:productId", verifyToken, checkReviewEligibility);
 AppRoute.post("/app/review/images/upload/:reviewId", verifyToken, upload.array("reviewImages", 5), uploadReviewImages);
 AppRoute.post("/app/review/images/delete/:reviewId/:imageIndex", verifyToken, deleteReviewImage);
+
+AppRoute.get("/app/states", getStates);
+
+AppRoute.get("/app/cities/:state", getCitiesByState);
 
 module.exports = AppRoute;
