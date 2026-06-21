@@ -28,6 +28,7 @@ const Lead = require("../Model/Lead");
 
 const axios = require("axios");
 const Wishlist = require("../Model/Wishlist");
+const Review = require("../Model/Review");
 
 // const twilio = require("twilio");
 
@@ -2179,4 +2180,352 @@ exports.getWishlist = catchAsync(async (req, res) => {
       count: wishlist?.productIds?.length || 0,
     }
   );
+});
+
+
+exports.addReview = catchAsync(async (req, res) => {
+  const userId = req.user.id;
+  const { productId, rating, title, message } = req.body;
+
+  if (!productId || !rating || !message) {
+    return errorResponse(
+      res,
+      "Product ID, rating, and message are required",
+      400
+    );
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(productId)) {
+    return errorResponse(res, "Invalid product ID", 400);
+  }
+
+  if (rating < 1 || rating > 5) {
+    return errorResponse(res, "Rating must be between 1 and 5", 400);
+  }
+
+  const product = await Product.findById(productId);
+  if (!product) {
+    return errorResponse(res, "Product not found", 404);
+  }
+
+  const existingReview = await Review.findOne({
+    product: productId,
+    user: userId,
+    isDeleted: false,
+  });
+
+  if (existingReview) {
+    return errorResponse(
+      res,
+      "You have already reviewed this product. You can edit or delete your existing review.",
+      400
+    );
+  }
+
+  // Collect uploaded images
+  let images = [];
+
+  if (req.files && req.files.length > 0) {
+    images = req.files.map((file) => file.path || file.location || file.url);
+
+    if (images.length > 5) {
+      return errorResponse(
+        res,
+        "Maximum 5 images allowed per review",
+        400
+      );
+    }
+  }
+
+  const review = await Review.create({
+    product: productId,
+    user: userId,
+    rating,
+    title: title || "",
+    message,
+    images,
+  });
+
+  const populatedReview = await Review.findById(review._id)
+    .populate("user", "name profileImage")
+    .lean();
+
+  return successResponse(
+    res,
+    "Review added successfully",
+    201,
+    populatedReview
+  );
+});
+
+
+exports.updateReview = catchAsync(async (req, res) => {
+  const userId = req.user.id;
+  const { reviewId } = req.params;
+  const { rating, title, message, removeImages = [] } = req.body;
+
+  if (!mongoose.Types.ObjectId.isValid(reviewId)) {
+    return errorResponse(res, "Invalid review ID", 400);
+  }
+
+  const review = await Review.findOne({
+    _id: reviewId,
+    user: userId,
+    isDeleted: false,
+  });
+
+  if (!review) {
+    return errorResponse(
+      res,
+      "Review not found or you are not authorized",
+      404
+    );
+  }
+
+  if (rating !== undefined) {
+    if (rating < 1 || rating > 5) {
+      return errorResponse(res, "Rating must be between 1 and 5", 400);
+    }
+    review.rating = rating;
+  }
+
+  if (title !== undefined) review.title = title;
+  if (message !== undefined) review.message = message;
+
+  // Remove selected images
+  if (Array.isArray(removeImages) && removeImages.length > 0) {
+    review.images = review.images.filter(
+      (img) => !removeImages.includes(img)
+    );
+  }
+
+  // Add new uploaded images
+  if (req.files && req.files.length > 0) {
+    const newImages = req.files.map(
+      (file) => file.path || file.location || file.url
+    );
+
+    review.images = [...review.images, ...newImages];
+  }
+
+  // Maximum 5 images validation
+  if (review.images.length > 5) {
+    return errorResponse(
+      res,
+      "Maximum 5 images allowed per review",
+      400
+    );
+  }
+
+  // Reset status to pending for re-approval
+  review.status = "pending";
+
+  await review.save();
+
+  // Recalculate rating
+  await recalculateProductRating(review.product);
+
+  const updatedReview = await Review.findById(review._id)
+    .populate("user", "name profileImage")
+    .lean();
+
+  return successResponse(
+    res,
+    "Review updated successfully",
+    200,
+    updatedReview
+  );
+});
+
+
+exports.getProductReviews = catchAsync(async (req, res) => {
+  const { productId } = req.params;
+  let { page = 1, limit = 10, sort = "latest", rating } = req.query;
+
+  if (!mongoose.Types.ObjectId.isValid(productId)) {
+    return errorResponse(res, "Invalid product ID", 400);
+  }
+
+  page = parseInt(page);
+  limit = parseInt(limit);
+  const skip = (page - 1) * limit;
+
+  const currentUserId = req.query.userId || null;
+
+  const product = await Product.findById(productId)
+    .select("averageRating totalRating totalReviews ratingBreakdown")
+    .lean();
+
+  if (!product) {
+    return errorResponse(res, "Product not found", 404);
+  }
+
+  const filter = {
+    product: productId,
+    isDeleted: false,
+  };
+
+  if (currentUserId) {
+    filter.$or = [
+      { status: "approved" },
+      { user: new mongoose.Types.ObjectId(currentUserId) },
+    ];
+  } else {
+    filter.status = "approved";
+  }
+
+  if (rating) {
+    const ratingNum = parseInt(rating);
+    if (ratingNum >= 1 && ratingNum <= 5) {
+      filter.rating = ratingNum;
+    }
+  }
+
+  let sortOption = {};
+
+  switch (sort) {
+    case "latest":
+      sortOption = { createdAt: -1 };
+      break;
+
+    case "highest":
+      sortOption = { rating: -1, createdAt: -1 };
+      break;
+
+    case "lowest":
+      sortOption = { rating: 1, createdAt: -1 };
+      break;
+
+    case "most_helpful":
+      filter.helpfulCount = { $gte: 1 };
+      sortOption = { helpfulCount: -1, createdAt: -1 };
+      break;
+
+    case "positive":
+      filter.rating = { $gte: 3 };
+      sortOption = { rating: -1, createdAt: -1 };
+      break;
+
+    case "negative":
+      filter.rating = { $lt: 3 };
+      sortOption = { rating: 1, createdAt: -1 };
+      break;
+
+    default:
+      sortOption = { createdAt: -1 };
+  }
+
+  const [reviews, total] = await Promise.all([
+    Review.find(filter)
+      .populate("user", "name profileImage")
+      .sort(sortOption)
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+
+    Review.countDocuments(filter),
+  ]);
+
+  // Rating Summary
+  const breakdown = product.ratingBreakdown || {
+    star1: 0,
+    star2: 0,
+    star3: 0,
+    star4: 0,
+    star5: 0,
+  };
+
+  const totalReviews = product.totalReviews || 0;
+
+  const ratingBreakdown = {};
+
+  for (let i = 1; i <= 5; i++) {
+    const count = breakdown[`star${i}`] || 0;
+
+    ratingBreakdown[`star${i}`] = {
+      count,
+      percentage:
+        totalReviews > 0
+          ? Math.round((count / totalReviews) * 100)
+          : 0,
+    };
+  }
+
+  return successResponse(res, "Reviews fetched successfully", 200, {
+    summary: {
+      averageRating: product.averageRating || 0,
+      totalRating: product.totalRating || 0,
+      totalReviews: product.totalReviews || 0,
+      ratingBreakdown,
+    },
+
+    reviews,
+
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      hasNextPage: page * limit < total,
+      hasPrevPage: page > 1,
+    },
+  });
+});
+
+exports.deleteReviewImage = catchAsync(async (req, res) => {
+  const userId = req.user.id;
+  const { reviewId, imageIndex } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(reviewId)) {
+    return errorResponse(res, "Invalid review ID", 400);
+  }
+
+  const review = await Review.findOne({ _id: reviewId, user: userId, isDeleted: false });
+  if (!review) {
+    return errorResponse(res, "Review not found or unauthorized", 404);
+  }
+
+  const idx = parseInt(imageIndex);
+  if (isNaN(idx) || idx < 0 || idx >= review.images.length) {
+    return errorResponse(res, "Invalid image index", 400);
+  }
+
+  const removedImage = review.images[idx];
+
+  // Remove from array
+  review.images.splice(idx, 1);
+  await review.save();
+
+  // Attempt to delete from S3 (non-blocking)
+  if (removedImage && removedImage.includes("amazonaws.com")) {
+    deleteFile(removedImage).catch((err) => console.error("S3 delete error:", err));
+  }
+
+  return successResponse(res, "Image removed successfully", 200, {
+    images: review.images,
+  });
+});
+
+
+exports.deleteReview = catchAsync(async (req, res) => {
+  const userId = req.user.id;
+  const { reviewId } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(reviewId)) {
+    return errorResponse(res, "Invalid review ID", 400);
+  }
+
+  const review = await Review.findOne({ _id: reviewId, user: userId, isDeleted: false });
+  if (!review) {
+    return errorResponse(res, "Review not found or you are not authorized", 404);
+  }
+
+  review.isDeleted = true;
+  review.deletedAt = new Date();
+  await review.save();
+
+  // Recalculate product rating
+  await recalculateProductRating(review.product);
+
+  return successResponse(res, "Review deleted successfully", 200);
 });
