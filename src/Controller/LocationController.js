@@ -35,17 +35,35 @@ exports.getCitiesByState = async (req, res) => {
   try {
     const { state } = req.params;
 
-    const stateData = await State.findOne({
-      state,
-    });
+    const stateData = await State.findOne(
+      { state },
+      { cities: 1, state: 1, country: 1, _id: 0 }
+    ).lean();
 
-    res.status(200).json({
+    if (!stateData) {
+      return res.status(404).json({
+        success: false,
+        message: "State not found",
+      });
+    }
+
+    // Remove duplicates & sort cities
+    const uniqueCities = [...new Set(stateData.cities)]
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b));
+
+    return res.status(200).json({
       success: true,
-    message: "city fetched successfully",
-      data: stateData || [],
+      message: "Cities fetched successfully",
+      data: {
+        country: stateData.country,
+        state: stateData.state,
+        totalCities: uniqueCities.length,
+        cities: uniqueCities,
+      },
     });
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: error.message,
     });
