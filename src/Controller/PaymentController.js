@@ -5,6 +5,7 @@ const Address = require("../Model/MultipleAddress");
 const Razorpay = require("razorpay");
 const catchAsync = require("../Utill/catchAsync");
 const { createDhlShipment, normalizeAddress } = require("../Utill/createDhlShipment");
+const { createBlueDartWaybill } = require("../Utill/blueDartService");
 require("dotenv").config();
 
 const razorpayInstance = new Razorpay({
@@ -15,9 +16,76 @@ const razorpayInstance = new Razorpay({
 const getShipmentTrackingNumber = (shipmentResponse = {}) =>
   shipmentResponse?.shipmentTrackingNumber ||
   shipmentResponse?.trackingNumber ||
+  shipmentResponse?.awbNumber ||
+  shipmentResponse?.AWBNo ||
+  shipmentResponse?.awbNo ||
   shipmentResponse?.packages?.[0]?.trackingNumber ||
   shipmentResponse?.pieces?.[0]?.trackingNumber ||
   null;
+
+const normalizeShippingProvider = (value) => {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = String(value).trim().toUpperCase().replace(/[\s-]+/g, "_");
+  if (normalized === "BLUEDART" || normalized === "BLUE_DART") {
+    return "BLUE_DART";
+  }
+  if (normalized === "DHL") {
+    return "DHL";
+  }
+
+  return null;
+};
+
+const resolveDefaultShippingProvider = (value) =>
+  normalizeShippingProvider(value) ||
+  normalizeShippingProvider(process.env.DEFAULT_SHIPPING_PROVIDER) ||
+  "DHL";
+
+const createShipmentForOrder = async ({
+  order,
+  receiverAddress,
+  shippingProvider,
+}) => {
+  const provider = resolveDefaultShippingProvider(shippingProvider);
+
+  if (provider === "BLUE_DART") {
+    const shipment = await createBlueDartWaybill({
+      orderId: order.orderId,
+      name: order.name,
+      mobile: order.mobile,
+      receiverAddress,
+      products: order.product,
+      declaredValue: order.amount,
+      isCod: false,
+    });
+
+    return {
+      provider,
+      shipment,
+      trackingNumber: shipment.success
+        ? shipment.awbNumber || getShipmentTrackingNumber(shipment.data)
+        : null,
+    };
+  }
+
+  const shipment = await createDhlShipment({
+    name: order.name,
+    mobile: order.mobile,
+    address: receiverAddress,
+    products: order.product,
+    totalAmount: order.amount,
+    orderId: order.orderId,
+  });
+
+  return {
+    provider: "DHL",
+    shipment,
+    trackingNumber: shipment.success ? getShipmentTrackingNumber(shipment.data) : null,
+  };
+};
 
 const verifyRazorpaySignature = ({ orderId, paymentId, signature }) => {
   if (!signature) {
@@ -99,6 +167,8 @@ exports.paymentAdd = catchAsync(async (req, res) => {
     razorpay_order_id,
     razorpay_payment_id,
     razorpay_signature,
+    shipping_provider,
+    shippingProvider,
   } = req.body;
 
   const effectiveOrderId = order_id || razorpay_order_id;
@@ -180,19 +250,18 @@ exports.paymentAdd = catchAsync(async (req, res) => {
     } else {
       const receiverAddress = await resolveOrderAddress(order);
 
-      shipment = await createDhlShipment({
-        name: order.name,
-        mobile: order.mobile,
-        address: receiverAddress,
-        products: order.product,
-        totalAmount: order.amount,
-        orderId: order.orderId,
+      const desiredProvider = shipping_provider || shippingProvider;
+      const created = await createShipmentForOrder({
+        order,
+        receiverAddress,
+        shippingProvider: desiredProvider,
       });
 
-      order.courier_name = "DHL";
+      shipment = created.shipment;
+      order.courier_name = created.provider;
 
       if (shipment.success) {
-        order.tracking_number = getShipmentTrackingNumber(shipment.data);
+        order.tracking_number = created.trackingNumber;
         order.shipping_status = "shipment_created";
         order.shipping_response = shipment.data;
       } else {
