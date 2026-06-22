@@ -7,35 +7,43 @@ const OrderProductSchema = new mongoose.Schema(
       ref: "Product",
       required: true,
     },
+
+    title: {
+      type: String,
+      required: true,
+    },
+
     price: {
       type: Number,
       required: true,
     },
-    originalPrice: {
-      type: Number,
-    },
+
+    originalPrice: Number,
+
     discount: {
       type: Number,
       default: 0,
     },
+
     quantity: {
       type: Number,
       required: true,
       min: 1,
     },
+
     total: {
       type: Number,
       required: true,
     },
-    variant: {
-      type: String,
-      required: true,
-    },
-    variantTitle: {              // ✅ NEW: human-readable variant name
+
+    variant: String,
+
+    variantTitle: {
       type: String,
       default: null,
     },
-    priceSectionTitle: {         // ✅ NEW: package / pricing tier title
+
+    priceSectionTitle: {
       type: String,
       default: null,
     },
