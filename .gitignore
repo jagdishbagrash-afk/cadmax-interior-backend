@@ -3,3 +3,6 @@
 .env.local
 /logs
 ./history/*
+.env.development.local
+.env.test.local
+.env.production.local
