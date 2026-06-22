@@ -17,6 +17,22 @@ const getBlueDartJwtToken = () => {
   return token;
 };
 
+const getBlueDartLoginId = () =>
+  process.env.BLUE_DART_LOGIN_ID ||
+  process.env.BLUE_DART_LOGINID ||
+  "";
+
+const getBlueDartLicenceKey = () =>
+  process.env.BLUE_DART_LICENCE_KEY ||
+  process.env.BLUE_DART_LICENSE_KEY ||
+  process.env.BLUE_DART_LICENCEKEY ||
+  "";
+
+const getBlueDartCustomerCode = () =>
+  process.env.BLUE_DART_CUSTOMER_CODE ||
+  process.env.BLUE_DART_CUSTOMERCODE ||
+  "";
+
 const getBlueDartHeaders = () => ({
   JWTToken: getBlueDartJwtToken(),
   "content-type": "application/json",
@@ -27,6 +43,18 @@ const extractError = (error) => error?.response?.data || error.message;
 const coerceNumber = (value) => {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : null;
+};
+
+const toLimitedString = (value, maxLength, fallback = "") => {
+  const normalized = String(value ?? fallback)
+    .trim()
+    .replace(/\s+/g, " ");
+
+  if (!normalized) {
+    return fallback;
+  }
+
+  return normalized.slice(0, maxLength);
 };
 
 const toBlueDartDateLiteral = (date) => {
@@ -55,6 +83,75 @@ const getApproxWeightKg = (products = []) => {
   return Math.max(total, perPieceKg);
 };
 
+const buildDefaultDimensions = (pieceCount) => {
+  const length = coerceNumber(process.env.BLUE_DART_DIMENSION_LENGTH) ?? 10;
+  const breadth = coerceNumber(process.env.BLUE_DART_DIMENSION_BREADTH) ?? 10;
+  const height = coerceNumber(process.env.BLUE_DART_DIMENSION_HEIGHT) ?? 10;
+
+  return [
+    {
+      Length: length,
+      Breadth: breadth,
+      Height: height,
+      Count: pieceCount,
+    },
+  ];
+};
+
+const buildCommodity = () => ({
+  CommodityDetail1: process.env.BLUE_DART_COMMODITY_DETAIL_1 || "",
+  CommodityDetail2: process.env.BLUE_DART_COMMODITY_DETAIL_2 || "",
+  CommodityDetail3: process.env.BLUE_DART_COMMODITY_DETAIL_3 || "",
+});
+
+const toBlueDartItemDetails = (products = []) =>
+  (Array.isArray(products) ? products : [])
+    .map((item, index) => {
+      const quantity = coerceNumber(item?.quantity) ?? 1;
+      const itemValue =
+        coerceNumber(item?.total) ??
+        (coerceNumber(item?.price) ?? 0) * quantity;
+      const itemLabel = toLimitedString(
+        item?.title || item?.name || `Item ${index + 1}`,
+        50,
+        `Item ${index + 1}`
+      );
+
+      return {
+        CGSTAmount: 0,
+        HSCode: "",
+        IGSTAmount: 0,
+        IGSTRate: 0,
+        Instruction: "",
+        InvoiceDate: toBlueDartDateLiteral(new Date()),
+        InvoiceNumber: "",
+        ItemID: toLimitedString(
+          item?.sku || item?.id || item?._id || `ITEM-${index + 1}`,
+          15,
+          `ITEM-${index + 1}`
+        ),
+        ItemName: itemLabel,
+        ItemValue: itemValue,
+        Itemquantity: quantity,
+        PlaceofSupply: process.env.BLUE_DART_PLACE_OF_SUPPLY || "",
+        ProductDesc1: itemLabel,
+        ProductDesc2: toLimitedString(item?.variant || item?.name || "", 50, ""),
+        ReturnReason: "",
+        SGSTAmount: 0,
+        SKUNumber: toLimitedString(item?.sku || "", 50, ""),
+        SellerGSTNNumber: process.env.BLUE_DART_SELLER_GSTN || "",
+        SellerName: process.env.BLUE_DART_SELLER_NAME || "",
+        TaxableAmount: 0,
+        TotalValue: itemValue,
+        cessAmount: "0.0",
+        countryOfOrigin: process.env.BLUE_DART_COUNTRY_OF_ORIGIN || "IN",
+        docType: process.env.BLUE_DART_DOC_TYPE || "INV",
+        subSupplyType: coerceNumber(process.env.BLUE_DART_SUB_SUPPLY_TYPE) ?? 1,
+        supplyType: process.env.BLUE_DART_SUPPLY_TYPE || "0",
+      };
+    })
+    .slice(0, 50);
+
 const buildGenerateWaybillPayload = ({
   orderId,
   name,
@@ -66,6 +163,8 @@ const buildGenerateWaybillPayload = ({
   collectableAmount,
   overrides = {},
 }) => {
+  const pieceCount = getTotalPieces(products);
+  const itemDetails = toBlueDartItemDetails(products);
   const consigneePincode =
     receiverAddress?.pincode ||
     receiverAddress?.postalCode ||
@@ -86,16 +185,24 @@ const buildGenerateWaybillPayload = ({
     process.env.BLUE_DART_SHIPPER_ADDRESS1 || process.env.DHL_SHIPPER_ADDRESS_LINE1 || "";
   const shipperPincode =
     process.env.BLUE_DART_SHIPPER_PINCODE || process.env.DHL_SHIPPER_POSTAL_CODE || "";
+  const shipperMobile =
+    process.env.BLUE_DART_SHIPPER_MOBILE || process.env.DHL_SHIPPER_PHONE || "";
+  const shipperName =
+    process.env.BLUE_DART_SHIPPER_NAME || process.env.DHL_SHIPPER_NAME || "Cadmax";
 
   const payload = {
     Request: {
       Consignee: {
+        AvailableDays: "",
+        AvailableTiming: "",
         ConsigneeAddress1: consigneeAddress1,
         ConsigneeAddress2: receiverAddress?.addressLine2 || "",
         ConsigneeAddress3: receiverAddress?.addressLine3 || "",
         ConsigneeAddressType: receiverAddress?.addressType || "R",
+        ConsigneeAddressinfo: "",
         ConsigneeAttention: "",
         ConsigneeEmailID: "",
+        ConsigneeFullAddress: "",
         ConsigneeGSTNumber: "",
         ConsigneeLatitude: "",
         ConsigneeLongitude: "",
@@ -129,47 +236,70 @@ const buildGenerateWaybillPayload = ({
       Services: {
         AWBNo: "",
         ActualWeight: String(getApproxWeightKg(products).toFixed(2)),
-        Commodity: {},
-        CreditReferenceNo: String(orderId || ""),
-        Dimensions: [],
-        ECCN: "",
+        CollectableAmount:
+          coerceNumber(collectableAmount) ?? (isCod ? coerceNumber(declaredValue) ?? 0 : 0),
+        Commodity: buildCommodity(),
+        CreditReferenceNo: toLimitedString(orderId || "", 20, ""),
+        CreditReferenceNo2: "",
+        CreditReferenceNo3: "",
+        CurrencyCode: "",
+        DeclaredValue: coerceNumber(declaredValue) ?? 0,
+        DeliveryTimeSlot: "",
+        Dimensions: buildDefaultDimensions(pieceCount),
+        FavouringName: "",
+        ForwardAWBNo: "",
+        ForwardLogisticCompName: "",
+        InsurancePaidBy: "",
+        InvoiceNo: "",
+        IsChequeDD: "",
+        IsDedicatedDeliveryNetwork: false,
+        IsForcePickup: false,
+        IsPartialPickup: false,
+        IsReversePickup: false,
+        ItemCount: itemDetails.length || pieceCount,
+        OTPBasedDelivery: String(coerceNumber(process.env.BLUE_DART_OTP_BASED_DELIVERY) ?? 0),
+        OTPCode: "",
+        Officecutofftime: "",
         PDFOutputNotRequired: true,
         PackType: process.env.BLUE_DART_PACK_TYPE || "L",
+        ParcelShopCode: "",
+        PayableAt: "",
         PickupDate: toBlueDartDateLiteral(new Date()),
-        PickupTime: process.env.BLUE_DART_PICKUP_TIME || "1600",
-        PieceCount: String(getTotalPieces(products)),
+        PickupMode: "",
+        PickupTime: process.env.BLUE_DART_PICKUP_TIME || "0800",
+        PickupType: "",
+        PieceCount: String(pieceCount),
+        PreferredPickupTimeSlot: "",
         ProductCode: process.env.BLUE_DART_PRODUCT_CODE || "A",
+        ProductFeature: "",
         ProductType: coerceNumber(process.env.BLUE_DART_PRODUCT_TYPE) ?? 1,
         RegisterPickup:
-          String(process.env.BLUE_DART_REGISTER_PICKUP || "false").toLowerCase() ===
+          String(process.env.BLUE_DART_REGISTER_PICKUP || "true").toLowerCase() ===
           "true",
         SpecialInstruction: "",
         SubProductCode:
           process.env.BLUE_DART_SUB_PRODUCT_CODE || (isCod ? "C" : "P"),
-        OTPBasedDelivery: coerceNumber(process.env.BLUE_DART_OTP_BASED_DELIVERY) ?? 0,
-        OTPCode: "",
-        itemdtl: [],
+        TotalCashPaytoCustomer: 0,
+        itemdtl: itemDetails,
         noOfDCGiven: 0,
-        DeclaredValue: coerceNumber(declaredValue) ?? 0,
-        CollectableAmount:
-          coerceNumber(collectableAmount) ?? (isCod ? coerceNumber(declaredValue) ?? 0 : 0),
+        ECCN: "",
       },
       Shipper: {
         CustomerAddress1: shipperAddress1,
         CustomerAddress2: process.env.BLUE_DART_SHIPPER_ADDRESS2 || "",
         CustomerAddress3: process.env.BLUE_DART_SHIPPER_ADDRESS3 || "",
-        CustomerCode: process.env.BLUE_DART_CUSTOMER_CODE || "",
+        CustomerAddressinfo: "",
+        CustomerCode: getBlueDartCustomerCode(),
         CustomerEmailID: process.env.BLUE_DART_SHIPPER_EMAIL || "",
         CustomerGSTNumber: process.env.BLUE_DART_SHIPPER_GST || "",
         CustomerLatitude: "",
         CustomerLongitude: "",
         CustomerMaskedContactNumber: "",
-        CustomerMobile:
-          process.env.BLUE_DART_SHIPPER_MOBILE || process.env.DHL_SHIPPER_PHONE || "",
-        CustomerName:
-          process.env.BLUE_DART_SHIPPER_NAME || process.env.DHL_SHIPPER_NAME || "Cadmax",
+        CustomerMobile: shipperMobile,
+        CustomerName: shipperName,
         CustomerPincode: shipperPincode,
-        CustomerTelephone: process.env.BLUE_DART_SHIPPER_PHONE || "",
+        CustomerTelephone:
+          process.env.BLUE_DART_SHIPPER_TELEPHONE || process.env.BLUE_DART_SHIPPER_PHONE || "",
         IsToPayCustomer: false,
         OriginArea: process.env.BLUE_DART_ORIGIN_AREA || "",
         Sender: process.env.BLUE_DART_SENDER || "",
@@ -178,8 +308,8 @@ const buildGenerateWaybillPayload = ({
     },
     Profile: {
       Api_type: process.env.BLUE_DART_API_TYPE || "S",
-      LicenceKey: process.env.BLUE_DART_LICENCE_KEY || "",
-      LoginID: process.env.BLUE_DART_LOGIN_ID || "",
+      LicenceKey: getBlueDartLicenceKey(),
+      LoginID: getBlueDartLoginId(),
     },
   };
 
@@ -264,12 +394,21 @@ const extractAwbNumber = (payload) => {
   return null;
 };
 
-const validateBlueDartCredentials = () => {
-  const required = ["BLUE_DART_LOGIN_ID", "BLUE_DART_LICENCE_KEY", "BLUE_DART_CUSTOMER_CODE"];
-  const missing = required.filter((key) => !process.env[key]);
-  if (missing.length) {
-    throw new Error(`Missing Blue Dart env vars: ${missing.join(", ")}`);
-  }
+const extractGenerateWayBillResult = (payload) =>
+  payload?.GenerateWayBillResult || payload?.generateWayBillResult || null;
+
+const extractBlueDartStatus = (payload) => {
+  const result = extractGenerateWayBillResult(payload);
+  const statusList = Array.isArray(result?.Status) ? result.Status : [];
+  const validStatus =
+    statusList.find((item) => item?.StatusCode === "Valid") || statusList[0] || null;
+
+  return {
+    statusCode: validStatus?.StatusCode || null,
+    statusInformation: validStatus?.StatusInformation || null,
+    tokenNumber: result?.TokenNumber || null,
+    creditReference: result?.CCRCRDREF || null,
+  };
 };
 
 const createBlueDartWaybill = async ({
@@ -284,8 +423,6 @@ const createBlueDartWaybill = async ({
   overrides,
 }) => {
   try {
-    validateBlueDartCredentials();
-
     const payload = buildGenerateWaybillPayload({
       orderId,
       name,
@@ -308,6 +445,7 @@ const createBlueDartWaybill = async ({
       success: true,
       data: response.data,
       awbNumber: extractAwbNumber(response.data),
+      ...extractBlueDartStatus(response.data),
     };
   } catch (error) {
     return {
@@ -319,16 +457,14 @@ const createBlueDartWaybill = async ({
 
 const trackBlueDartShipment = async (trackingNumber, options = {}) => {
   try {
-    validateBlueDartCredentials();
-
     if (!trackingNumber) {
       throw new Error("trackingNumber is required");
     }
 
     const params = {
       numbers: trackingNumber,
-      loginid: process.env.BLUE_DART_LOGIN_ID,
-      lickey: process.env.BLUE_DART_LICENCE_KEY,
+      loginid: getBlueDartLoginId(),
+      lickey: getBlueDartLicenceKey(),
       scan: options.scan ?? process.env.BLUE_DART_TRACK_SCAN ?? "1",
       action: options.action ?? process.env.BLUE_DART_TRACK_ACTION ?? "custawbquery",
       verno: options.verno ?? process.env.BLUE_DART_TRACK_VERNO ?? "1",
@@ -363,4 +499,3 @@ module.exports = {
   trackBlueDartShipment,
   extractAwbNumber,
 };
-
