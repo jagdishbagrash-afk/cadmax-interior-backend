@@ -168,6 +168,7 @@ const Product = require("../Model/Product");
 // });
 
 
+
 exports.addOrder = catchAsync(async (req, res) => {
   const {
     name,
@@ -179,73 +180,43 @@ exports.addOrder = catchAsync(async (req, res) => {
     PaymentId,
   } = req.body;
 
-  const userId = req.user?.id || "692dcfbd4816433146e11abd";
-  const orderId = `ORD-${uuidv4().slice(0, 8).toUpperCase()}`;
+  const userId = req.user?.id;
 
-  // Validation
-  if (!name || !mobile || !product || !amount) {
+  if (!name || !mobile || !product?.length || !amount) {
     return validationErrorResponse(
       res,
-      "All fields (name, mobile, address, product, amount) are required"
+      "Name, mobile, product and amount are required"
     );
   }
 
   const numericAmount = Number(
-    typeof amount === "string" ? amount.replace(/,/g, "") : amount
+    typeof amount === "string"
+      ? amount.replace(/,/g, "")
+      : amount
   );
 
-  // ✅ Build product array with all needed fields
-  const productWithDetails = product.map((p) => ({
-    id: p.id,
-    title: p.title,                         // ✅ now included
-    price: p.price,
-    originalPrice: p.originalPrice || null,
-    discount: p.discount || 0,
-    quantity: p.quantity,
-    total: p.total,
-    variant: p.variant,
-    variantTitle: p.variantTitle || null,
-    priceSectionTitle: p.priceSectionTitle || null,
-  }));
+  const orderId = `ORD-${uuidv4()
+    .replace(/-/g, "")
+    .slice(0, 8)
+    .toUpperCase()}`;
 
-  const newOrder = new Order({
-    name,
-    mobile,
-    address,
-    product: productWithDetails,
-    addressId,
-    amount: numericAmount,
-    userId,
-    orderId,
-    PaymentId,
-    shipping_status: "pending",
-    courier_name: "DHL",
-  });
+  // ==========================
+  // Verify Products & Stock
+  // ==========================
+  const orderProducts = [];
 
-  const record = await newOrder.save();
-
-  // Update cart status
-  const productIds = product.map((p) => p.id);
-  const cart = await Cart.findOne({
-    user: userId,
-    status: { $ne: "completed" },
-    "product.productId": { $in: productIds },
-  });
-
-  if (cart && cart.status !== "completed") {
-    cart.status = "completed";
-    await cart.save();
-  }
-
-  // Update stock
   for (const item of product) {
     const productData = await Product.findById(item.id);
 
     if (!productData) {
-      return validationErrorResponse(res, "Product not found");
+      return validationErrorResponse(
+        res,
+        `Product not found (${item.id})`
+      );
     }
 
-    const currentStock = productData.variants[0].stock;
+    const currentStock =
+      productData?.variants?.[0]?.stock || 0;
 
     if (currentStock < item.quantity) {
       return validationErrorResponse(
@@ -254,20 +225,106 @@ exports.addOrder = catchAsync(async (req, res) => {
       );
     }
 
-    productData.variants[0].stock -= item.quantity;
+    orderProducts.push({
+      id: productData._id,
+      title: productData.title,
+      price: item.price,
+      originalPrice: item.originalPrice || item.price,
+      discount: item.discount || 0,
+      quantity: item.quantity,
+      total: item.total,
+      variant: item.variant || null,
+      variantTitle: item.variantTitle || null,
+      priceSectionTitle:
+        item.priceSectionTitle || null,
+    });
+  }
 
-    if (productData.variants[0].stock <= 0) {
-      productData.stock_status = "out_of_stock";
+  // ==========================
+  // Create Order
+  // ==========================
+  const newOrder = new Order({
+    name,
+    mobile,
+    address,
+    addressId,
+    product: orderProducts,
+    amount: numericAmount,
+    userId,
+    PaymentId,
+    orderId,
+    status: "pending",
+    shipping_status: "pending",
+    courier_name: "DHL",
+  });
+
+  const savedOrder = await newOrder.save();
+
+  // ==========================
+  // Complete Cart
+  // ==========================
+  const productIds = product.map((p) => p.id);
+
+  await Cart.updateMany(
+    {
+      user: userId,
+      status: { $ne: "completed" },
+      "product.productId": { $in: productIds },
+    },
+    {
+      $set: {
+        status: "completed",
+      },
+    }
+  );
+
+  // ==========================
+  // Reduce Stock
+  // ==========================
+  for (const item of product) {
+    const updatedProduct =
+      await Product.findOneAndUpdate(
+        {
+          _id: item.id,
+          "variants.0.stock": {
+            $gte: item.quantity,
+          },
+        },
+        {
+          $inc: {
+            "variants.0.stock": -item.quantity,
+          },
+        },
+        {
+          new: true,
+          runValidators: false,
+        }
+      );
+
+    if (!updatedProduct) {
+      continue;
     }
 
-    await productData.save();
+    const remainingStock =
+      updatedProduct?.variants?.[0]?.stock || 0;
+
+    if (remainingStock <= 0) {
+      await Product.updateOne(
+        { _id: item.id },
+        {
+          $set: {
+            stock_status: "out_of_stock",
+          },
+        }
+      );
+    }
   }
 
   return successResponse(
     res,
     "Order added successfully",
     201,
-    record
+    savedOrder
   );
 });
 
