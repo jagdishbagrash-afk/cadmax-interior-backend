@@ -9,8 +9,6 @@ exports.getWishlist = catchAsync(async (req, res) => {
 
   const wishlist = await Wishlist.findOne({ userId }).populate({
     path: "productIds",
-    select:
-      "title slug amount final_amount discount_amount variants stock_status category",
     populate: { path: "category", select: "name slug" }
   });
 
@@ -27,9 +25,6 @@ exports.getWishlist = catchAsync(async (req, res) => {
     })
       .sort({ createdAt: -1 })
       .limit(10)
-      .select(
-        "title slug amount final_amount discount_amount variants stock_status"
-      );
   }
 
   // Calculate stats
