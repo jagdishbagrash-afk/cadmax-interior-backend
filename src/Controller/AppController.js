@@ -1894,7 +1894,6 @@ const bestSellers = await Order.aggregate([
 
 
 
-
 exports.latestProducts = catchAsync(async (req, res) => {
   const limit = parseInt(req.query.limit) || 10;
 
