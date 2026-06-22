@@ -1,47 +1,48 @@
 const mongoose = require("mongoose");
 
-const ProductSchema = new mongoose.Schema(
-  {
-    // This is product id referencing to product table
-    productId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Product",
-      required: true,
-    },
-    price: {
-      type: Number,
-      default :0 
-    },
-    originalPrice: {
-      type: Number,
-      default :0 
+const ProductSchema = new mongoose.Schema({
+  productId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Product",
+    required: true,
+  },
 
-    },
-    discount: {
-      type: Number,
-      default: 0
-    },
-    variant: {
-      type: String, // color
-      required: true,
-    },
-    quantity: {
-      type: Number,
-      min: 1,
-      required: true,
-    },
-    priceSection: {
-      type: {
-        title: String,
-        amount: Number,
-        discount_amount: Number,
-        final_amount: Number
-      },
-      default: null
-    }
-  }, 
-  { _id: false }
-);
+  variant: {
+    type: String,
+    required: true,
+  },
+
+  size: {
+    type: String,
+    default: null
+  },
+
+  quantity: {
+    type: Number,
+    required: true,
+    min: 1,
+  },
+
+  price: {
+    type: Number,
+    default: 0,
+  },
+
+  originalPrice: {
+    type: Number,
+    default: 0,
+  },
+
+  discount: {
+    type: Number,
+    default: 0,
+  },
+
+priceSection: {
+  type: String,
+  default: null
+}
+}, { _id: false });
 
 const CartSchema = mongoose.Schema(
   {

@@ -162,100 +162,71 @@ exports.CommonAddToCart = catchAsync(async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const { productId, quantity, variant, priceSection } = req.body;
+    const {
+      productId,
+      quantity = 1,
+      variant,
+      size,
+      priceSection,
+      price,
+    } = req.body;
 
     if (!productId || !variant) {
-      return errorResponse(res, "ProductId or variant missing", 400);
+      return errorResponse(
+        res,
+        "ProductId and Variant are required",
+        400
+      );
     }
 
-    // Quantity validation
     if (quantity <= 0) {
-      return errorResponse(res, "Quantity must be at least 1", 400);
+      return errorResponse(
+        res,
+        "Quantity must be greater than 0",
+        400
+      );
     }
 
-    const dbProduct = await Product.findById(productId);
-    if (!dbProduct) {
-      return errorResponse(res, "Product not found", 400);
+    const product = await Product.findById(productId);
+
+    if (!product) {
+      return errorResponse(
+        res,
+        "Product not found",
+        404
+      );
     }
 
-    const normalizedVariant = variant.toLowerCase().trim();
+    const normalizedVariant =
+      variant.toLowerCase().trim();
 
-    const matchedVariant = dbProduct.variants.find(
-      v => v.color.toLowerCase() === normalizedVariant
-    );
+    const matchedVariant =
+      product.variants.find(
+        (v) =>
+          v.color.toLowerCase().trim() ===
+          normalizedVariant
+      );
 
     if (!matchedVariant) {
-      return errorResponse(res, `Variant '${variant}' not available`, 400);
+      return errorResponse(
+        res,
+        `Variant '${variant}' not available`,
+        400
+      );
     }
 
     if (matchedVariant.stock < quantity) {
       return errorResponse(
         res,
-        `Only ${matchedVariant.stock} items left for ${variant}`,
+        `Only ${matchedVariant.stock} items available`,
         400
       );
     }
 
-    // Calculate price based on product amount or price section
-    let finalPrice = 0;
-    let originalPrice = 0;
-    let discountPercent = 0;
-    let selectedPriceSection = null;
-
-    // Check if main product amount is 0 and price sections exist
-    if ((!dbProduct.amount || dbProduct.amount === 0) && dbProduct.product_price_section && dbProduct.product_price_section.length > 0) {
-      // Use price section
-      if (priceSection && priceSection.title) {
-        // Find the selected price section
-        const foundSection = dbProduct.product_price_section.find(
-          section => section.title === priceSection.title
-        );
-        
-        if (foundSection) {
-          selectedPriceSection = {
-            title: foundSection.title,
-            amount: foundSection.amount,
-            discount_amount: foundSection.discount_amount,
-            final_amount: foundSection.final_amount
-          };
-          finalPrice = foundSection.final_amount;
-          originalPrice = foundSection.amount;
-          discountPercent = foundSection.discount_amount;
-        } else {
-          // If price section not found, use first one
-          const firstSection = dbProduct.product_price_section[0];
-          selectedPriceSection = {
-            title: firstSection.title,
-            amount: firstSection.amount,
-            discount_amount: firstSection.discount_amount,
-            final_amount: firstSection.final_amount
-          };
-          finalPrice = firstSection.final_amount;
-          originalPrice = firstSection.amount;
-          discountPercent = firstSection.discount_amount;
-        }
-      } else {
-        // Use first price section by default
-        const firstSection = dbProduct.product_price_section[0];
-        selectedPriceSection = {
-          title: firstSection.title,
-          amount: firstSection.amount,
-          discount_amount: firstSection.discount_amount,
-          final_amount: firstSection.final_amount
-        };
-        finalPrice = firstSection.final_amount;
-        originalPrice = firstSection.amount;
-        discountPercent = firstSection.discount_amount;
-      }
-    } else {
-      // Use main product price
-      finalPrice = dbProduct.final_amount || dbProduct.amount;
-      originalPrice = dbProduct.amount;
-      discountPercent = dbProduct.discount_amount || 0;
-    }
-
-    // Find or create cart
-    let cart = await Cart.findOne({ user: userId, status: "pending" });
+    let cart = await Cart.findOne({
+      user: userId,
+      status: "pending",
+    });
 
     if (!cart) {
       cart = await Cart.create({
@@ -265,205 +236,212 @@ exports.CommonAddToCart = catchAsync(async (req, res) => {
           {
             productId,
             variant: normalizedVariant,
+            size,
             quantity,
-            price: finalPrice,
-            originalPrice: originalPrice,
-            discount: discountPercent,
-            priceSection: selectedPriceSection
-          }
+            price,
+            originalPrice: price,
+            discount: 0,
+            priceSection,
+          },
         ],
-        subtotal: finalPrice * quantity,
-        totalAmount: finalPrice * quantity
       });
 
-      return successResponse(res, "Item added to cart", 200, cart);
+      return successResponse(
+        res,
+        "Item added to cart",
+        200,
+        cart
+      );
     }
 
-    // Check if product already exists in cart (with same variant and price section)
-    const existingItem = cart.product.find(
-      p =>
-        p.productId.toString() === productId &&
-        p.variant === normalizedVariant &&
-        JSON.stringify(p.priceSection?.title) === JSON.stringify(selectedPriceSection?.title)
-    );
+    const existingItem =
+      cart.product.find(
+        (item) =>
+          item.productId.toString() ===
+            productId &&
+          item.variant ===
+            normalizedVariant &&
+          item.size === size &&
+          item.priceSection ===
+            priceSection
+      );
 
     if (existingItem) {
-      const newQuantity = existingItem.quantity + quantity;
+      const updatedQty =
+        existingItem.quantity + quantity;
 
-      if (newQuantity > matchedVariant.stock) {
+      if (
+        updatedQty >
+        matchedVariant.stock
+      ) {
         return errorResponse(
           res,
-          `Cannot add more than available stock (${matchedVariant.stock})`,
+          `Only ${matchedVariant.stock} items available`,
           400
         );
       }
 
-      existingItem.quantity = newQuantity;
-      existingItem.price = finalPrice;
-      existingItem.originalPrice = originalPrice;
-      existingItem.discount = discountPercent;
-      existingItem.priceSection = selectedPriceSection;
+      existingItem.quantity =
+        updatedQty;
+
+      existingItem.price = price;
+      existingItem.originalPrice =
+        price;
     } else {
       cart.product.push({
         productId,
         variant: normalizedVariant,
+        size,
         quantity,
-        price: finalPrice,
-        originalPrice: originalPrice,
-        discount: discountPercent,
-        priceSection: selectedPriceSection
+        price,
+        originalPrice: price,
+        discount: 0,
+        priceSection,
       });
     }
 
-    // Recalculate cart totals
-    cart.subtotal = cart.product.reduce((total, item) => {
-      return total + (item.price * item.quantity);
-    }, 0);
-    
-    const discountAmount = (cart.subtotal * (cart.discount || 0)) / 100;
-    const taxAmount = (cart.subtotal * (cart.tax || 0)) / 100;
-    cart.totalAmount = cart.subtotal - discountAmount + taxAmount;
-
     await cart.save();
 
-    return successResponse(res, "Item added to cart", 200, cart);
-
+    return successResponse(
+      res,
+      "Item added to cart",
+      200,
+      cart
+    );
   } catch (error) {
-    console.log("error", error);
-    return errorResponse(res, error.message || "Internal Server Error", 500);
-  }
-}); 
+    console.log(
+      "Add To Cart Error:",
+      error
+    );
 
+    return errorResponse(
+      res,
+      error.message ||
+        "Internal Server Error",
+      500
+    );
+  }
+});
 
 exports.updateCommonCart = catchAsync(async (req, res) => {
   try {
     const userId = req.user.id;
-    const { productId, quantity, variant, priceSectionTitle } = req.body;
+
+    const { productId, variant, quantity } = req.body;
 
     if (!productId || !variant || quantity === undefined) {
       return errorResponse(res, "Invalid payload", 400);
     }
 
     if (quantity < 0) {
-      return errorResponse(res, "Quantity cannot be negative", 400);
+      return errorResponse(
+        res,
+        "Quantity cannot be negative",
+        400
+      );
     }
 
-    // ✅ correct cart
-    const cart = await Cart.findOne({ user: userId, status: "pending" });
+    const cart = await Cart.findOne({
+      user: userId,
+      status: "pending",
+    });
 
-    if (!cart || cart.product.length === 0) {
-      return errorResponse(res, "Cart is empty", 400);
+    if (!cart) {
+      return errorResponse(res, "Cart not found", 404);
     }
 
-    const dbProduct = await Product.findById(productId);
-    if (!dbProduct) {
-      return errorResponse(res, "Product not found", 400);
+    const product = await Product.findById(productId);
+
+    if (!product) {
+      return errorResponse(
+        res,
+        "Product not found",
+        404
+      );
     }
 
-    const normalizedVariant = variant.toLowerCase().trim();
+    const normalizedVariant = variant
+      .toLowerCase()
+      .trim();
 
-    const matchedVariant = dbProduct.variants.find(
-      (v) => v.color === normalizedVariant
+    const variantData = product.variants.find(
+      (v) =>
+        v.color.toLowerCase().trim() ===
+        normalizedVariant
     );
 
-    if (!matchedVariant) {
-      return errorResponse(res, `Variant '${variant}' not available`, 400);
+    if (!variantData) {
+      return errorResponse(
+        res,
+        `Variant '${variant}' not found`,
+        400
+      );
     }
 
-    // Find cart item with matching product, variant, and price section
-    const cartItemIndex = cart.product.findIndex(
-      (p) =>
-        p.productId.toString() === productId &&
-        p.variant === normalizedVariant &&
-        (priceSectionTitle ? p.priceSection?.title === priceSectionTitle : !p.priceSection)
+    const itemIndex = cart.product.findIndex(
+      (item) =>
+        item.productId.toString() === productId &&
+        item.variant === normalizedVariant
     );
 
-    if (cartItemIndex === -1) {
-      return errorResponse(res, "Item not found in cart", 400);
+    if (itemIndex === -1) {
+      return errorResponse(
+        res,
+        "Item not found in cart",
+        404
+      );
     }
 
-    // 🔥 REMOVE
+    // Remove item
     if (quantity === 0) {
-      cart.product.splice(cartItemIndex, 1);
+      cart.product.splice(itemIndex, 1);
     } else {
-      // 🔥 STOCK CHECK
-      if (quantity > matchedVariant.stock) {
+      // Stock validation
+      if (quantity > variantData.stock) {
         return errorResponse(
           res,
-          `Only ${matchedVariant.stock} items left`,
+          `Only ${variantData.stock} items available`,
           400
         );
       }
 
-      cart.product[cartItemIndex].quantity = quantity;
+      cart.product[itemIndex].quantity = quantity;
     }
 
-    // Recalculate cart totals
-    cart.subtotal = cart.product.reduce((total, item) => {
-      return total + ((item.price || 0) * (item.quantity || 0));
-    }, 0);
-    
-    const discountAmount = (cart.subtotal * (cart.discount || 0)) / 100;
-    const taxAmount = (cart.subtotal * (cart.tax || 0)) / 100;
-    cart.totalAmount = cart.subtotal - discountAmount + taxAmount;
+    // Recalculate totals
+    cart.subtotal = cart.product.reduce(
+      (total, item) =>
+        total + item.price * item.quantity,
+      0
+    );
+
+    const discountAmount =
+      (cart.subtotal * cart.discount) / 100;
+
+    const taxAmount =
+      (cart.subtotal * cart.tax) / 100;
+
+    cart.totalAmount =
+      cart.subtotal -
+      discountAmount +
+      taxAmount;
 
     await cart.save();
 
-    // 🔥 clean response for frontend
-    const populatedCart = await Cart.findById(cart._id).populate({
-      path: "product.productId",
-      select: "title amount discount_amount final_amount variants product_price_section",
-    });
-
-    const formattedItems = populatedCart.product.map((item) => {
-      const product = item.productId;
-
-      const variantData = product.variants.find(
-        (v) => v.color === item.variant
-      );
-
-      // Get price based on price section or main product
-      let displayPrice = item.price;
-      let originalPrice = item.originalPrice;
-      let discountPercent = item.discount;
-      let priceSectionData = item.priceSection;
-
-      if (priceSectionData) {
-        displayPrice = priceSectionData.final_amount;
-        originalPrice = priceSectionData.amount;
-        discountPercent = priceSectionData.discount_amount;
-      }
-
-      return {
-        productId: product._id,
-        name: product.title,
-        price: displayPrice,
-        originalPrice: originalPrice,
-        discount: discountPercent,
-        quantity: item.quantity,
-        variant: item.variant,
-        variantTitle: variantData?.title || `${item.variant} Variant`,
-        images: variantData?.images || [],
-        priceSection: priceSectionData,
-        subtotal: displayPrice * item.quantity
-      };
-    });
-
-    const cartSummary = {
-      items: formattedItems,
-      subtotal: cart.subtotal,
-      discount: cart.discount,
-      tax: cart.tax,
-      totalAmount: cart.totalAmount,
-      itemCount: cart.product.reduce((sum, item) => sum + item.quantity, 0),
-      status: cart.status
-    };
-
-    return successResponse(res, "Cart updated successfully", 200, cartSummary);
-
+    return successResponse(
+      res,
+      "Cart updated successfully",
+      200,
+      cart
+    );
   } catch (error) {
-    console.log("error", error);
-    return errorResponse(res, error.message || "Internal Server Error", 500);
+    console.log("Update Cart Error:", error);
+
+    return errorResponse(
+      res,
+      error.message || "Internal Server Error",
+      500
+    );
   }
 });
 

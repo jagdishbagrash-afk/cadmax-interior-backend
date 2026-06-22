@@ -1,4 +1,4 @@
-const { signup, Login, SendOtp, profilegettoken, PhoneVerify, OTPVerify, AppOrder, getAllCategorys, getSubCategoryByCategory, getProductBySubCategory, getProductById, AddToCart, getCart, GetAllProject, GetServicesType, GetServiceTypeId, GetServicesDetails, ConceptUserPost, removeProductVariantFromCart, EditProfile, BookingAppAdd, GetVendorCatApp, GetAllVendor, GetVendorCategory, updateCart, clearCart, OrderList, bestSellerProducts, latestProducts, GetAllServicesSubCategorys, getAllBookings, AppDeleteUser, AppAllVendors, globalSearch, LeadApp, GetAllRecordServicesSubCategorys, addReview, updateReview, getProductReviews, deleteReviewImage, deleteReview } = require("../Controller/AppController");
+const { signup, Login, SendOtp, profilegettoken, PhoneVerify, OTPVerify, AppOrder, getAllCategorys, getSubCategoryByCategory, getProductBySubCategory, getProductById, AddToCart, getCart, GetAllProject, GetServicesType, GetServiceTypeId, GetServicesDetails, ConceptUserPost, removeProductVariantFromCart, EditProfile, BookingAppAdd, GetVendorCatApp, GetAllVendor, GetVendorCategory, updateCart, clearCart, OrderList, bestSellerProducts, latestProducts, GetAllServicesSubCategorys, getAllBookings, AppDeleteUser, AppAllVendors, globalSearch, LeadApp, GetAllRecordServicesSubCategorys, addReview, updateReview, getProductReviews, deleteReviewImage, deleteReview, addToWishlist } = require("../Controller/AppController");
 const { GetAllBanner } = require("../Controller/BannerController");
 const ServciesSubCategoryController = require("../Controller/ServciesSubCategoryController.js");
 const MultipleAddressController = require("../Controller/MultipleAddressController");
@@ -65,6 +65,9 @@ AppRoute.get("/app/wishlist/get", verifyToken, getWishlist);
 AppRoute.post("/app/wishlist/remove", verifyToken, removeFromWishlist);
 
 AppRoute.delete("/app/wishlist/delete/:productId", verifyToken, removeFromWishlistByProductId);
+
+AppRoute.post("/app/wishlist/add", verifyToken, addToWishlist);
+
 
 // Authenticated
 AppRoute.post("/app/review/add", verifyToken, upload.array("reviewImages", 15),  addReview);
