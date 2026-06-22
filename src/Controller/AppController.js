@@ -28,6 +28,7 @@ const Lead = require("../Model/Lead");
 
 const axios = require("axios");
 const Wishlist = require("../Model/Wishlist");
+const Review = require("../Model/Review");
 
 // const twilio = require("twilio");
 
@@ -1023,6 +1024,7 @@ exports.getProductByCategory = catchAsync(async (req, res) => {
 exports.getProductBySubCategory = catchAsync(async (req, res) => {
   try {
     const { id } = req.params;
+    const {userid} = req.query 
     const filter = {
       subcategory: id,
       deletedAt: null,
@@ -1031,17 +1033,7 @@ exports.getProductBySubCategory = catchAsync(async (req, res) => {
       .populate("subcategory")
       .populate("category")
       .sort({ createdAt: -1 })
-    // const totalRecords = await Product.countDocuments(filter);
-    // const totalPages = Math.ceil(totalRecords / limit);
-    // return successResponse(res, "Products fetched by category", 200, {
-    //   data: products,
-    //   pagination: {
-    //     page,
-    //     limit,
-    //     totalRecords,
-    //     totalPages,
-    //   },
-    // });
+    
 
     return successResponse(res, "Products fetched by category", 200,
       products);
@@ -1070,320 +1062,464 @@ exports.getProductById = catchAsync(async (req, res) => {
 exports.AddToCart = catchAsync(async (req, res) => {
   try {
     const userId = req.user.id;
-    const { product } = req.body;
-    if (!product || !product.id || !product.quantity || !product.variant) {
-      return errorResponse(res, "Invalid product payload", 400);
-    }
-    const { id: productId, quantity, variant } = product;
-    // Quantity validation
-    if (quantity <= 0) {
-      return errorResponse(res, "Quantity must be at least 1", 400);
-    }
-    const dbProduct = await Product.findById(productId);
-    if (!dbProduct) {
-      return errorResponse(res, "Product not found", 400);
-    }
-    const normalizedVariant = variant.toLowerCase().trim();
-    const matchedVariant = dbProduct.variants.find(
-      v => v.color === normalizedVariant
-    );
-    if (!matchedVariant) {
-      return errorResponse(res, `Variant '${variant}' not available`, 400);
-    }
-    if (matchedVariant.stock < quantity) {
+
+    const {
+      productId,
+      quantity = 1,
+      variant,
+      size,
+      priceSection,
+      price,
+    } = req.body;
+
+    if (!productId || !variant) {
       return errorResponse(
         res,
-        `Only ${matchedVariant.stock} items left for ${variant}`,
+        "ProductId and Variant are required",
         400
       );
     }
-    // Find or create cart
-    let cart = await Cart.findOne({ user: userId, status: "pending" });
+
+    if (quantity <= 0) {
+      return errorResponse(
+        res,
+        "Quantity must be greater than 0",
+        400
+      );
+    }
+
+    const product = await Product.findById(productId);
+
+    if (!product) {
+      return errorResponse(
+        res,
+        "Product not found",
+        404
+      );
+    }
+
+    const normalizedVariant =
+      variant.toLowerCase().trim();
+
+    const matchedVariant =
+      product.variants.find(
+        (v) =>
+          v.color.toLowerCase().trim() ===
+          normalizedVariant
+      );
+
+    if (!matchedVariant) {
+      return errorResponse(
+        res,
+        `Variant '${variant}' not available`,
+        400
+      );
+    }
+
+    if (matchedVariant.stock < quantity) {
+      return errorResponse(
+        res,
+        `Only ${matchedVariant.stock} items available`,
+        400
+      );
+    }
+
+    let cart = await Cart.findOne({
+      user: userId,
+      status: "pending",
+    });
 
     if (!cart) {
       cart = await Cart.create({
         user: userId,
-        status: "pending", // ✅ important
+        status: "pending",
         product: [
           {
             productId,
             variant: normalizedVariant,
-            quantity
-          }
-        ]
+            size,
+            quantity,
+            price,
+            originalPrice: price,
+            discount: 0,
+            priceSection,
+          },
+        ],
       });
-      return successResponse(res, "Item added to cart", 200, cart);
+
+      return successResponse(
+        res,
+        "Item added to cart",
+        200,
+        cart
+      );
     }
-    // Check if product+variant already exists in cart
-    const existingItem = cart.product.find(
-      p =>
-        p.productId.toString() === productId &&
-        p.variant === normalizedVariant
-    );
+
+    const existingItem =
+      cart.product.find(
+        (item) =>
+          item.productId.toString() ===
+            productId &&
+          item.variant ===
+            normalizedVariant &&
+          item.size === size &&
+          item.priceSection ===
+            priceSection
+      );
+
     if (existingItem) {
-      const newQuantity = existingItem.quantity + quantity;
-      if (newQuantity > matchedVariant.stock) {
+      const updatedQty =
+        existingItem.quantity + quantity;
+
+      if (
+        updatedQty >
+        matchedVariant.stock
+      ) {
         return errorResponse(
           res,
-          `Cannot add more than available stock (${matchedVariant.stock})`,
+          `Only ${matchedVariant.stock} items available`,
           400
         );
       }
-      existingItem.quantity = newQuantity;
+
+      existingItem.quantity =
+        updatedQty;
+
+      existingItem.price = price;
+      existingItem.originalPrice =
+        price;
     } else {
       cart.product.push({
         productId,
         variant: normalizedVariant,
-        quantity
+        size,
+        quantity,
+        price,
+        originalPrice: price,
+        discount: 0,
+        priceSection,
       });
     }
+
     await cart.save();
-    return successResponse(res, "Item added to cart", 200, cart);
+
+    return successResponse(
+      res,
+      "Item added to cart",
+      200,
+      cart
+    );
   } catch (error) {
-    console.log("error", error)
-    return errorResponse(res, error.message || "Internal Server Error", 500);
+    console.log(
+      "Add To Cart Error:",
+      error
+    );
+
+    return errorResponse(
+      res,
+      error.message ||
+        "Internal Server Error",
+      500
+    );
   }
 });
-
-// exports.updateCart = catchAsync(async (req, res) => {
-//   try {
-//     const userId = req.user.id;
-//     const { product } = req.body;
-
-//     if (!product || !product.id || !product.variant || product.quantity === undefined) {
-//       return errorResponse(res, "Invalid product payload", 400);
-//     }
-
-//     const { id: productId, quantity, variant } = product;
-
-//     if (quantity < 0) {
-//       return errorResponse(res, "Quantity cannot be negative", 400);
-//     }
-
-//     const cart = await Cart.findOne({ user: userId });
-//     if (!cart || cart.product.length === 0) {
-//       return errorResponse(res, "Cart is empty", 400);
-//     }
-
-//     const dbProduct = await Product.findById(productId);
-//     if (!dbProduct) {
-//       return errorResponse(res, "Product not found", 400);
-//     }
-
-//     const normalizedVariant = variant.toLowerCase().trim();
-
-//     const matchedVariant = dbProduct.variants.find(
-//       v => v.color === normalizedVariant
-//     );
-
-//     if (!matchedVariant) {
-//       return errorResponse(res, `Variant '${variant}' not available`, 400);
-//     }
-
-//     const cartItemIndex = cart.product.findIndex(
-//       p =>
-//         p.productId.toString() === productId &&
-//         p.variant === normalizedVariant
-//     );
-
-//     if (cartItemIndex === -1) {
-//       return errorResponse(res, "Item not found in cart", 400);
-//     }
-
-//     // Remove item if quantity = 0
-//     if (quantity === 0) {
-//       cart.product.splice(cartItemIndex, 1);
-//     } else {
-//       if (quantity > matchedVariant.stock) {
-//         return errorResponse(res, `Only ${matchedVariant.stock} items left for ${variant}`,400);
-//       }
-//       cart.product[cartItemIndex].quantity = quantity;
-//     }
-//     await cart.save();
-//     return successResponse(res, "Cart updated successfully", 200, cart);
-//   } catch (error) {
-//     return errorResponse(res, error.message || "Internal Server Error", 500);
-//   }
-// });
-
-
 
 exports.updateCart = catchAsync(async (req, res) => {
   try {
     const userId = req.user.id;
-    const { product } = req.body;
 
-    if (!product || !product.id || !product.variant || product.quantity === undefined) {
-      return errorResponse(res, "Invalid product payload", 400);
+    const { productId, variant, quantity } = req.body;
+
+    if (!productId || !variant || quantity === undefined) {
+      return errorResponse(res, "Invalid payload", 400);
     }
-
-    const { id: productId, quantity, variant } = product;
 
     if (quantity < 0) {
-      return errorResponse(res, "Quantity cannot be negative", 400);
-    }
-   const cart = await Cart.findOne({ user: userId, status: "pending" });
-
-    if (!cart || cart.product.length === 0) {
-      return errorResponse(res, "Cart is empty", 400);
-    }
-
-    const dbProduct = await Product.findById(productId);
-    if (!dbProduct) {
-      return errorResponse(res, "Product not found", 400);
+      return errorResponse(
+        res,
+        "Quantity cannot be negative",
+        400
+      );
     }
 
-    const normalizedVariant = variant.toLowerCase().trim();
+    const cart = await Cart.findOne({
+      user: userId,
+      status: "pending",
+    });
 
-    const matchedVariant = dbProduct.variants.find(
-      v => v.color === normalizedVariant
+    if (!cart) {
+      return errorResponse(res, "Cart not found", 404);
+    }
+
+    const product = await Product.findById(productId);
+
+    if (!product) {
+      return errorResponse(
+        res,
+        "Product not found",
+        404
+      );
+    }
+
+    const normalizedVariant = variant
+      .toLowerCase()
+      .trim();
+
+    const variantData = product.variants.find(
+      (v) =>
+        v.color.toLowerCase().trim() ===
+        normalizedVariant
     );
 
-    if (!matchedVariant) {
-      return errorResponse(res, `Variant '${variant}' not available`, 400);
+    if (!variantData) {
+      return errorResponse(
+        res,
+        `Variant '${variant}' not found`,
+        400
+      );
     }
 
-    const cartItemIndex = cart.product.findIndex(
-      p =>
-        p.productId.toString() === productId &&
-        p.variant === normalizedVariant
+    const itemIndex = cart.product.findIndex(
+      (item) =>
+        item.productId.toString() === productId &&
+        item.variant === normalizedVariant
     );
 
-    if (cartItemIndex === -1) {
-      return errorResponse(res, "Item not found in cart", 400);
+    if (itemIndex === -1) {
+      return errorResponse(
+        res,
+        "Item not found in cart",
+        404
+      );
     }
 
     // Remove item
     if (quantity === 0) {
-      cart.product.splice(cartItemIndex, 1);
+      cart.product.splice(itemIndex, 1);
     } else {
-      if (quantity > matchedVariant.stock) {
+      // Stock validation
+      if (quantity > variantData.stock) {
         return errorResponse(
           res,
-          `Only ${matchedVariant.stock} items left for ${variant}`,
+          `Only ${variantData.stock} items available`,
           400
         );
       }
-      cart.product[cartItemIndex].quantity = quantity;
+
+      cart.product[itemIndex].quantity = quantity;
     }
+
+    // Recalculate totals
+    cart.subtotal = cart.product.reduce(
+      (total, item) =>
+        total + item.price * item.quantity,
+      0
+    );
+
+    const discountAmount =
+      (cart.subtotal * cart.discount) / 100;
+
+    const taxAmount =
+      (cart.subtotal * cart.tax) / 100;
+
+    cart.totalAmount =
+      cart.subtotal -
+      discountAmount +
+      taxAmount;
 
     await cart.save();
 
-    // 🔥 SAME RESPONSE AS GET CART
-    const response = await buildCartResponse(cart);
-
-    return successResponse(res, "Cart updated successfully", 200, response);
+    return successResponse(
+      res,
+      "Cart updated successfully",
+      200,
+      cart
+    );
   } catch (error) {
-    return errorResponse(res, error.message || "Internal Server Error", 500);
+    console.log("Update Cart Error:", error);
+
+    return errorResponse(
+      res,
+      error.message || "Internal Server Error",
+      500
+    );
   }
 });
 
 
+
 exports.getCart = catchAsync(async (req, res) => {
   try {
-    const userId = req.user.id;
-
-    // ✅ Fetch active cart
     const cart = await Cart.findOne({
-      user: userId,
+      user: req.user.id,
       status: "pending",
     }).populate({
       path: "product.productId",
-      select:
-        "title amount discount_amount final_amount images variants stock",
+      select: "title description slug amount discount_amount final_amount variants product_price_section stock_status"
     });
 
-
-    // ✅ Empty cart response
     if (!cart || !cart.product || cart.product.length === 0) {
-      return successResponse(res, "Cart is empty", 200, {
-        items: [],
-        summary: {
-          subtotal: 0,
-          discountAmount: 0,
-          finalAmount: 0,
-          taxPercent: 0,
-          taxAmount: 0,
-          grandTotal: 0,
-        },
-      });
+      return successResponse(
+        res,
+        "Cart is empty",
+        200,
+        {
+          items: [],
+          summary: {
+            subtotal: 0,
+            totalDiscount: 0,
+            cartDiscount: 0,
+            cartDiscountAmount: 0,
+            tax: 2,
+            taxAmount: 0,
+            totalAmount: 0,
+            itemCount: 0,
+            uniqueItems: 0,
+            status: "pending",
+            lastUpdated: new Date()
+          },
+        }
+      );
     }
 
     let subtotal = 0;
-    let discountAmount = 0;
-    let finalAmount = 0;
+    let totalDiscount = 0;
+    const items = [];
+    let hasOutOfStockItems = false;
 
-    // ✅ Build cart items
-    const items = cart.product
-      .map((item) => {
-        const product = item.productId;
+    for (const item of cart.product) {
+      const product = item.productId;
 
-        if (!product) return null;
+      if (!product) {
+        console.warn(`Product not found for cart item: ${item._id}`);
+        continue;
+      }
 
-        const selectedVariant = product.variants?.find(
-          (v) => v.color === item.variant
-        );
+      const variantData = product.variants?.find(
+        (v) =>
+          v.color?.toLowerCase().trim() ===
+          item.variant?.toLowerCase().trim()
+      );
 
-        const variantImages = selectedVariant?.images || [];
-        const variantStock = selectedVariant?.stock || [];
+      if (!variantData) {
+        console.warn(`Variant ${item.variant} not found for product ${product._id}`);
+        continue;
+      }
 
+      // Use stored price from cart (saved at time of adding to cart)
+      let itemPrice = item.price;
+      let itemOriginalPrice = item.originalPrice;
+      let itemDiscount = item.discount;
+      let priceSectionData = item.priceSection;
 
-        // ✅ Product values
-        const productAmount = Number(product.amount || 0);
-        const productDiscount = Number(product.discount_amount || 0);
-        const productFinal = Number(product.final_amount || 0);
+      // Fallback for backward compatibility (if price not stored in cart)
+      if (!itemPrice || itemPrice === 0) {
+        // Check if product has price sections and main amount is 0
+        if (product.product_price_section?.length > 0 && (!product.amount || product.amount === 0)) {
+          // Try to find matching price section by title
+          const matchingSection = product.product_price_section.find(
+            section => section.title === priceSectionData?.title
+          );
+          
+          if (matchingSection) {
+            itemPrice = matchingSection.final_amount;
+            itemOriginalPrice = matchingSection.amount;
+            itemDiscount = matchingSection.discount_amount;
+            priceSectionData = matchingSection;
+          } else if (product.product_price_section[0]) {
+            // Use first price section as fallback
+            itemPrice = product.product_price_section[0].final_amount;
+            itemOriginalPrice = product.product_price_section[0].amount;
+            itemDiscount = product.product_price_section[0].discount_amount;
+            priceSectionData = product.product_price_section[0];
+          }
+        } else {
+          // Use variant price from product
+          itemPrice = variantData.final_amount || variantData.amount || product.final_amount || product.amount;
+          itemOriginalPrice = variantData.amount || product.amount;
+          itemDiscount = variantData.discount_amount || product.discount_amount || 0;
+        }
+      }
 
-        // ✅ Quantity wise calculations
-        const subtotalPrice = productAmount * item.quantity;
-        const discountPrice = productDiscount * item.quantity;
-        const finalPrice = productFinal * item.quantity;
+      const itemQuantity = item.quantity;
+      const itemSubtotal = itemPrice * itemQuantity;
+      const itemOriginalSubtotal = itemOriginalPrice * itemQuantity;
+      const itemDiscountAmount = itemOriginalSubtotal - itemSubtotal;
 
-        // ✅ Summary totals
-        subtotal += subtotalPrice;
-        discountAmount += discountPrice;
-        finalAmount += finalPrice;
+      subtotal += itemOriginalSubtotal;
+      totalDiscount += itemDiscountAmount;
 
-        return {
-          productId: product._id,
-          title: product.title,
-          stock: variantStock,
-          images: variantImages,
-          variant: item.variant,
-          quantity: item.quantity,
-          amount: productAmount,
-          discount_amount: productDiscount,
-          final_amount: productFinal,
-          subtotal: subtotalPrice,
-          discountTotal: discountPrice,
-          finalTotal: finalPrice,
-        };
-      })
-      .filter(Boolean);
+      const isOutOfStock = variantData.stock < itemQuantity;
+      if (isOutOfStock) hasOutOfStockItems = true;
 
-    // ✅ Tax calculation
-    const taxPercent = Number(cart.tax || 0);
+      items.push({
+        cartItemId: item._id,
+        productId: product._id,
+        title: product.title,
+        description: product.description,
+        slug: product.slug,
+        variant: variantData.color,
+        variantTitle: variantData.title || `${variantData.color} Variant`,
+        quantity: itemQuantity,
+        maxStock: variantData.stock,
+        // Price details
+        originalPrice: itemOriginalPrice,
+        discountAmount: itemDiscount,
+        finalPrice: itemPrice,
+        // Price section details
+        priceSection: priceSectionData ? {
+          title: priceSectionData.title,
+          amount: priceSectionData.amount,
+          discount_amount: priceSectionData.discount_amount,
+          final_amount: priceSectionData.final_amount
+        } : null,
+        // Images
+        images: variantData.images || [],
+        // Item totals
+        itemSubtotal: itemSubtotal,
+        itemOriginalSubtotal: itemOriginalSubtotal,
+        itemDiscountAmount: itemDiscountAmount,
+        // Status flags
+        isOutOfStock: isOutOfStock,
+        stock_status: product.stock_status
+      });
+    }
 
-    const taxAmount = Number(
-      ((finalAmount * taxPercent) / 100).toFixed(2)
+    // Calculate cart totals
+    const taxPercentage = cart.tax || 2;
+    const cartDiscountPercentage = cart.discount || 2;
+    
+    const cartDiscountAmount = (subtotal * cartDiscountPercentage) / 100;
+    const taxAmount = (subtotal * taxPercentage) / 100;
+    const totalAmount = subtotal - totalDiscount - cartDiscountAmount + taxAmount;
+
+    const summary = {
+      subtotal: Math.round(subtotal * 100) / 100,
+      totalDiscount: Math.round(totalDiscount * 100) / 100,
+      cartDiscount: cartDiscountPercentage,
+      cartDiscountAmount: Math.round(cartDiscountAmount * 100) / 100,
+      tax: taxPercentage,
+      taxAmount: Math.round(taxAmount * 100) / 100,
+      totalAmount: Math.round(totalAmount * 100) / 100,
+      itemCount: items.reduce((sum, item) => sum + item.quantity, 0),
+      uniqueItems: items.length,
+      status: cart.status,
+      hasOutOfStockItems: hasOutOfStockItems,
+      lastUpdated: cart.updatedAt,
+      createdAt: cart.createdAt
+    };
+
+    return successResponse(
+      res,
+      "Cart fetched successfully",
+      200,
+      {
+        items,
+        summary
+      }
     );
-
-    // ✅ Grand Total
-    const grandTotal = Number(
-      (finalAmount + taxAmount).toFixed(2)
-    );
-
-    return successResponse(res, "Cart fetched successfully", 200, {
-      items,
-      summary: {
-        subtotal: Number(subtotal.toFixed(2)),
-        discountAmount: Number(discountAmount.toFixed(2)),
-        finalAmount: Number(finalAmount.toFixed(2)),
-        taxPercent,
-        taxAmount,
-        grandTotal,
-      },
-    });
   } catch (error) {
+    console.error("Error in getCart:", error);
     return errorResponse(
       res,
       error.message || "Internal Server Error",
@@ -1835,7 +1971,6 @@ const bestSellers = await Order.aggregate([
 
 
 
-
 exports.latestProducts = catchAsync(async (req, res) => {
   const limit = parseInt(req.query.limit) || 10;
 
@@ -2178,4 +2313,386 @@ exports.getWishlist = catchAsync(async (req, res) => {
       count: wishlist?.productIds?.length || 0,
     }
   );
+});
+
+
+exports.addReview = catchAsync(async (req, res) => {
+  const userId = req.user.id;
+  const { productId, rating, title, message } = req.body;
+
+  if (!productId || !rating || !message) {
+    return errorResponse(
+      res,
+      "Product ID, rating, and message are required",
+      400
+    );
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(productId)) {
+    return errorResponse(res, "Invalid product ID", 400);
+  }
+
+  if (rating < 1 || rating > 5) {
+    return errorResponse(res, "Rating must be between 1 and 5", 400);
+  }
+
+  const product = await Product.findById(productId);
+  if (!product) {
+    return errorResponse(res, "Product not found", 404);
+  }
+
+  const existingReview = await Review.findOne({
+    product: productId,
+    user: userId,
+    isDeleted: false,
+  });
+
+  if (existingReview) {
+    return errorResponse(
+      res,
+      "You have already reviewed this product. You can edit or delete your existing review.",
+      400
+    );
+  }
+
+  // Collect uploaded images
+  let images = [];
+
+  if (req.files && req.files.length > 0) {
+    images = req.files.map((file) => file.path || file.location || file.url);
+
+    if (images.length > 5) {
+      return errorResponse(
+        res,
+        "Maximum 5 images allowed per review",
+        400
+      );
+    }
+  }
+
+  const review = await Review.create({
+    product: productId,
+    user: userId,
+    rating,
+    title: title || "",
+    message,
+    images,
+  });
+
+  const populatedReview = await Review.findById(review._id)
+    .populate("user", "name profileImage")
+    .lean();
+
+  return successResponse(
+    res,
+    "Review added successfully",
+    201,
+    populatedReview
+  );
+});
+
+
+exports.updateReview = catchAsync(async (req, res) => {
+  const userId = req.user.id;
+  const { reviewId } = req.params;
+  const { rating, title, message, removeImages = [] } = req.body;
+
+  if (!mongoose.Types.ObjectId.isValid(reviewId)) {
+    return errorResponse(res, "Invalid review ID", 400);
+  }
+
+  const review = await Review.findOne({
+    _id: reviewId,
+    user: userId,
+    isDeleted: false,
+  });
+
+  if (!review) {
+    return errorResponse(
+      res,
+      "Review not found or you are not authorized",
+      404
+    );
+  }
+
+  if (rating !== undefined) {
+    if (rating < 1 || rating > 5) {
+      return errorResponse(res, "Rating must be between 1 and 5", 400);
+    }
+    review.rating = rating;
+  }
+
+  if (title !== undefined) review.title = title;
+  if (message !== undefined) review.message = message;
+
+  // Remove selected images
+  if (Array.isArray(removeImages) && removeImages.length > 0) {
+    review.images = review.images.filter(
+      (img) => !removeImages.includes(img)
+    );
+  }
+
+  // Add new uploaded images
+  if (req.files && req.files.length > 0) {
+    const newImages = req.files.map(
+      (file) => file.path || file.location || file.url
+    );
+
+    review.images = [...review.images, ...newImages];
+  }
+
+  // Maximum 5 images validation
+  if (review.images.length > 5) {
+    return errorResponse(
+      res,
+      "Maximum 5 images allowed per review",
+      400
+    );
+  }
+
+  // Reset status to pending for re-approval
+  review.status = "pending";
+
+  await review.save();
+
+  // Recalculate rating
+  await recalculateProductRating(review.product);
+
+  const updatedReview = await Review.findById(review._id)
+    .populate("user", "name profileImage")
+    .lean();
+
+  return successResponse(
+    res,
+    "Review updated successfully",
+    200,
+    updatedReview
+  );
+});
+
+
+exports.getProductReviews = catchAsync(async (req, res) => {
+  const { productId } = req.params;
+  let { page = 1, limit = 10, sort = "latest", rating } = req.query;
+
+  if (!mongoose.Types.ObjectId.isValid(productId)) {
+    return errorResponse(res, "Invalid product ID", 400);
+  }
+
+  page = parseInt(page);
+  limit = parseInt(limit);
+  const skip = (page - 1) * limit;
+
+  const currentUserId = req.query.userId || null;
+
+  const product = await Product.findById(productId)
+    .select("averageRating totalRating totalReviews ratingBreakdown")
+    .lean();
+
+  if (!product) {
+    return errorResponse(res, "Product not found", 404);
+  }
+
+  const filter = {
+    product: productId,
+    isDeleted: false,
+  };
+
+  if (currentUserId) {
+    filter.$or = [
+      { status: "approved" },
+      { user: new mongoose.Types.ObjectId(currentUserId) },
+    ];
+  } else {
+    filter.status = "approved";
+  }
+
+  if (rating) {
+    const ratingNum = parseInt(rating);
+    if (ratingNum >= 1 && ratingNum <= 5) {
+      filter.rating = ratingNum;
+    }
+  }
+
+  let sortOption = {};
+
+  switch (sort) {
+    case "latest":
+      sortOption = { createdAt: -1 };
+      break;
+
+    case "highest":
+      sortOption = { rating: -1, createdAt: -1 };
+      break;
+
+    case "lowest":
+      sortOption = { rating: 1, createdAt: -1 };
+      break;
+
+    case "most_helpful":
+      filter.helpfulCount = { $gte: 1 };
+      sortOption = { helpfulCount: -1, createdAt: -1 };
+      break;
+
+    case "positive":
+      filter.rating = { $gte: 3 };
+      sortOption = { rating: -1, createdAt: -1 };
+      break;
+
+    case "negative":
+      filter.rating = { $lt: 3 };
+      sortOption = { rating: 1, createdAt: -1 };
+      break;
+
+    default:
+      sortOption = { createdAt: -1 };
+  }
+
+  const [reviews, total] = await Promise.all([
+    Review.find(filter)
+      .populate("user", "name profileImage")
+      .sort(sortOption)
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+
+    Review.countDocuments(filter),
+  ]);
+
+  // Rating Summary
+  const breakdown = product.ratingBreakdown || {
+    star1: 0,
+    star2: 0,
+    star3: 0,
+    star4: 0,
+    star5: 0,
+  };
+
+  const totalReviews = product.totalReviews || 0;
+
+  const ratingBreakdown = {};
+
+  for (let i = 1; i <= 5; i++) {
+    const count = breakdown[`star${i}`] || 0;
+
+    ratingBreakdown[`star${i}`] = {
+      count,
+      percentage:
+        totalReviews > 0
+          ? Math.round((count / totalReviews) * 100)
+          : 0,
+    };
+  }
+
+  return successResponse(res, "Reviews fetched successfully", 200, {
+    summary: {
+      averageRating: product.averageRating || 0,
+      totalRating: product.totalRating || 0,
+      totalReviews: product.totalReviews || 0,
+      ratingBreakdown,
+    },
+
+    reviews,
+
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      hasNextPage: page * limit < total,
+      hasPrevPage: page > 1,
+    },
+  });
+});
+
+exports.deleteReviewImage = catchAsync(async (req, res) => {
+  const userId = req.user.id;
+  const { reviewId, imageIndex } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(reviewId)) {
+    return errorResponse(res, "Invalid review ID", 400);
+  }
+
+  const review = await Review.findOne({ _id: reviewId, user: userId, isDeleted: false });
+  if (!review) {
+    return errorResponse(res, "Review not found or unauthorized", 404);
+  }
+
+  const idx = parseInt(imageIndex);
+  if (isNaN(idx) || idx < 0 || idx >= review.images.length) {
+    return errorResponse(res, "Invalid image index", 400);
+  }
+
+  const removedImage = review.images[idx];
+
+  // Remove from array
+  review.images.splice(idx, 1);
+  await review.save();
+
+  // Attempt to delete from S3 (non-blocking)
+  if (removedImage && removedImage.includes("amazonaws.com")) {
+    deleteFile(removedImage).catch((err) => console.error("S3 delete error:", err));
+  }
+
+  return successResponse(res, "Image removed successfully", 200, {
+    images: review.images,
+  });
+});
+
+
+exports.deleteReview = catchAsync(async (req, res) => {
+  const userId = req.user.id;
+  const { reviewId } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(reviewId)) {
+    return errorResponse(res, "Invalid review ID", 400);
+  }
+
+  const review = await Review.findOne({ _id: reviewId, user: userId, isDeleted: false });
+  if (!review) {
+    return errorResponse(res, "Review not found or you are not authorized", 404);
+  }
+
+  review.isDeleted = true;
+  review.deletedAt = new Date();
+  await review.save();
+
+  // Recalculate product rating
+  await recalculateProductRating(review.product);
+
+  return successResponse(res, "Review deleted successfully", 200);
+});
+
+
+exports.addToWishlist = catchAsync(async (req, res) => {
+  const userId = req.user.id;
+  const { productId } = req.body;
+
+  if (!productId) {
+    return errorResponse(res, "Product ID is required", 400);
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(productId)) {
+    return errorResponse(res, "Invalid product ID", 400);
+  }
+
+  const product = await Product.findById(productId);
+  if (!product) {
+    return errorResponse(res, "Product not found", 404);
+  }
+
+  let wishlist = await Wishlist.findOne({ userId });
+
+  if (!wishlist) {
+    wishlist = new Wishlist({ userId, productIds: [] });
+  }
+
+  if (wishlist.productIds.includes(productId)) {
+    return errorResponse(res, "Product already in wishlist", 400);
+  }
+
+  wishlist.productIds.push(productId);
+  await wishlist.save();
+
+  return successResponse(res, "Added to Wishlist", 200, wishlist);
 });

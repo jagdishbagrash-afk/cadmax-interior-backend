@@ -191,13 +191,28 @@ exports.addOrder = catchAsync(async (req, res) => {
   }
 
   const numericAmount = Number(
-  typeof amount === "string" ? amount.replace(/,/g, "") : amount
-);
+    typeof amount === "string" ? amount.replace(/,/g, "") : amount
+  );
+
+  // ✅ Build product array with all needed fields
+  const productWithDetails = product.map((p) => ({
+    id: p.id,
+    title: p.title,                         // ✅ now included
+    price: p.price,
+    originalPrice: p.originalPrice || null,
+    discount: p.discount || 0,
+    quantity: p.quantity,
+    total: p.total,
+    variant: p.variant,
+    variantTitle: p.variantTitle || null,
+    priceSectionTitle: p.priceSectionTitle || null,
+  }));
+
   const newOrder = new Order({
     name,
     mobile,
     address,
-    product,
+    product: productWithDetails,
     addressId,
     amount: numericAmount,
     userId,
@@ -206,24 +221,23 @@ exports.addOrder = catchAsync(async (req, res) => {
     shipping_status: "pending",
     courier_name: "DHL",
   });
+
   const record = await newOrder.save();
 
-
-  await record.save();
-
-  // UPDATE CART
+  // Update cart status
   const productIds = product.map((p) => p.id);
   const cart = await Cart.findOne({
     user: userId,
-    status: { $ne: "done" },
+    status: { $ne: "completed" },
     "product.productId": { $in: productIds },
   });
 
-  if (cart && cart.status !== "done") {
-    cart.status = "done";
+  if (cart && cart.status !== "completed") {
+    cart.status = "completed";
     await cart.save();
   }
 
+  // Update stock
   for (const item of product) {
     const productData = await Product.findById(item.id);
 
@@ -249,7 +263,6 @@ exports.addOrder = catchAsync(async (req, res) => {
     await productData.save();
   }
 
-  // RESPONSE
   return successResponse(
     res,
     "Order added successfully",
@@ -416,5 +429,3 @@ exports.getOrdersByUser = catchAsync(async (req, res) => {
     return errorResponse(res, error.message || "Internal Server Error", 500);
   }
 });
-
-

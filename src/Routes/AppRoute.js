@@ -1,11 +1,13 @@
-const { signup, Login, SendOtp, profilegettoken, PhoneVerify, OTPVerify, AppOrder, getAllCategorys, getSubCategoryByCategory, getProductBySubCategory, getProductById, AddToCart, getCart, GetAllProject, GetServicesType, GetServiceTypeId, GetServicesDetails, ConceptUserPost, removeProductVariantFromCart, EditProfile, BookingAppAdd, GetVendorCatApp, GetAllVendor, GetVendorCategory, updateCart, clearCart, OrderList, bestSellerProducts, latestProducts, GetAllServicesSubCategorys, getAllBookings, AppDeleteUser, AppAllVendors, globalSearch, LeadApp, GetAllRecordServicesSubCategorys } = require("../Controller/AppController");
+const { signup, Login, SendOtp, profilegettoken, PhoneVerify, OTPVerify, AppOrder, getAllCategorys, getSubCategoryByCategory, getProductBySubCategory, getProductById, AddToCart, getCart, GetAllProject, GetServicesType, GetServiceTypeId, GetServicesDetails, ConceptUserPost, removeProductVariantFromCart, EditProfile, BookingAppAdd, GetVendorCatApp, GetAllVendor, GetVendorCategory, updateCart, clearCart, OrderList, bestSellerProducts, latestProducts, GetAllServicesSubCategorys, getAllBookings, AppDeleteUser, AppAllVendors, globalSearch, LeadApp, GetAllRecordServicesSubCategorys, addReview, updateReview, getProductReviews, deleteReviewImage, deleteReview, addToWishlist } = require("../Controller/AppController");
 const { GetAllBanner } = require("../Controller/BannerController");
 const ServciesSubCategoryController = require("../Controller/ServciesSubCategoryController.js");
 const MultipleAddressController = require("../Controller/MultipleAddressController");
 
 const { upload } = require("../Utill/S3");
 const { verifyToken } = require("../Utill/tokenVerify");
-const { removeFromWishlist, removeFromWishlistByProductId, getWishlist, addToWishlist } = require("../Controller/WishlistController.js");
+const { removeFromWishlist, removeFromWishlistByProductId, getWishlist } = require("../Controller/WishlistController.js");
+
+const { getStates, getCitiesByState } = require("../Controller/LocationController.js");
 const AppRoute = require("express").Router();
 
 
@@ -63,8 +65,23 @@ AppRoute.get("/app/wishlist/get", verifyToken, getWishlist);
 AppRoute.post("/app/wishlist/remove", verifyToken, removeFromWishlist);
 
 AppRoute.delete("/app/wishlist/delete/:productId", verifyToken, removeFromWishlistByProductId);
+
 AppRoute.post("/app/wishlist/add", verifyToken, addToWishlist);
 
 
+// Authenticated
+AppRoute.post("/app/review/add", verifyToken, upload.array("reviewImages", 15),  addReview);
+AppRoute.post("/app/review/update/:reviewId", upload.array("reviewImages", 15),   verifyToken, updateReview);
+
+AppRoute.get("/app/review/product/:productId", verifyToken , getProductReviews);
+
+AppRoute.post("/app/review/images/delete/:reviewId/:imageIndex", verifyToken, deleteReviewImage);
+
+AppRoute.get("/app/states", getStates);
+
+AppRoute.get("/app/cities/:state", getCitiesByState);
+
+
+AppRoute.post("/review/delete/:reviewId", verifyToken, deleteReview);
 
 module.exports = AppRoute;

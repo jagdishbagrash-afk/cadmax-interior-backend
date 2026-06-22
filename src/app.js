@@ -36,7 +36,65 @@ app.use("/api", require("./Routes/CommonRoute"));
 app.use("/api", require("./Routes/Paymentroute"));
 app.use("/api", require("./Routes/MutipleAddressRoute"));
 app.use("/api", require("./Routes/WishlistRoute"));
-app.use("/api", require("./Routes/ShipmentRoute"));
+app.use("/api", require("./Routes/ReviewRoute"));
+
+
+const Product = require("./Model/Product");
+
+/* ==============================
+   TEST ROUTE
+============================== */
+
+const DHL_CLIENT_ID = process.env.DHL_CLIENT_ID;
+const DHL_CLIENT_SECRET = process.env.DHL_CLIENT_SECRET;
+const DHL_API_BASE = "https://express.api.dhl.com/mydhlapi";
+
+// 1. Token लेने का function
+async function getDHLToken() {
+  const res = await fetch(`${DHL_API_BASE}/auth/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: `grant_type=client_credentials&client_id=${DHL_CLIENT_ID}&client_secret=${DHL_CLIENT_SECRET}`,
+  });
+  const data = await res.json();
+  return data.access_token;
+}
+
+// 2. Tracking API (सबसे ज़रूरी)
+app.get("/api/dhl/track/:trackingNumber", async (req, res) => {
+  try {
+    const token = await getDHLToken();
+    const trackingNumber = req.params.trackingNumber;
+
+    const response = await fetch(
+      `${DHL_API_BASE}/shipments/${trackingNumber}/tracking`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+
+    const trackingData = await response.json();
+    
+    // Simple format में बदलें
+    const events = trackingData.shipments[0]?.events.map(event => ({
+      status: event.description,
+      location: `${event.serviceArea?.city}, ${event.serviceArea?.countryCode}`,
+      timestamp: event.timestamp,
+    })) || [];
+
+    res.json({ 
+      trackingNumber, 
+      status: trackingData.shipments[0]?.status,
+      events 
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Tracking failed" });
+  }
+});
+
+
+
+
 
 const server = app.listen(PORT, () => console.log("Server is running at port : " + PORT));
 server.timeout = 360000;
