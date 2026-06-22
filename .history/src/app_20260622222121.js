@@ -4,50 +4,48 @@ dotenv.config();
 require("./dbconfigration");
 const express = require("express");
 const app = express();
-const getAllowedOrigins = () => {
-  const configuredOrigins = process.env.CORS_ALLOWED_ORIGINS || process.env.FRONTEND_URL;
-  if (!configuredOrigins) {
-    return ["http://localhost:3000"];
-  }
+const cors = require("cors");
 
-  return configuredOrigins
-    .split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean);
+const allowedOrigins = [
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+  "http://localhost:3001",
+  "http://127.0.0.1:3001",
+  ...(process.env.FRONTEND_URL
+    ? process.env.FRONTEND_URL.split(",")
+        .map((origin) => origin.trim())
+        .filter(Boolean)
+    : []),
+];
+
+const corsOptions = {
+  origin(origin, callback) {
+    // Allow non-browser clients like curl/postman and same-origin requests.
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error(`CORS blocked for origin: ${origin}`));
+  },
+  methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+  optionsSuccessStatus: 200,
 };
 
-const allowedOrigins = getAllowedOrigins();
-const allowedMethods = "GET,POST,PUT,PATCH,DELETE,OPTIONS";
-const allowedHeaders = "Content-Type, Authorization";
-
-app.use((req, res, next) => {
-  const requestOrigin = req.headers.origin;
-
-  if (!requestOrigin) {
-    return next();
-  }
-
-  if (allowedOrigins.includes(requestOrigin)) {
-    res.header("Access-Control-Allow-Origin", requestOrigin);
-    res.header("Vary", "Origin");
-    res.header("Access-Control-Allow-Methods", allowedMethods);
-    res.header("Access-Control-Allow-Headers", allowedHeaders);
-
-    if (req.method === "OPTIONS") {
-      return res.sendStatus(204);
-    }
-  }
-
-  return next();
-});
-
+app.use(cors(corsOptions));
+app.options(/.*/, cors(corsOptions));
 app.use(express.json({ limit: '10000mb' }));
 app.use(express.urlencoded({ extended: true, limit: "10000mb" }));
 app.get("/", (_req, res) => {
   res.json({ message: "Server is running fine 🚀" });
 });
 
-const PORT = Number(process.env.PORT || process.env.REACT_APP_SERVER_DOMAIN) || 5001;
+const PORT = Number(process.env.PORT || process.env.REACT_APP_SERVER_DOMAIN) || 5000;
 app.use("/api", require("./Routes/AuthRoute"));
 app.use("/api", require("./Routes/ContactRoute"));
 app.use("/api", require("./Routes/ServicesRoute"));
@@ -64,7 +62,9 @@ app.use("/api", require("./Routes/Paymentroute"));
 app.use("/api", require("./Routes/MutipleAddressRoute"));
 app.use("/api", require("./Routes/WishlistRoute"));
 app.use("/api", require("./Routes/ReviewRoute"));
-app.use("/api", require("./Routes/ShipmentRoute"));
+
+
+const Product = require("./Model/Product");
 
 /* ==============================
    TEST ROUTE
@@ -72,11 +72,7 @@ app.use("/api", require("./Routes/ShipmentRoute"));
 
 const DHL_CLIENT_ID = process.env.DHL_CLIENT_ID;
 const DHL_CLIENT_SECRET = process.env.DHL_CLIENT_SECRET;
-const DHL_API_BASE =
-  (process.env.DHL_API_BASE_URL || "https://express.api.dhl.com/mydhlapi").replace(
-    /\/+$/,
-    ""
-  );
+const DHL_API_BASE = "https://express.api.dhl.com/mydhlapi";
 
 // 1. Token लेने का function
 async function getDHLToken() {
