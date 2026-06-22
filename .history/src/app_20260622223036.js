@@ -47,7 +47,7 @@ app.get("/", (_req, res) => {
   res.json({ message: "Server is running fine 🚀" });
 });
 
-const PORT = Number(process.env.PORT || process.env.REACT_APP_SERVER_DOMAIN) || 5001;
+const PORT = Number(process.env.PORT || process.env.REACT_APP_SERVER_DOMAIN) || 5000;
 app.use("/api", require("./Routes/AuthRoute"));
 app.use("/api", require("./Routes/ContactRoute"));
 app.use("/api", require("./Routes/ServicesRoute"));

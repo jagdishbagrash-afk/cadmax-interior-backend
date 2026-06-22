@@ -2,4 +2,4 @@
 .env
 .env.local
 /logs
-./history/*
+./h

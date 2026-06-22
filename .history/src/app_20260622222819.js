@@ -4,6 +4,7 @@ dotenv.config();
 require("./dbconfigration");
 const express = require("express");
 const app = express();
+const cors = require("cors");
 const getAllowedOrigins = () => {
   const configuredOrigins = process.env.CORS_ALLOWED_ORIGINS || process.env.FRONTEND_URL;
   if (!configuredOrigins) {
@@ -17,37 +18,36 @@ const getAllowedOrigins = () => {
 };
 
 const allowedOrigins = getAllowedOrigins();
-const allowedMethods = "GET,POST,PUT,PATCH,DELETE,OPTIONS";
-const allowedHeaders = "Content-Type, Authorization";
+const allowCredentials =
+  String(process.env.CORS_ALLOW_CREDENTIALS || "false").toLowerCase() === "true";
 
-app.use((req, res, next) => {
-  const requestOrigin = req.headers.origin;
-
-  if (!requestOrigin) {
-    return next();
-  }
-
-  if (allowedOrigins.includes(requestOrigin)) {
-    res.header("Access-Control-Allow-Origin", requestOrigin);
-    res.header("Vary", "Origin");
-    res.header("Access-Control-Allow-Methods", allowedMethods);
-    res.header("Access-Control-Allow-Headers", allowedHeaders);
-
-    if (req.method === "OPTIONS") {
-      return res.sendStatus(204);
+const corsOptions = {
+  origin(origin, callback) {
+    // Allow server-to-server and same-origin requests that have no Origin header.
+    if (!origin) {
+      return callback(null, true);
     }
-  }
 
-  return next();
-});
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
 
+    return callback(new Error(`Origin ${origin} is not allowed by CORS`));
+  },
+  methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "Accept"],
+  credentials: allowCredentials,
+  optionsSuccessStatus: 200,
+};
+
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '10000mb' }));
 app.use(express.urlencoded({ extended: true, limit: "10000mb" }));
 app.get("/", (_req, res) => {
   res.json({ message: "Server is running fine 🚀" });
 });
 
-const PORT = Number(process.env.PORT || process.env.REACT_APP_SERVER_DOMAIN) || 5001;
+const PORT = Number(process.env.PORT || process.env.REACT_APP_SERVER_DOMAIN) || 5000;
 app.use("/api", require("./Routes/AuthRoute"));
 app.use("/api", require("./Routes/ContactRoute"));
 app.use("/api", require("./Routes/ServicesRoute"));
