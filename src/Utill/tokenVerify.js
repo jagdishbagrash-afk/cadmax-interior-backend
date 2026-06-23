@@ -9,7 +9,6 @@ exports.verifyToken = (req, res, next) => {
         message: 'Token missing or invalid'
       });
     }
-    // console.log("authHeader", authHeader);
 
     const token = authHeader.split(' ')[1];
 

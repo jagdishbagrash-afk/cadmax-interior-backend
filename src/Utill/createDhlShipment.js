@@ -101,11 +101,7 @@ const createDhlShipment = async ({
 
   } catch (error) {
 
-    console.log(
-      "DHL ERROR",
-      error?.response?.data ||
-      error.message
-    );
+ 
 
     return {
       success: false,

@@ -196,7 +196,6 @@ const createAnyUploadMiddleware = () => {
             try {
                 const processedFiles = await processAndUploadMultipleFiles(req.files);
                 req.files = processedFiles;
-                console.log(`✅ ${processedFiles.length} files uploaded successfully (any fields)`);
                 next();
             } catch (uploadError) {
                 console.error('S3 Upload Error:', uploadError);
@@ -262,9 +261,7 @@ const deleteFile = async (fileUrl) => {
       throw new Error("Invalid file key");
     }
 
-    console.log("🗑️ Deleting from S3:");
-    console.log("Bucket:", process.env.S3_BUCKET_NAME);
-    console.log("Key:", key);
+    
 
     const result = await s3Client.send(
       new DeleteObjectCommand({

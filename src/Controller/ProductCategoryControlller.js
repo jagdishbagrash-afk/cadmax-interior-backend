@@ -45,7 +45,6 @@ exports.addCategory = CatchAsync(async (req, res) => {
         // ✅ Ab yeh kaam karega - req.file.location available hai
         if (req.file && req.file.location) {
             imageUrl = req.file.location;
-            console.log("Image uploaded to S3:", imageUrl);
 
             // Optional: Log processing stats if available
             if (req.imageProcessing) {

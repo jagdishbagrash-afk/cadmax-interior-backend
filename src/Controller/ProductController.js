@@ -32,7 +32,6 @@ const generateUniqueSlug = async (Model, title) => {
 
   exports.addProduct = CatchAsync(async (req, res) => {
     try {
-      console.log("req.body", req.body);
 
       let variants = [];
       if (req.body.variants) {
@@ -91,7 +90,6 @@ const generateUniqueSlug = async (Model, title) => {
         }
       }
 
-      console.log("productPriceSection", productPriceSection);
 
       // Updated validation: allow amount = 0, reject only negative
       if (productPriceSection.length > 0) {

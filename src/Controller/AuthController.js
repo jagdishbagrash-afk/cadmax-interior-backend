@@ -326,7 +326,6 @@ exports.VerifySignupOtp = catchAsync(async (req, res) => {
       }
     );
 
-    console.log("verifyResponse", verifyResponse.data);
 
     // Invalid OTP
     if (verifyResponse.data.type !== "success") {

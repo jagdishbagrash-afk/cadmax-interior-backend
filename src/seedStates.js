@@ -7,7 +7,6 @@ const seedIndiaStates = async () => {
   try {
     await mongoose.connect(process.env.DB_URL);
 
-    console.log("✅ MongoDB Connected");
 
     // Purana India data delete
     await State.deleteMany({ country: "India" });
@@ -22,7 +21,6 @@ const seedIndiaStates = async () => {
     const states = statesResponse?.data?.data?.states || [];
 
     for (const state of states) {
-      console.log(`Fetching ${state.name}...`);
 
       const citiesResponse = await axios.post(
         "https://countriesnow.space/api/v0.1/countries/state/cities",
@@ -40,10 +38,8 @@ const seedIndiaStates = async () => {
         cities: citiesResponse?.data?.data || [],
       });
 
-      console.log(`✅ Saved ${state.name}`);
     }
 
-    console.log("🎉 India States & Cities Seeded Successfully");
     process.exit(0);
   } catch (error) {
     console.error(error);

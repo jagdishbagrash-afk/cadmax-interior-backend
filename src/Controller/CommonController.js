@@ -620,160 +620,246 @@ exports.getCart = catchAsync(async (req, res) => {
     const cart = await Cart.findOne({
       user: req.user.id,
       status: "pending",
-    }).populate({
-      path: "product.productId",
-      select: "title description slug amount discount_amount final_amount variants product_price_section stock_status"
-    });
+    })
+      .populate({
+        path: "product.productId",
+      })
+      .lean();
 
     if (!cart || !cart.product || cart.product.length === 0) {
-      return successResponse(
-        res,
-        "Cart is empty",
-        200,
-        {
-          items: [],
-          summary: {
-            subtotal: 0,
-            totalDiscount: 0,
-            cartDiscount: 0,
-            cartDiscountAmount: 0,
-            tax: 2,
-            taxAmount: 0,
-            totalAmount: 0,
-            itemCount: 0,
-            uniqueItems: 0,
-            status: "pending",
-            lastUpdated: new Date()
-          },
-        }
-      );
+      return successResponse(res, "Cart is empty", 200, {
+        items: [],
+        summary: {
+          subtotal: 0,
+          totalDiscount: 0,
+          cartDiscount: 0,
+          cartDiscountAmount: 0,
+          tax: 2,
+          taxAmount: 0,
+          totalAmount: 0,
+          itemCount: 0,
+          uniqueItems: 0,
+          status: "pending",
+          hasOutOfStockItems: false,
+          lastUpdated: new Date(),
+        },
+      });
     }
 
     let subtotal = 0;
     let totalDiscount = 0;
-    const items = [];
     let hasOutOfStockItems = false;
+
+    const items = [];
 
     for (const item of cart.product) {
       const product = item.productId;
 
       if (!product) {
-        console.warn(`Product not found for cart item: ${item._id}`);
+        console.warn(`Product not found for cart item ${item._id}`);
         continue;
       }
 
-      const variantData = product.variants?.find(
-        (v) =>
-          v.color?.toLowerCase().trim() ===
-          item.variant?.toLowerCase().trim()
-      );
+      const variantData =
+        product?.variants?.find(
+          (variant) =>
+            variant?.color?.toLowerCase()?.trim() ===
+            item?.variant?.toLowerCase()?.trim()
+        ) || null;
 
-      if (!variantData) {
-        console.warn(`Variant ${item.variant} not found for product ${product._id}`);
-        continue;
-      }
+      let itemPrice = item.price || 0;
+      let itemOriginalPrice = item.originalPrice || 0;
+      let itemDiscount = item.discount || 0;
+      let priceSectionData = null;
 
-      // Use stored price from cart (saved at time of adding to cart)
-      let itemPrice = item.price;
-      let itemOriginalPrice = item.originalPrice;
-      let itemDiscount = item.discount;
-      let priceSectionData = item.priceSection;
+      // Handle Price Section Products
+      if (
+        product?.product_price_section?.length > 0 &&
+        item?.priceSection
+      ) {
+        priceSectionData = product.product_price_section.find(
+          (section) =>
+            section.title?.toLowerCase()?.trim() ===
+            item.priceSection?.toLowerCase()?.trim()
+        );
 
-      // Fallback for backward compatibility (if price not stored in cart)
-      if (!itemPrice || itemPrice === 0) {
-        // Check if product has price sections and main amount is 0
-        if (product.product_price_section?.length > 0 && (!product.amount || product.amount === 0)) {
-          // Try to find matching price section by title
-          const matchingSection = product.product_price_section.find(
-            section => section.title === priceSectionData?.title
-          );
-          
-          if (matchingSection) {
-            itemPrice = matchingSection.final_amount;
-            itemOriginalPrice = matchingSection.amount;
-            itemDiscount = matchingSection.discount_amount;
-            priceSectionData = matchingSection;
-          } else if (product.product_price_section[0]) {
-            // Use first price section as fallback
-            itemPrice = product.product_price_section[0].final_amount;
-            itemOriginalPrice = product.product_price_section[0].amount;
-            itemDiscount = product.product_price_section[0].discount_amount;
-            priceSectionData = product.product_price_section[0];
-          }
-        } else {
-          // Use variant price from product
-          itemPrice = variantData.final_amount || variantData.amount || product.final_amount || product.amount;
-          itemOriginalPrice = variantData.amount || product.amount;
-          itemDiscount = variantData.discount_amount || product.discount_amount || 0;
+        if (priceSectionData) {
+          itemPrice =
+            item.price ||
+            priceSectionData.final_amount ||
+            priceSectionData.amount;
+
+          itemOriginalPrice =
+            item.originalPrice || priceSectionData.amount;
+
+          itemDiscount =
+            item.discount ||
+            priceSectionData.discount_amount ||
+            0;
         }
       }
 
-      const itemQuantity = item.quantity;
-      const itemSubtotal = itemPrice * itemQuantity;
-      const itemOriginalSubtotal = itemOriginalPrice * itemQuantity;
-      const itemDiscountAmount = itemOriginalSubtotal - itemSubtotal;
+      // Fallback Variant Pricing
+      if (!itemPrice || itemPrice === 0) {
+        itemPrice =
+          variantData?.final_amount ||
+          variantData?.amount ||
+          product?.final_amount ||
+          product?.amount ||
+          0;
+
+        itemOriginalPrice =
+          variantData?.amount ||
+          product?.amount ||
+          itemPrice;
+
+        itemDiscount =
+          variantData?.discount_amount ||
+          product?.discount_amount ||
+          0;
+      }
+
+      const quantity = item.quantity || 1;
+
+      const itemSubtotal = itemPrice * quantity;
+      const itemOriginalSubtotal =
+        itemOriginalPrice * quantity;
+
+      const itemDiscountAmount =
+        itemOriginalSubtotal - itemSubtotal;
 
       subtotal += itemOriginalSubtotal;
       totalDiscount += itemDiscountAmount;
 
-      const isOutOfStock = variantData.stock < itemQuantity;
-      if (isOutOfStock) hasOutOfStockItems = true;
+      const availableStock =
+        variantData?.stock ??
+        product?.stock ??
+        0;
+
+      const isOutOfStock =
+        availableStock < quantity;
+
+      if (isOutOfStock) {
+        hasOutOfStockItems = true;
+      }
 
       items.push({
         cartItemId: item._id,
-        productId: product._id,
-        title: product.title,
-        description: product.description,
-        slug: product.slug,
-        variant: variantData.color,
-        variantTitle: variantData.title || `${variantData.color} Variant`,
-        quantity: itemQuantity,
-        maxStock: variantData.stock,
-        // Price details
-        originalPrice: itemOriginalPrice,
-        discountAmount: itemDiscount,
-        finalPrice: itemPrice,
-        // Price section details
-        priceSection: priceSectionData ? {
-          title: priceSectionData.title,
-          amount: priceSectionData.amount,
-          discount_amount: priceSectionData.discount_amount,
-          final_amount: priceSectionData.final_amount
-        } : null,
-        // Images
-        images: variantData.images || [],
-        // Item totals
-        itemSubtotal: itemSubtotal,
-        itemOriginalSubtotal: itemOriginalSubtotal,
-        itemDiscountAmount: itemDiscountAmount,
-        // Status flags
-        isOutOfStock: isOutOfStock,
-        stock_status: product.stock_status
+
+        // COMPLETE PRODUCT DATA
+        product,
+        // SELECTED OPTIONS
+        selectedVariant: item.variant || null,
+        selectedSize: item.size || null,
+        variant: variantData
+          ? {
+              _id: variantData._id,
+              title: variantData.title,
+              color: variantData.color,
+              stock: variantData.stock,
+              amount: variantData.amount,
+              final_amount: variantData.final_amount,
+              discount_amount:
+                variantData.discount_amount,
+              images: variantData.images || [],
+            }
+          : null,
+
+        priceDetails: {
+          originalPrice: itemOriginalPrice,
+          discountAmount: itemDiscount,
+          finalPrice: itemPrice,
+        },
+
+        // PRICE SECTION DETAILS
+        priceSection: priceSectionData
+          ? {
+              _id: priceSectionData._id,
+              title: priceSectionData.title,
+            }
+          : null,
+
+        quantity,
+
+        // TOTALS
+        itemSubtotal,
+        itemOriginalSubtotal,
+        itemDiscountAmount,
+
+        // STOCK
+        availableStock,
+        isOutOfStock,
+
+        stock_status:
+          product.stock_status || "in_stock",
       });
     }
 
-    // Calculate cart totals
-    const taxPercentage = cart.tax || 2;
-    const cartDiscountPercentage = cart.discount || 2;
-    
-    const cartDiscountAmount = (subtotal * cartDiscountPercentage) / 100;
-    const taxAmount = (subtotal * taxPercentage) / 100;
-    const totalAmount = subtotal - totalDiscount - cartDiscountAmount + taxAmount;
+    const cartDiscountPercentage =
+      cart.discount || 2;
+
+    const taxPercentage =
+      cart.tax || 2;
+
+    const cartDiscountAmount =
+      (subtotal * cartDiscountPercentage) / 100;
+
+    const taxableAmount =
+      subtotal -
+      totalDiscount -
+      cartDiscountAmount;
+
+    const taxAmount =
+      (taxableAmount * taxPercentage) / 100;
+
+    const totalAmount =
+      taxableAmount + taxAmount;
 
     const summary = {
-      subtotal: Math.round(subtotal * 100) / 100,
-      totalDiscount: Math.round(totalDiscount * 100) / 100,
+      subtotal: Number(subtotal.toFixed(2)),
+
+      totalDiscount: Number(
+        totalDiscount.toFixed(2)
+      ),
+
+      savings: Number(
+        (
+          totalDiscount +
+          cartDiscountAmount
+        ).toFixed(2)
+      ),
+
       cartDiscount: cartDiscountPercentage,
-      cartDiscountAmount: Math.round(cartDiscountAmount * 100) / 100,
+
+      cartDiscountAmount: Number(
+        cartDiscountAmount.toFixed(2)
+      ),
+
       tax: taxPercentage,
-      taxAmount: Math.round(taxAmount * 100) / 100,
-      totalAmount: Math.round(totalAmount * 100) / 100,
-      itemCount: items.reduce((sum, item) => sum + item.quantity, 0),
+
+      taxAmount: Number(
+        taxAmount.toFixed(2)
+      ),
+
+      totalAmount: Number(
+        totalAmount.toFixed(2)
+      ),
+
+      itemCount: items.reduce(
+        (total, item) =>
+          total + item.quantity,
+        0
+      ),
+
       uniqueItems: items.length,
+
       status: cart.status,
-      hasOutOfStockItems: hasOutOfStockItems,
+
+      hasOutOfStockItems,
+
+      createdAt: cart.createdAt,
+
       lastUpdated: cart.updatedAt,
-      createdAt: cart.createdAt
     };
 
     return successResponse(
@@ -782,11 +868,12 @@ exports.getCart = catchAsync(async (req, res) => {
       200,
       {
         items,
-        summary
+        summary,
       }
     );
   } catch (error) {
-    console.error("Error in getCart:", error);
+    console.error("Get Cart Error:", error);
+
     return errorResponse(
       res,
       error.message || "Internal Server Error",
