@@ -1357,7 +1357,7 @@ exports.getCart = catchAsync(async (req, res) => {
       })
       .lean();
 
-    if (!cart || !cart.product || cart.product.length === 0) {
+    if (!cart || !cart.product?.length) {
       return successResponse(res, "Cart is empty", 200, {
         items: [],
         summary: {
@@ -1386,67 +1386,105 @@ exports.getCart = catchAsync(async (req, res) => {
     for (const item of cart.product) {
       const product = item.productId;
 
-      if (!product) {
-        console.warn(`Product not found for cart item ${item._id}`);
-        continue;
-      }
+      if (!product) continue;
 
-      const variantData =
+      // ==========================
+      // Selected Variant
+      // ==========================
+      const selectedVariant =
         product?.variants?.find(
           (variant) =>
             variant?.color?.toLowerCase()?.trim() ===
             item?.variant?.toLowerCase()?.trim()
         ) || null;
 
-      let itemPrice = item.price || 0;
-      let itemOriginalPrice = item.originalPrice || 0;
-      let itemDiscount = item.discount || 0;
-      let priceSectionData = null;
+      // ==========================
+      // Selected Price Section
+      // ==========================
+      let selectedPriceSection = null;
+      let selectedSize = null;
 
-      // Handle Price Section Products
       if (
-        product?.product_price_section?.length > 0 &&
+        product?.product_price_section?.length &&
         item?.priceSection
       ) {
-        priceSectionData = product.product_price_section.find(
-          (section) =>
-            section.title?.toLowerCase()?.trim() ===
-            item.priceSection?.toLowerCase()?.trim()
-        );
+        selectedPriceSection =
+          product.product_price_section.find(
+            (section) =>
+              section?.title?.toLowerCase()?.trim() ===
+              item?.priceSection?.toLowerCase()?.trim()
+          ) || null;
 
-        if (priceSectionData) {
-          itemPrice =
-            item.price ||
-            priceSectionData.final_amount ||
-            priceSectionData.amount;
+        if (selectedPriceSection?.sizes?.length) {
+          selectedSize =
+            selectedPriceSection.sizes.find(
+              (size) =>
+                size?.title?.toLowerCase()?.trim() ===
+                item?.size?.toLowerCase()?.trim()
+            ) || null;
+        }
 
-          itemOriginalPrice =
-            item.originalPrice || priceSectionData.amount;
-
-          itemDiscount =
-            item.discount ||
-            priceSectionData.discount_amount ||
-            0;
+        if (selectedPriceSection) {
+          selectedPriceSection = {
+            ...selectedPriceSection,
+            sizes: selectedSize ? [selectedSize] : [],
+          };
         }
       }
 
-      // Fallback Variant Pricing
-      if (!itemPrice || itemPrice === 0) {
+      // ==========================
+      // Price Calculation
+      // ==========================
+      let itemPrice = item.price || 0;
+      let itemOriginalPrice = item.originalPrice || 0;
+      let itemDiscount = item.discount || 0;
+
+      if (selectedSize) {
         itemPrice =
-          variantData?.final_amount ||
-          variantData?.amount ||
-          product?.final_amount ||
-          product?.amount ||
+          item.price || selectedSize.final_amount || 0;
+
+        itemOriginalPrice =
+          item.originalPrice || selectedSize.amount || 0;
+
+        itemDiscount =
+          item.discount ||
+          selectedSize.discount_amount ||
+          0;
+      } else if (selectedPriceSection) {
+        itemPrice =
+          item.price ||
+          selectedPriceSection.final_amount ||
+          selectedPriceSection.amount ||
           0;
 
         itemOriginalPrice =
-          variantData?.amount ||
-          product?.amount ||
+          item.originalPrice ||
+          selectedPriceSection.amount ||
+          0;
+
+        itemDiscount =
+          item.discount ||
+          selectedPriceSection.discount_amount ||
+          0;
+      } else {
+        itemPrice =
+          item.price ||
+          selectedVariant?.final_amount ||
+          selectedVariant?.amount ||
+          product.final_amount ||
+          product.amount ||
+          0;
+
+        itemOriginalPrice =
+          item.originalPrice ||
+          selectedVariant?.amount ||
+          product.amount ||
           itemPrice;
 
         itemDiscount =
-          variantData?.discount_amount ||
-          product?.discount_amount ||
+          item.discount ||
+          selectedVariant?.discount_amount ||
+          product.discount_amount ||
           0;
       }
 
@@ -1463,7 +1501,7 @@ exports.getCart = catchAsync(async (req, res) => {
       totalDiscount += itemDiscountAmount;
 
       const availableStock =
-        variantData?.stock ??
+        selectedVariant?.stock ??
         product?.stock ??
         0;
 
@@ -1474,55 +1512,22 @@ exports.getCart = catchAsync(async (req, res) => {
         hasOutOfStockItems = true;
       }
 
+      // ==========================
+      // Filter Product Data
+      // ==========================
+      const filteredProduct = {
+        ...product,
+        variants: selectedVariant
+          ? [selectedVariant]
+          : [],
+        product_price_section:
+          selectedPriceSection
+            ? [selectedPriceSection]
+            : [],
+      };
+
       items.push({
-        cartItemId: item._id,
-
-        // COMPLETE PRODUCT DATA
-        product,
-        // SELECTED OPTIONS
-        selectedVariant: item.variant || null,
-        selectedSize: item.size || null,
-        variant: variantData
-          ? {
-              _id: variantData._id,
-              title: variantData.title,
-              color: variantData.color,
-              stock: variantData.stock,
-              amount: variantData.amount,
-              final_amount: variantData.final_amount,
-              discount_amount:
-                variantData.discount_amount,
-              images: variantData.images || [],
-            }
-          : null,
-
-        priceDetails: {
-          originalPrice: itemOriginalPrice,
-          discountAmount: itemDiscount,
-          finalPrice: itemPrice,
-        },
-
-        // PRICE SECTION DETAILS
-        priceSection: priceSectionData
-          ? {
-              _id: priceSectionData._id,
-              title: priceSectionData.title,
-            }
-          : null,
-
-        quantity,
-
-        // TOTALS
-        itemSubtotal,
-        itemOriginalSubtotal,
-        itemDiscountAmount,
-
-        // STOCK
-        availableStock,
-        isOutOfStock,
-
-        stock_status:
-          product.stock_status || "in_stock",
+        product: filteredProduct,
       });
     }
 
@@ -1548,10 +1553,7 @@ exports.getCart = catchAsync(async (req, res) => {
 
     const summary = {
       subtotal: Number(subtotal.toFixed(2)),
-
-      totalDiscount: Number(
-        totalDiscount.toFixed(2)
-      ),
+      totalDiscount: Number(totalDiscount.toFixed(2)),
 
       savings: Number(
         (
@@ -1577,8 +1579,7 @@ exports.getCart = catchAsync(async (req, res) => {
       ),
 
       itemCount: items.reduce(
-        (total, item) =>
-          total + item.quantity,
+        (sum, item) => sum + item.quantity,
         0
       ),
 
