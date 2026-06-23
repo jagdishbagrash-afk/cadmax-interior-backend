@@ -1527,7 +1527,22 @@ exports.getCart = catchAsync(async (req, res) => {
       };
 
       items.push({
+        cartItemId: item._id,
+
         product: filteredProduct,
+
+        quantity,
+
+      
+        itemSubtotal,
+        itemOriginalSubtotal,
+        itemDiscountAmount,
+
+        availableStock,
+        isOutOfStock,
+
+        stock_status:
+          product.stock_status || "in_stock",
       });
     }
 
