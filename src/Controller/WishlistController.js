@@ -14,6 +14,18 @@ exports.getWishlist = catchAsync(async (req, res) => {
 
   const products = wishlist?.productIds || [];
 
+  // Merge variant data with products
+  const productsWithVariants = products.map((product) => {
+    const wishlistItem = wishlist?.items?.find(
+      (item) => item.productId.toString() === product._id.toString()
+    );
+
+    return {
+      ...product.toObject ? product.toObject() : product,
+      _wishlistItem: wishlistItem || null,
+    };
+  });
+
   //  Recommendations: Last 6 recently added products
   let recommendations = [];
   if (products.length > 0) {
@@ -45,11 +57,11 @@ exports.getWishlist = catchAsync(async (req, res) => {
 
   return successResponse(res, "Wishlist fetched successfully", 200, {
     userId,
-    count: products.length,
-    products,
+    count: productsWithVariants.length,
+    products: productsWithVariants,
     recommendations,
     stats: {
-      totalItems: products.length,
+      totalItems: productsWithVariants.length,
       totalSavings,
       lowStockCount,
     },
@@ -59,7 +71,7 @@ exports.getWishlist = catchAsync(async (req, res) => {
 // ADD product to wishlist
 exports.addToWishlist = catchAsync(async (req, res) => {
   const userId = req.user.id;
-  const { productId } = req.body;
+  const { productId, selectedVariant, selectedPriceSection, selectedSize } = req.body;
 
   if (!productId) {
     return errorResponse(res, "Product ID is required", 400);
@@ -77,7 +89,7 @@ exports.addToWishlist = catchAsync(async (req, res) => {
   let wishlist = await Wishlist.findOne({ userId });
 
   if (!wishlist) {
-    wishlist = new Wishlist({ userId, productIds: [] });
+    wishlist = new Wishlist({ userId, productIds: [], items: [] });
   }
 
   if (wishlist.productIds.includes(productId)) {
@@ -85,6 +97,18 @@ exports.addToWishlist = catchAsync(async (req, res) => {
   }
 
   wishlist.productIds.push(productId);
+
+  // Store variant selection if provided
+  if (selectedVariant || selectedPriceSection || selectedSize) {
+    const wishlistItem = {
+      productId,
+      selectedVariant: selectedVariant || null,
+      selectedPriceSection: selectedPriceSection || null,
+      selectedSize: selectedSize || null,
+    };
+    wishlist.items.push(wishlistItem);
+  }
+
   await wishlist.save();
 
   return successResponse(res, "Added to Wishlist", 200, wishlist);
@@ -111,6 +135,15 @@ exports.removeFromWishlist = catchAsync(async (req, res) => {
   }
 
   wishlist.productIds.splice(index, 1);
+
+  // Also remove from items array
+  const itemIndex = wishlist.items.findIndex(
+    (item) => item.productId.toString() === productId
+  );
+  if (itemIndex !== -1) {
+    wishlist.items.splice(itemIndex, 1);
+  }
+
   await wishlist.save();
 
   return successResponse(res, "Removed from Wishlist", 200, wishlist);
@@ -137,6 +170,15 @@ exports.removeFromWishlistByProductId = catchAsync(async (req, res) => {
   }
 
   wishlist.productIds.splice(index, 1);
+
+  // Also remove from items array
+  const itemIndex = wishlist.items.findIndex(
+    (item) => item.productId.toString() === productId
+  );
+  if (itemIndex !== -1) {
+    wishlist.items.splice(itemIndex, 1);
+  }
+
   await wishlist.save();
 
   return successResponse(res, "Deleted from Wishlist", 200, wishlist);
@@ -145,7 +187,7 @@ exports.removeFromWishlistByProductId = catchAsync(async (req, res) => {
 // TOGGLE wishlist status
 exports.toggleWishlist = catchAsync(async (req, res) => {
   const userId = req.user.id;
-  const { productId } = req.body;
+  const { productId, selectedVariant, selectedPriceSection, selectedSize } = req.body;
 
   if (!productId) {
     return errorResponse(res, "Product ID is required", 400);
@@ -163,7 +205,7 @@ exports.toggleWishlist = catchAsync(async (req, res) => {
   let wishlist = await Wishlist.findOne({ userId });
 
   if (!wishlist) {
-    wishlist = new Wishlist({ userId, productIds: [] });
+    wishlist = new Wishlist({ userId, productIds: [], items: [] });
   }
 
   const exists = wishlist.productIds.includes(productId);
@@ -171,6 +213,15 @@ exports.toggleWishlist = catchAsync(async (req, res) => {
   if (exists) {
     const index = wishlist.productIds.indexOf(productId);
     wishlist.productIds.splice(index, 1);
+
+    // Also remove from items array
+    const itemIndex = wishlist.items.findIndex(
+      (item) => item.productId.toString() === productId
+    );
+    if (itemIndex !== -1) {
+      wishlist.items.splice(itemIndex, 1);
+    }
+
     await wishlist.save();
     return successResponse(res, "Removed from Wishlist", 200, {
       wishlist,
@@ -178,6 +229,18 @@ exports.toggleWishlist = catchAsync(async (req, res) => {
     });
   } else {
     wishlist.productIds.push(productId);
+
+    // Store variant selection if provided
+    if (selectedVariant || selectedPriceSection || selectedSize) {
+      const wishlistItem = {
+        productId,
+        selectedVariant: selectedVariant || null,
+        selectedPriceSection: selectedPriceSection || null,
+        selectedSize: selectedSize || null,
+      };
+      wishlist.items.push(wishlistItem);
+    }
+
     await wishlist.save();
     return successResponse(res, "Added to Wishlist", 200, {
       wishlist,

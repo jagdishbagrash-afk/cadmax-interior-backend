@@ -14,6 +14,31 @@ const wishlistSchema = new mongoose.Schema(
         ref: "Product",
       },
     ],
+    items: [
+      {
+        productId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Product",
+          required: true,
+        },
+        selectedVariant: {
+          color: String,
+          images: [String],
+        },
+        selectedPriceSection: {
+          title: String,
+          amount: Number,
+          final_amount: Number,
+          discount_amount: Number,
+        },
+        selectedSize: {
+          title: String,
+          amount: Number,
+          final_amount: Number,
+          discount_amount: Number,
+        },
+      },
+    ],
   },
   {
     timestamps: true,

@@ -215,13 +215,21 @@ exports.addOrder = catchAsync(async (req, res) => {
       );
     }
 
-    const currentStock =
-      productData?.variants?.[0]?.stock || 0;
+    // Find the specific variant by color
+    const variantColor = item.variant?.toLowerCase();
+    const variantIndex = productData.variants.findIndex(
+      v => v.color.toLowerCase() === variantColor
+    );
+
+    // If variant not found, check first variant as fallback
+    const currentStock = variantIndex !== -1
+      ? productData.variants[variantIndex].stock || 0
+      : productData?.variants?.[0]?.stock || 0;
 
     if (currentStock < item.quantity) {
       return validationErrorResponse(
         res,
-        `${productData.title} is out of stock`
+        `${productData.title} (${item.variant || 'Default'}) is out of stock. Available: ${currentStock}`
       );
     }
 
@@ -282,38 +290,69 @@ exports.addOrder = catchAsync(async (req, res) => {
   // Reduce Stock
   // ==========================
   for (const item of product) {
-    const updatedProduct =
-      await Product.findOneAndUpdate(
-        {
-          _id: item.id,
-          "variants.0.stock": {
-            $gte: item.quantity,
-          },
+    // Find the product first to get variant info
+    const productData = await Product.findById(item.id);
+    
+    if (!productData) {
+      continue;
+    }
+
+    // Find the specific variant by color (item.variant contains the color)
+    const variantColor = item.variant?.toLowerCase();
+    const variantIndex = productData.variants.findIndex(
+      v => v.color.toLowerCase() === variantColor
+    );
+
+    if (variantIndex === -1) {
+      // Fallback to first variant if color not found
+      continue;
+    }
+
+    // Update the specific variant's stock
+    const updatedProduct = await Product.findOneAndUpdate(
+      {
+        _id: item.id,
+        [`variants.${variantIndex}.stock`]: {
+          $gte: item.quantity,
         },
-        {
-          $inc: {
-            "variants.0.stock": -item.quantity,
-          },
+      },
+      {
+        $inc: {
+          [`variants.${variantIndex}.stock`]: -item.quantity,
         },
-        {
-          new: true,
-          runValidators: false,
-        }
-      );
+      },
+      {
+        new: true,
+        runValidators: false,
+      }
+    );
 
     if (!updatedProduct) {
       continue;
     }
 
-    const remainingStock =
-      updatedProduct?.variants?.[0]?.stock || 0;
+    // Check if any variant still has stock
+    const anyVariantInStock = updatedProduct.variants.some(
+      v => v.stock > 0
+    );
 
-    if (remainingStock <= 0) {
+    // Update stock_status based on whether any variant is in stock
+    if (!anyVariantInStock) {
       await Product.updateOne(
         { _id: item.id },
         {
           $set: {
             stock_status: "out_of_stock",
+          },
+        }
+      );
+    } else {
+      // Ensure product is marked as in_stock if at least one variant has stock
+      await Product.updateOne(
+        { _id: item.id },
+        {
+          $set: {
+            stock_status: "in_stock",
           },
         }
       );
