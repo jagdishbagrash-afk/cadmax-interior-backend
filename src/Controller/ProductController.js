@@ -298,15 +298,25 @@ exports.updateProduct = CatchAsync(async (req, res) => {
           images = [...images, ...variantImageMap[colorKey]];
         }
 
+        // Ensure stock is never negative - use existing stock if new value is invalid
+        let newStock = Number(v.stock);
+        if (isNaN(newStock) || newStock < 0) {
+          newStock = existingVariant ? existingVariant.stock : 0;
+        }
+
         return {
           title: v.title || `${v.color} Variant`,
           color: colorKey,
-          stock: Number(v.stock) || (existingVariant ? existingVariant.stock : 0),
+          stock: newStock,
           images: images
         };
       });
 
       product.variants = updatedVariants;
+
+      // Update stock_status based on variant stock levels
+      const anyVariantInStock = updatedVariants.some(v => v.stock > 0);
+      product.stock_status = anyVariantInStock ? "in_stock" : "out_of_stock";
     }
 
     // Update price sections with sizes
