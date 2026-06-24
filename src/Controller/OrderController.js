@@ -369,10 +369,14 @@ exports.addOrder = catchAsync(async (req, res) => {
 
 exports.getAllOrders = catchAsync(async (req, res) => {
   try {
-    const orders = await Order.find().populate({
-      path: "product.id",
-      model: "Product",
-    })
+    const orders = await Order.find()  .populate({
+        path: "product.id",
+        model: "Product",
+      })
+      .populate({
+        path: "addressId",
+        model: "Address", // apne Address model ka naam yahan likhein
+      })
       .sort({ createdAt: -1 });
     return successResponse(res, "Orders fetched successfully", 200, orders);
   } catch (error) {
@@ -508,20 +512,37 @@ exports.updateStatus = catchAsync(async (req, res) => {
 });
 
 
-exports.getOrdersByUser = catchAsync(async (req, res) => {
+  exports.getOrdersByUser = catchAsync(async (req, res) => {
   try {
     const userId = req.user?.id;
+
     if (!userId) {
       return errorResponse(res, "Please provide userId", 401);
     }
-    const orders = await Order.find({ userId }).populate({
-      path: "product.id",
-      model: "Product",
-    })
+
+    const orders = await Order.find({ userId })
+      .populate({
+        path: "product.id",
+        model: "Product",
+      })
+      .populate({
+        path: "addressId",
+        model: "Address", // apne Address model ka naam yahan likhein
+      })
       .sort({ createdAt: -1 });
-    return successResponse(res, "User orders fetched successfully", 200, orders);
+
+    return successResponse(
+      res,
+      "User orders fetched successfully",
+      200,
+      orders
+    );
   } catch (error) {
     console.error(error);
-    return errorResponse(res, error.message || "Internal Server Error", 500);
+    return errorResponse(
+      res,
+      error.message || "Internal Server Error",
+      500
+    );
   }
 });
