@@ -259,6 +259,8 @@ exports.updateProduct = CatchAsync(async (req, res) => {
     if (req.body.material) product.material = req.body.material;
     if (req.body.type) product.type = req.body.type;
     if (req.body.terms) product.terms = req.body.terms;
+    if (req.body.stock_status) product.stock_status ="in_stock" ;
+
 
     // Handle variant images
     const variantImageMap = {};
