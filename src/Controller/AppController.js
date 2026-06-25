@@ -2797,3 +2797,18 @@ exports.addToWishlist = catchAsync(async (req, res) => {
 
   return successResponse(res, "Added to Wishlist", 200, wishlist);
 });
+
+exports.getMaintenanceStatus = catchAsync(async (req, res) => {
+return res.status(200).json({
+success: false,
+maintenance: true,
+message: "Server under maintenance",
+data: {
+title: "Maintenance Break",
+description:
+"We are currently upgrading our services. Please try again later.",
+supportEmail: "info@cadmaxatelier.com",
+retryAfter: 300
+}
+});
+});
