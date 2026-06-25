@@ -82,8 +82,8 @@ AppRoute.get("/app/states", getStates);
 AppRoute.get("/app/cities/:state", getCitiesByState);
 
 
-AppRoute.post("/review/delete/:reviewId", verifyToken, deleteReview);
+AppRoute.post("/app/review/delete/:reviewId", verifyToken, deleteReview);
 
-AppRoute.get("/maintenance-status", getMaintenanceStatus);
+AppRoute.get("/app/maintenance-status", getMaintenanceStatus);
 
 module.exports = AppRoute;
