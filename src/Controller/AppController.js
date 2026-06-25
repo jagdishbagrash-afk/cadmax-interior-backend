@@ -3,6 +3,7 @@ const catchAsync = require("../Utill/catchAsync");
 const User = require("../Model/User");
 const SubCategory = require("../Model/SubProductCategory");
 const Category = require("../Model/ProductCategroy")
+
 const Address =  require("../Model/MultipleAddress")
 const { v4: uuidv4 } = require("uuid");
 // const nodemailer = require("nodemailer");
@@ -2798,17 +2799,40 @@ exports.addToWishlist = catchAsync(async (req, res) => {
   return successResponse(res, "Added to Wishlist", 200, wishlist);
 });
 
+
 exports.getMaintenanceStatus = catchAsync(async (req, res) => {
-return res.status(200).json({
-success: false,
-maintenance: true,
-message: "Server under maintenance",
-data: {
-title: "Maintenance Break",
-description:
-"We are currently upgrading our services. Please try again later.",
-supportEmail: "info@cadmaxatelier.com",
-retryAfter: 300
+try {
+const response = await axios.get(
+"https://api.cadmaxatelier.com/",
+{
+timeout: 5000,
 }
+);
+
+return res.status(200).json({
+  success: true,
+  maintenance: false,
+  message: "Server is running",
+  data: response.data,
 });
+
+} catch (error) {
+const status = error?.response?.status;
+
+if ([500, 502, 503, 504].includes(status) || !error.response) {
+  return res.status(200).json({
+    success: false,
+    maintenance: true,
+    message: "Server under maintenance",
+    data: {
+      title: "Maintenance Break",
+      description:
+        "We are currently upgrading our services. Please try again later.",
+      retryAfter: 300,
+    },
+  });
+}
+
+throw error;
+}
 });
