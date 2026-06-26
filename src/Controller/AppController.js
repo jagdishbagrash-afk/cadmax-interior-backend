@@ -4,7 +4,7 @@ const User = require("../Model/User");
 const SubCategory = require("../Model/SubProductCategory");
 const Category = require("../Model/ProductCategroy")
 
-const Address =  require("../Model/MultipleAddress")
+const Address = require("../Model/MultipleAddress")
 const { v4: uuidv4 } = require("uuid");
 // const nodemailer = require("nodemailer");
 const { validationErrorResponse, errorResponse, successResponse } = require("../Utill/ErrorHandling");
@@ -599,25 +599,25 @@ exports.signup = catchAsync(async (req, res) => {
     });
 
     const result = await record.save();
-    console.log("rs",result)
+    console.log("rs", result)
     const token = jwt.sign(
       { id: result._id, role: result.role, email: result.email },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || "365d" }
     );
 
-   try {
-  const subject = "Welcome to Cadmax! 🎉";
-  const emailHtml = Welcome(result.name);
+    try {
+      const subject = "Welcome to Cadmax! 🎉";
+      const emailHtml = Welcome(result.name);
 
-  await sendEmail({
-    email: result.email,
-    subject,
-    emailHtml,
-  });
-} catch (err) {
-  console.error("Email Error:", err.message);
-}
+      await sendEmail({
+        email: result.email,
+        subject,
+        emailHtml,
+      });
+    } catch (err) {
+      console.error("Email Error:", err.message);
+    }
 
     return successResponse(
       res,
@@ -891,7 +891,7 @@ exports.AppOrder = catchAsync(async (req, res) => {
 
 
 exports.OrderList = catchAsync(async (req, res) => {
-    const userId = req.user?.id;
+  const userId = req.user?.id;
 
   const orders = await Order.find({ userId })
     .populate({
@@ -968,7 +968,7 @@ exports.getSubCategoryByCategory = catchAsync(async (req, res) => {
     const categoryId = req.params.id;
     const subCategories = await SubCategory.find({
       category: categoryId,
-      status : true
+      status: true
     }).populate("category");
 
     if (!subCategories || subCategories?.length === 0) {
@@ -1025,7 +1025,7 @@ exports.getProductByCategory = catchAsync(async (req, res) => {
 exports.getProductBySubCategory = catchAsync(async (req, res) => {
   try {
     const { id } = req.params;
-    const {userid} = req.query 
+    const { userid } = req.query
     const filter = {
       subcategory: id,
       deletedAt: null,
@@ -1034,7 +1034,7 @@ exports.getProductBySubCategory = catchAsync(async (req, res) => {
       .populate("subcategory")
       .populate("category")
       .sort({ createdAt: -1 })
-    
+
 
     return successResponse(res, "Products fetched by category", 200,
       products);
@@ -1160,12 +1160,12 @@ exports.AddToCart = catchAsync(async (req, res) => {
       cart.product.find(
         (item) =>
           item.productId.toString() ===
-            productId &&
+          productId &&
           item.variant ===
-            normalizedVariant &&
+          normalizedVariant &&
           item.size === size &&
           item.priceSection ===
-            priceSection
+          priceSection
       );
 
     if (existingItem) {
@@ -1219,7 +1219,7 @@ exports.AddToCart = catchAsync(async (req, res) => {
     return errorResponse(
       res,
       error.message ||
-        "Internal Server Error",
+      "Internal Server Error",
       500
     );
   }
@@ -1534,7 +1534,7 @@ exports.getCart = catchAsync(async (req, res) => {
 
         quantity,
 
-      
+
         itemSubtotal,
         itemOriginalSubtotal,
         itemDiscountAmount,
@@ -1705,36 +1705,36 @@ exports.GetAllProject = catchAsync(async (req, res) => {
 exports.GetServicesType = catchAsync(
   async (req, res) => {
     try {
-       const residentialRaw = await ServicesType.find({
-            TypeServices: "Residential",
-          });
-      
-          const orderMap = {
-            facades: 1,
-            "landscaping & gazebo": 2,
-            "living room": 3,
-            "drwaing room": 4,
-            bedroom: 5,
-            kitchen: 6,
-            staircase: 7,
-            "pooja room": 8,
-            washroom: 9,
-          };
-      
-          const residentialServices = residentialRaw.sort((a, b) => {
-            const titleA = (a.title || "").trim().toLowerCase();
-            const titleB = (b.title || "").trim().toLowerCase();
-      
-            const orderA = orderMap[titleA] ?? 999;
-            const orderB = orderMap[titleB] ?? 999;
-      
-            if (orderA !== orderB) return orderA - orderB;
-      
-            return titleA.localeCompare(titleB);
-          });
+      const residentialRaw = await ServicesType.find({
+        TypeServices: "Residential",
+      });
+
+      const orderMap = {
+        facades: 1,
+        "landscaping & gazebo": 2,
+        "living room": 3,
+        "drwaing room": 4,
+        bedroom: 5,
+        kitchen: 6,
+        staircase: 7,
+        "pooja room": 8,
+        washroom: 9,
+      };
+
+      const residentialServices = residentialRaw.sort((a, b) => {
+        const titleA = (a.title || "").trim().toLowerCase();
+        const titleB = (b.title || "").trim().toLowerCase();
+
+        const orderA = orderMap[titleA] ?? 999;
+        const orderB = orderMap[titleB] ?? 999;
+
+        if (orderA !== orderB) return orderA - orderB;
+
+        return titleA.localeCompare(titleB);
+      });
       const Commercialservices = await ServicesType.find({ TypeServices: "Commercial" }).sort({ createdAt: -1 });
       return successResponse(res, "Services Type list successfully.", 201, {
-        Residentialservices :  residentialServices, Commercialservices
+        Residentialservices: residentialServices, Commercialservices
       });
     } catch (error) {
       return errorResponse(res, error.message || "Internal Server Error", 500);
@@ -1834,7 +1834,7 @@ exports.GetServicesDetails = catchAsync(async (req, res) => {
 exports.ConceptUserPost = catchAsync(async (req, res) => {
   try {
     const userId = req?.user?.id;
-    const {  ServicesType, Services, concept } = req.body;
+    const { ServicesType, Services, concept } = req.body;
 
     if (!User || !ServicesType || !Services) {
       return validationErrorResponse(res, "All fields (services, user, typeservices) are required.", 401);
@@ -2014,52 +2014,52 @@ exports.GetVendorCategory = catchAsync(async (req, res) => {
 exports.bestSellerProducts = catchAsync(async (req, res) => {
   const limit = parseInt(req.query.limit) || 10;
 
-const bestSellers = await Order.aggregate([
-  { $unwind: "$product" },
+  const bestSellers = await Order.aggregate([
+    { $unwind: "$product" },
 
-  {
-    $group: {
-      _id: "$product.id",
-      totalQuantity: { $sum: "$product.quantity" },
-      totalOrders: { $sum: 1 },
+    {
+      $group: {
+        _id: "$product.id",
+        totalQuantity: { $sum: "$product.quantity" },
+        totalOrders: { $sum: 1 },
+      },
     },
-  },
 
-  {
-    $match: {
-      totalOrders: { $gt: 1 },
+    {
+      $match: {
+        totalOrders: { $gt: 1 },
+      },
     },
-  },
 
-  { $sort: { totalQuantity: -1 } },
+    { $sort: { totalQuantity: -1 } },
 
-  { $limit: limit },
+    { $limit: limit },
 
-  {
-    $lookup: {
-      from: "products",
-      localField: "_id",
-      foreignField: "_id",
-      as: "product",
+    {
+      $lookup: {
+        from: "products",
+        localField: "_id",
+        foreignField: "_id",
+        as: "product",
+      },
     },
-  },
 
-  { $unwind: "$product" },
+    { $unwind: "$product" },
 
-  {
-    $match: {
-      "product.deletedAt": null,
+    {
+      $match: {
+        "product.deletedAt": null,
+      },
     },
-  },
 
-  {
-    $project: {
-      product: "$product",
+    {
+      $project: {
+        product: "$product",
+      },
     },
-  },
-]);
+  ]);
 
-  
+
 
   res.status(200).json({
     success: true,
@@ -2077,7 +2077,7 @@ exports.latestProducts = catchAsync(async (req, res) => {
   const limit = parseInt(req.query.limit) || 10;
 
   const products = await Product.find({
-    deletedAt : null
+    deletedAt: null
   })
     .sort({ createdAt: -1 })
     .limit(limit)
@@ -2093,50 +2093,50 @@ exports.latestProducts = catchAsync(async (req, res) => {
 
 exports.GetAllServicesSubCategorys = catchAsync(
   async (req, res) => {
-  try {
-    const orderMap = {
-      facades: 1,
-      "landscaping & gazebo": 2,
-      "living room": 3,
-      "drwaing room": 4,
-      bedroom: 5,
-      kitchen: 6,
-      staircase: 7,
-      "pooja room": 8,
-      washroom: 9,
-    };
+    try {
+      const orderMap = {
+        facades: 1,
+        "landscaping & gazebo": 2,
+        "living room": 3,
+        "drwaing room": 4,
+        bedroom: 5,
+        kitchen: 6,
+        staircase: 7,
+        "pooja room": 8,
+        washroom: 9,
+      };
 
-    const subCategories = await ServicesType.find({
-      status: true,
-    });
+      const subCategories = await ServicesType.find({
+        status: true,
+      });
 
-    subCategories.sort((a, b) => {
-      const titleA = (a.title || "").trim().toLowerCase();
-      const titleB = (b.title || "").trim().toLowerCase();
+      subCategories.sort((a, b) => {
+        const titleA = (a.title || "").trim().toLowerCase();
+        const titleB = (b.title || "").trim().toLowerCase();
 
-      const orderA = orderMap[titleA] || 999;
-      const orderB = orderMap[titleB] || 999;
+        const orderA = orderMap[titleA] || 999;
+        const orderB = orderMap[titleB] || 999;
 
-      if (orderA !== orderB) {
-        return orderA - orderB;
-      }
+        if (orderA !== orderB) {
+          return orderA - orderB;
+        }
 
-      return titleA.localeCompare(titleB);
-    });
+        return titleA.localeCompare(titleB);
+      });
 
-    return successResponse(
-      res,
-      "SubCategorys list successfully.",
-      200,
-      subCategories
-    );
-  } catch (error) {
-    return errorResponse(
-      res,
-      error.message || "Internal Server Error",
-      500
-    );
-  }
+      return successResponse(
+        res,
+        "SubCategorys list successfully.",
+        200,
+        subCategories
+      );
+    } catch (error) {
+      return errorResponse(
+        res,
+        error.message || "Internal Server Error",
+        500
+      );
+    }
   }
 );
 
@@ -2387,7 +2387,7 @@ exports.GetAllRecordServicesSubCategorys = catchAsync(async (req, res) => {
 exports.AppAllVendors = catchAsync(
   async (req, res) => {
     try {
-      const Categorys = await Vendor.find({deletedAt : null}).sort({ createdAt: -1 }).populate("VendorCategory");
+      const Categorys = await Vendor.find({ deletedAt: null }).sort({ createdAt: -1 }).populate("VendorCategory");
       return successResponse(res, "Vendor Categorys list successfully.", 201, Categorys);
     } catch (error) {
       return errorResponse(res, error.message || "Internal Server Error", 500);
@@ -2585,30 +2585,30 @@ exports.getProductReviews = catchAsync(async (req, res) => {
   limit = parseInt(limit);
   const skip = (page - 1) * limit;
 
+  // Get the requesting user's ID from query param (passed by frontend for logged-in users)
+  // If no userId provided, treat as guest - show only approved reviews
   const currentUserId = req.query.userId || null;
 
-  const product = await Product.findById(productId)
-    .select("averageRating totalRating totalReviews ratingBreakdown")
-    .lean();
-
-  if (!product) {
-    return errorResponse(res, "Product not found", 404);
-  }
-
+  // Build filter
+  // For non-owners: only show approved reviews
+  // For owners: show all their reviews regardless of status
   const filter = {
     product: productId,
     isDeleted: false,
   };
 
   if (currentUserId) {
+    // If user is logged in, show approved reviews + their own reviews (any status)
     filter.$or = [
-      { status: "approved" },
+      { status: "pending" },
       { user: new mongoose.Types.ObjectId(currentUserId) },
     ];
   } else {
+    // Guest users: only approved reviews
     filter.status = "approved";
   }
 
+  // Additional rating filter if specified
   if (rating) {
     const ratingNum = parseInt(rating);
     if (ratingNum >= 1 && ratingNum <= 5) {
@@ -2616,38 +2616,37 @@ exports.getProductReviews = catchAsync(async (req, res) => {
     }
   }
 
+  // Build sort
   let sortOption = {};
-
   switch (sort) {
     case "latest":
       sortOption = { createdAt: -1 };
       break;
-
     case "highest":
       sortOption = { rating: -1, createdAt: -1 };
       break;
-
     case "lowest":
       sortOption = { rating: 1, createdAt: -1 };
       break;
-
     case "most_helpful":
+      // Only show reviews that have at least 1 helpful vote
       filter.helpfulCount = { $gte: 1 };
       sortOption = { helpfulCount: -1, createdAt: -1 };
       break;
-
     case "positive":
+      // Filter for rating >= 3
       filter.rating = { $gte: 3 };
       sortOption = { rating: -1, createdAt: -1 };
       break;
-
     case "negative":
+      // Filter for rating < 3
       filter.rating = { $lt: 3 };
       sortOption = { rating: 1, createdAt: -1 };
       break;
-
+    case "relevant":
     default:
       sortOption = { createdAt: -1 };
+      break;
   }
 
   const [reviews, total] = await Promise.all([
@@ -2657,45 +2656,11 @@ exports.getProductReviews = catchAsync(async (req, res) => {
       .skip(skip)
       .limit(limit)
       .lean(),
-
     Review.countDocuments(filter),
   ]);
 
-  // Rating Summary
-  const breakdown = product.ratingBreakdown || {
-    star1: 0,
-    star2: 0,
-    star3: 0,
-    star4: 0,
-    star5: 0,
-  };
-
-  const totalReviews = product.totalReviews || 0;
-
-  const ratingBreakdown = {};
-
-  for (let i = 1; i <= 5; i++) {
-    const count = breakdown[`star${i}`] || 0;
-
-    ratingBreakdown[`star${i}`] = {
-      count,
-      percentage:
-        totalReviews > 0
-          ? Math.round((count / totalReviews) * 100)
-          : 0,
-    };
-  }
-
   return successResponse(res, "Reviews fetched successfully", 200, {
-    summary: {
-      averageRating: product.averageRating || 0,
-      totalRating: product.totalRating || 0,
-      totalReviews: product.totalReviews || 0,
-      ratingBreakdown,
-    },
-
     reviews,
-
     pagination: {
       total,
       page,
@@ -2801,38 +2766,38 @@ exports.addToWishlist = catchAsync(async (req, res) => {
 
 
 exports.getMaintenanceStatus = catchAsync(async (req, res) => {
-try {
-const response = await axios.get(
-"https://api.cadmaxatelier.com/",
-{
-timeout: 5000,
-}
-);
+  try {
+    const response = await axios.get(
+      "https://api.cadmaxatelier.com/",
+      {
+        timeout: 5000,
+      }
+    );
 
-return res.status(200).json({
-  success: true,
-  maintenance: false,
-  message: "Server is running",
-  data: response.data,
-});
+    return res.status(200).json({
+      success: true,
+      maintenance: false,
+      message: "Server is running",
+      data: response.data,
+    });
 
-} catch (error) {
-const status = error?.response?.status;
+  } catch (error) {
+    const status = error?.response?.status;
 
-if ([500, 502, 503, 504].includes(status) || !error.response) {
-  return res.status(200).json({
-    success: false,
-    maintenance: true,
-    message: "Server under maintenance",
-    data: {
-      title: "Maintenance Break",
-      description:
-        "We are currently upgrading our services. Please try again later.",
-      retryAfter: 300,
-    },
-  });
-}
+    if ([500, 502, 503, 504].includes(status) || !error.response) {
+      return res.status(200).json({
+        success: false,
+        maintenance: true,
+        message: "Server under maintenance",
+        data: {
+          title: "Maintenance Break",
+          description:
+            "We are currently upgrading our services. Please try again later.",
+          retryAfter: 300,
+        },
+      });
+    }
 
-throw error;
-}
+    throw error;
+  }
 });

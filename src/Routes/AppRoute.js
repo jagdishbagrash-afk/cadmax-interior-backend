@@ -73,7 +73,7 @@ AppRoute.post("/app/wishlist/add", verifyToken, addToWishlist);
 AppRoute.post("/app/review/add", verifyToken, upload.array("reviewImages", 15),  addReview);
 AppRoute.post("/app/review/update/:reviewId", upload.array("reviewImages", 15),   verifyToken, updateReview);
 
-AppRoute.get("/app/review/product/:productId", verifyToken , getProductReviews);
+AppRoute.get("/app/review/product/:productId" , getProductReviews);
 
 AppRoute.post("/app/review/images/delete/:reviewId/:imageIndex", verifyToken, deleteReviewImage);
 
