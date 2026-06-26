@@ -30,170 +30,171 @@ const generateUniqueSlug = async (Model, title) => {
 
 
 
-  exports.addProduct = CatchAsync(async (req, res) => {
-    try {
+exports.addProduct = CatchAsync(async (req, res) => {
+  try {
 
-      let variants = [];
-      if (req.body.variants) {
-        variants = JSON.parse(req.body.variants);
+    let variants = [];
+    if (req.body.variants) {
+      variants = JSON.parse(req.body.variants);
+    }
+
+    if (!variants.length) {
+      return validationErrorResponse(res, "At least one variant is required", 400);
+    }
+
+    let productPriceSection = [];
+    if (req.body.product_price_section) {
+      productPriceSection = JSON.parse(req.body.product_price_section);
+    }
+
+    const variantImageMap = {};
+
+    req.files.forEach((file) => {
+      const parts = file.fieldname.split("_");
+      const color = parts[1];
+      const index = Number(parts[2]);
+
+      if (!variantImageMap[color]) {
+        variantImageMap[color] = [];
       }
 
-      if (!variants.length) {
-        return validationErrorResponse(res, "At least one variant is required", 400);
+      variantImageMap[color].push({
+        index,
+        url: file.location,
+      });
+    });
+
+    Object.keys(variantImageMap).forEach((color) => {
+      variantImageMap[color] = variantImageMap[color]
+        .sort((a, b) => a.index - b.index)
+        .map((img) => img.url);
+    });
+
+    const finalVariants = variants.map(v => {
+      const colorKey = v.color.toLowerCase();
+      return {
+        title: v.title || `${v.color} Variant`,
+        color: colorKey,
+        stock: Number(v.stock) || 0,
+        images: variantImageMap[colorKey] || []
+      };
+    });
+
+    for (const v of finalVariants) {
+      if (!v.images.length) {
+        return validationErrorResponse(
+          res,
+          `Images required for color: ${v.color}`,
+          400
+        );
       }
+    }
 
-      let productPriceSection = [];
-      if (req.body.product_price_section) {
-        productPriceSection = JSON.parse(req.body.product_price_section);
-      }
 
-      const variantImageMap = {};
-
-      req.files.forEach((file) => {
-        const parts = file.fieldname.split("_");
-        const color = parts[1];
-        const index = Number(parts[2]);
-
-        if (!variantImageMap[color]) {
-          variantImageMap[color] = [];
-        }
-
-        variantImageMap[color].push({
-          index,
-          url: file.location,
-        });
-      });
-
-      Object.keys(variantImageMap).forEach((color) => {
-        variantImageMap[color] = variantImageMap[color]
-          .sort((a, b) => a.index - b.index)
-          .map((img) => img.url);
-      });
-
-      const finalVariants = variants.map(v => {
-        const colorKey = v.color.toLowerCase();
-        return {
-          title: v.title || `${v.color} Variant`,
-          color: colorKey,
-          stock: Number(v.stock) || 0,
-          images: variantImageMap[colorKey] || []
-        };
-      });
-
-      for (const v of finalVariants) {
-        if (!v.images.length) {
+    // Updated validation: allow amount = 0, reject only negative
+    if (productPriceSection.length > 0) {
+      for (const section of productPriceSection) {
+        if (!section.title) {
           return validationErrorResponse(
             res,
-            `Images required for color: ${v.color}`,
+            "Each price section must have a title",
             400
           );
         }
-      }
+        // Reject only if amount is undefined, null, or negative
+        if (section.amount === undefined || section.amount === null || section.amount < 0) {
+          return validationErrorResponse(
+            res,
+            `Valid amount required for section: ${section.title} (must be >= 0)`,
+            400
+          );
+        }
 
-
-      // Updated validation: allow amount = 0, reject only negative
-      if (productPriceSection.length > 0) {
-        for (const section of productPriceSection) {
-          if (!section.title) {
-            return validationErrorResponse(
-              res,
-              "Each price section must have a title",
-              400
-            );
-          }
-          // Reject only if amount is undefined, null, or negative
-          if (section.amount === undefined || section.amount === null || section.amount < 0) {
-            return validationErrorResponse(
-              res,
-              `Valid amount required for section: ${section.title} (must be >= 0)`,
-              400
-            );
-          }
-          
-          // Validate sizes if they exist
-          if (section.sizes && section.sizes.length > 0) {
-            for (const size of section.sizes) {
-              if (!size.title) {
-                return validationErrorResponse(
-                  res,
-                  `Each size in section "${section.title}" must have a title`,
-                  400
-                );
-              }
-              if (size.amount === undefined || size.amount === null || size.amount < 0) {
-                return validationErrorResponse(
-                  res,
-                  `Valid amount required for size "${size.title}" in section "${section.title}" (must be >= 0)`,
-                  400
-                );
-              }
+        // Validate sizes if they exist
+        if (section.sizes && section.sizes.length > 0) {
+          for (const size of section.sizes) {
+            if (!size.title) {
+              return validationErrorResponse(
+                res,
+                `Each size in section "${section.title}" must have a title`,
+                400
+              );
+            }
+            if (size.amount === undefined || size.amount === null || size.amount < 0) {
+              return validationErrorResponse(
+                res,
+                `Valid amount required for size "${size.title}" in section "${section.title}" (must be >= 0)`,
+                400
+              );
             }
           }
         }
       }
-
-
-      const slug = await generateUniqueSlug(Product, req.body.title?.[0]);
-
-      const newProduct = new Product({
-        title: req.body.title || "",
-        slug: slug,
-        label_size :req.body.label_size || "",
-        label_category : req.body.label_category || "",
-        description: req.body.description || "",
-        amount: Number(req.body.amount) || 0,
-        category: req.body.category || "",
-        subcategory: req.body.subcategory|| "",
-        dimensions: req.body.dimensions || "",
-        material: req.body.material || "",
-        type: req.body.type || "",
-        terms: req.body.terms || "",
-        variants: finalVariants,
-        product_price_section: productPriceSection.length > 0 ? productPriceSection : []
-      });
-
-      const record = await newProduct.save();
-
-      // Send notifications to customers
-      const users = await User.find({
-        role: "customer",
-        status: "active",
-        deleted_at: null,
-        fcmToken: { $ne: null }
-      }).select("fcmToken");
-
-      const admindata = await User.find({
-        role: "admin",
-        status: "active",
-        deleted_at: null,
-      });
-
-      const tokens = users.map(u => u.fcmToken).filter(Boolean);
-
-      if (tokens.length > 0) {
-        await sendPushNotification({
-          tokens,
-          title: "New Product Added 🛍️",
-          body: `${record.title} is now available. Check it out!`,
-          data: {
-            type: "NEW_PRODUCT",
-            productId: record._id.toString(),
-          },
-        });
-      }
-
-      return successResponse(
-        res,
-        "Product added successfully",
-        201,
-        record
-      );
-
-    } catch (error) {
-      console.error(error);
-      return errorResponse(res, error.message || "Internal Server Error", 500);
     }
-  });
+
+
+    const slug = await generateUniqueSlug(Product, req.body.title?.[0]);
+
+    const newProduct = new Product({
+      title: req.body.title || "",
+      slug: slug,
+      label_size: req.body.label_size || "",
+      label_category: req.body.label_category || "",
+      description: req.body.description || "",
+      amount: Number(req.body.amount) || 0,
+      category: req.body.category || "",
+      subcategory: req.body.subcategory || "",
+      dimensions: req.body.dimensions || "",
+      material: req.body.material || "",
+      type: req.body.type || "",
+      terms: req.body.terms || "",
+      variants: finalVariants,
+      product_price_section: productPriceSection.length > 0 ? productPriceSection : []
+    });
+
+    const record = await newProduct.save();
+
+    const admindata = await User.find({
+      role: "admin",
+      status: "active",
+      deleted_at: null,
+    });
+    // Send notifications to customers
+    const users = await User.find({
+      role: "customer",
+      status: "active",
+      deleted_at: null,
+      fcmToken: { $ne: null }
+    }).select("fcmToken");
+
+
+
+    const tokens = users.map(u => u.fcmToken).filter(Boolean);
+
+    if (tokens.length > 0) {
+      await sendPushNotification({
+        tokens,
+        title: "New Product Added 🛍️",
+        body: `${record.title} is now available. Check it out!`,
+        data: {
+          type: "NEW_PRODUCT",
+          productId: record._id.toString(),
+        },
+      });
+    }
+
+    return successResponse(
+      res,
+      "Product added successfully",
+      201,
+      record
+    );
+
+  } catch (error) {
+    console.error(error);
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});
 
 exports.getAllProducts = CatchAsync(async (req, res) => {
   try {
@@ -259,7 +260,6 @@ exports.updateProduct = CatchAsync(async (req, res) => {
     if (req.body.material) product.material = req.body.material;
     if (req.body.type) product.type = req.body.type;
     if (req.body.terms) product.terms = req.body.terms;
-    if (req.body.stock_status) product.stock_status ="in_stock" ;
 
 
     // Handle variant images
@@ -339,7 +339,7 @@ exports.updateProduct = CatchAsync(async (req, res) => {
             400
           );
         }
-        
+
         // Validate sizes if they exist
         if (section.sizes && section.sizes.length > 0) {
           for (const size of section.sizes) {
@@ -361,11 +361,39 @@ exports.updateProduct = CatchAsync(async (req, res) => {
           }
         }
       }
-      
+
       product.product_price_section = productPriceSection;
     }
 
     const record = await product.save();
+
+    const oldStockStatus = product.stock_status;
+
+    if (
+      oldStockStatus === "out_of_stock" &&
+      record.stock_status === "in_stock"
+    ) {
+      const users = await User.find({
+        role: "customer",
+        status: "active",
+        deleted_at: null,
+        fcmToken: { $ne: null },
+      }).select("fcmToken");
+
+      const tokens = users.map((u) => u.fcmToken).filter(Boolean);
+
+      if (tokens.length > 0) {
+        await sendPushNotification({
+          tokens,
+          title: "Back in Stock 🔥",
+          body: `${record.title} is back in stock. Order now before it sells out!`,
+          data: {
+            type: "BACK_IN_STOCK",
+            productId: record._id.toString(),
+          },
+        });
+      }
+    }
 
     return successResponse(
       res,
