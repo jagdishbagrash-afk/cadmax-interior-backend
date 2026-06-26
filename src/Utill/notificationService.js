@@ -1,4 +1,4 @@
-const admin = require("./firebase");
+const { getFirebaseAdmin } = require("./firebase");
 
 const sendPushNotification = async ({ tokens, title, body, data = {} }) => {
   try {
@@ -6,6 +6,7 @@ const sendPushNotification = async ({ tokens, title, body, data = {} }) => {
       throw new Error("No tokens provided");
     }
 
+    const admin = getFirebaseAdmin();
     let results = [];
 
     for (const token of tokens) {
