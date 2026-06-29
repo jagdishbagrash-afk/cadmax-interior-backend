@@ -4,21 +4,48 @@ dotenv.config();
 require("./dbconfigration");
 const express = require("express");
 const app = express();
+
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1"]);
+
+const expandLoopbackOrigin = (origin) => {
+  try {
+    const parsedUrl = new URL(origin);
+
+    if (!LOOPBACK_HOSTS.has(parsedUrl.hostname)) {
+      return [parsedUrl.origin];
+    }
+
+    const alternateHost = parsedUrl.hostname === "localhost" ? "127.0.0.1" : "localhost";
+
+    return [
+      parsedUrl.origin,
+      `${parsedUrl.protocol}//${alternateHost}${parsedUrl.port ? `:${parsedUrl.port}` : ""}`,
+    ];
+  } catch (_error) {
+    return [origin];
+  }
+};
+
 const getAllowedOrigins = () => {
   const configuredOrigins = process.env.CORS_ALLOWED_ORIGINS || process.env.FRONTEND_URL;
+
   if (!configuredOrigins) {
-    return ["http://localhost:3000"];
+    return ["http://localhost:3000", "http://127.0.0.1:3000"];
   }
 
-  return configuredOrigins
-    .split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean);
+  return [...new Set(
+    configuredOrigins
+      .split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean)
+      .flatMap(expandLoopbackOrigin)
+  )];
 };
 
 const allowedOrigins = getAllowedOrigins();
 const allowedMethods = "GET,POST,PUT,PATCH,DELETE,OPTIONS";
 const allowedHeaders = "Content-Type, Authorization";
+const allowCredentials = String(process.env.CORS_ALLOW_CREDENTIALS).toLowerCase() === "true";
 
 app.use((req, res, next) => {
   const requestOrigin = req.headers.origin;
@@ -32,6 +59,10 @@ app.use((req, res, next) => {
     res.header("Vary", "Origin");
     res.header("Access-Control-Allow-Methods", allowedMethods);
     res.header("Access-Control-Allow-Headers", allowedHeaders);
+
+    if (allowCredentials) {
+      res.header("Access-Control-Allow-Credentials", "true");
+    }
 
     if (req.method === "OPTIONS") {
       return res.sendStatus(204);
