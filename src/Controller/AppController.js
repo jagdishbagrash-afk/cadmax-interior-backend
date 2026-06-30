@@ -37,6 +37,49 @@ const Review = require("../Model/Review");
 //   process.env.TWILIO_ACCOUNT_SID,
 //   process.env.TWILIO_AUTH_TOKEN
 // );
+
+async function recalculateProductRating(productId) {
+  const result = await Review.aggregate([
+    { $match: { product: new mongoose.Types.ObjectId(productId), isDeleted: false, status: "approved" } },
+    {
+      $group: {
+        _id: null,
+        averageRating: { $avg: "$rating" },
+        totalReviews: { $sum: 1 },
+        totalRating: { $sum: "$rating" },
+        star1: { $sum: { $cond: [{ $eq: ["$rating", 1] }, 1, 0] } },
+        star2: { $sum: { $cond: [{ $eq: ["$rating", 2] }, 1, 0] } },
+        star3: { $sum: { $cond: [{ $eq: ["$rating", 3] }, 1, 0] } },
+        star4: { $sum: { $cond: [{ $eq: ["$rating", 4] }, 1, 0] } },
+        star5: { $sum: { $cond: [{ $eq: ["$rating", 5] }, 1, 0] } },
+      },
+    },
+  ]);
+
+  const stats = result[0] || {
+    averageRating: 0,
+    totalReviews: 0,
+    totalRating: 0,
+    star1: 0,
+    star2: 0,
+    star3: 0,
+    star4: 0,
+    star5: 0,
+  };
+
+  await Product.findByIdAndUpdate(productId, {
+    averageRating: Math.round(stats.averageRating * 10) / 10,
+    totalReviews: stats.totalReviews,
+    totalRating: stats.totalRating,
+    ratingBreakdown: {
+      star1: stats.star1,
+      star2: stats.star2,
+      star3: stats.star3,
+      star4: stats.star4,
+      star5: stats.star5,
+    },
+  });
+}
 const buildCartResponse = async (cart) => {
   await cart.populate({
     path: "product.productId",
@@ -2803,12 +2846,14 @@ exports.deleteReviewImage = catchAsync(async (req, res) => {
 exports.deleteReview = catchAsync(async (req, res) => {
   const userId = req.user.id;
   const { reviewId } = req.params;
-
+console.log("ss",reviewId)
+console.log("userId",userId)
   if (!mongoose.Types.ObjectId.isValid(reviewId)) {
     return errorResponse(res, "Invalid review ID", 400);
   }
 
   const review = await Review.findOne({ _id: reviewId, user: userId, isDeleted: false });
+
   if (!review) {
     return errorResponse(res, "Review not found or you are not authorized", 404);
   }
@@ -2893,4 +2938,89 @@ if ([500, 502, 503, 504].includes(status) || !error.response) {
 
 throw error;
 }
+});
+
+
+//  6. MARK HELPFUL
+exports.markHelpful = catchAsync(async (req, res) => {
+  const userId = req.user.id;
+  const { reviewId } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(reviewId)) {
+    return errorResponse(res, "Invalid review ID", 400);
+  }
+
+  const review = await Review.findOne({ _id: reviewId, isDeleted: false });
+  if (!review) {
+    return errorResponse(res, "Review not found", 404);
+  }
+
+  // Check if already marked as helpful
+  const alreadyHelpful = review.helpfulUsers.some((id) => id.toString() === userId);
+  // Check if already marked as not helpful
+  const alreadyNotHelpful = review.notHelpfulUsers.some((id) => id.toString() === userId);
+
+  if (alreadyHelpful) {
+    // Toggle off
+    review.helpfulUsers.pull(userId);
+    review.helpfulCount = review.helpfulUsers.length;
+  } else {
+    // Remove from not helpful if present
+    if (alreadyNotHelpful) {
+      review.notHelpfulUsers.pull(userId);
+      review.notHelpfulCount = review.notHelpfulUsers.length;
+    }
+    review.helpfulUsers.push(userId);
+    review.helpfulCount = review.helpfulUsers.length;
+  }
+
+  await review.save();
+
+  return successResponse(res, "Marked as helpful", 200, {
+    helpfulCount: review.helpfulCount,
+    notHelpfulCount: review.notHelpfulCount,
+    userMarked: alreadyHelpful ? null : "helpful",
+  });
+});
+
+//  7. MARK NOT HELPFUL
+exports.markNotHelpful = catchAsync(async (req, res) => {
+  const userId = req.user.id;
+  const { reviewId } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(reviewId)) {
+    return errorResponse(res, "Invalid review ID", 400);
+  }
+
+  const review = await Review.findOne({ _id: reviewId, isDeleted: false });
+  if (!review) {
+    return errorResponse(res, "Review not found", 404);
+  }
+
+  // Check if already marked as not helpful
+  const alreadyNotHelpful = review.notHelpfulUsers.some((id) => id.toString() === userId);
+  // Check if already marked as helpful
+  const alreadyHelpful = review.helpfulUsers.some((id) => id.toString() === userId);
+
+  if (alreadyNotHelpful) {
+    // Toggle off
+    review.notHelpfulUsers.pull(userId);
+    review.notHelpfulCount = review.notHelpfulUsers.length;
+  } else {
+    // Remove from helpful if present
+    if (alreadyHelpful) {
+      review.helpfulUsers.pull(userId);
+      review.helpfulCount = review.helpfulUsers.length;
+    }
+    review.notHelpfulUsers.push(userId);
+    review.notHelpfulCount = review.notHelpfulUsers.length;
+  }
+
+  await review.save();
+
+  return successResponse(res, "Marked as not helpful", 200, {
+    helpfulCount: review.helpfulCount,
+    notHelpfulCount: review.notHelpfulCount,
+    userMarked: alreadyNotHelpful ? null : "not_helpful",
+  });
 });

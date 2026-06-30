@@ -1,4 +1,4 @@
-const { signup, Login, SendOtp, profilegettoken, PhoneVerify, OTPVerify, AppOrder, getAllCategorys, getSubCategoryByCategory, getProductBySubCategory, getProductById, AddToCart, getCart, GetAllProject, GetServicesType, GetServiceTypeId, GetServicesDetails, ConceptUserPost, removeProductVariantFromCart, EditProfile, BookingAppAdd, GetVendorCatApp, GetAllVendor, GetVendorCategory, updateCart, clearCart, OrderList, bestSellerProducts, latestProducts, GetAllServicesSubCategorys, getAllBookings, AppDeleteUser, AppAllVendors, globalSearch, LeadApp, GetAllRecordServicesSubCategorys, addReview, updateReview, getProductReviews, deleteReviewImage, deleteReview, addToWishlist, getMaintenanceStatus } = require("../Controller/AppController");
+const { signup, Login, SendOtp, profilegettoken, PhoneVerify, OTPVerify, AppOrder, getAllCategorys, getSubCategoryByCategory, getProductBySubCategory, getProductById, AddToCart, getCart, GetAllProject, GetServicesType, GetServiceTypeId, GetServicesDetails, ConceptUserPost, removeProductVariantFromCart, EditProfile, BookingAppAdd, GetVendorCatApp, GetAllVendor, GetVendorCategory, updateCart, clearCart, OrderList, bestSellerProducts, latestProducts, GetAllServicesSubCategorys, getAllBookings, AppDeleteUser, AppAllVendors, globalSearch, LeadApp, GetAllRecordServicesSubCategorys, addReview, updateReview, getProductReviews, deleteReviewImage, deleteReview, addToWishlist, getMaintenanceStatus, markHelpful, markNotHelpful } = require("../Controller/AppController");
 const { GetAllBanner } = require("../Controller/BannerController");
 const ServciesSubCategoryController = require("../Controller/ServciesSubCategoryController.js");
 const MultipleAddressController = require("../Controller/MultipleAddressController");
@@ -73,6 +73,9 @@ AppRoute.post("/app/wishlist/add", verifyToken, addToWishlist);
 AppRoute.post("/app/review/add", verifyToken, upload.array("reviewImages", 15),  addReview);
 AppRoute.post("/app/review/update/:reviewId", upload.array("reviewImages", 15),   verifyToken, updateReview);
 
+AppRoute.get("/app/review/helpful/:reviewId", verifyToken, markHelpful);
+AppRoute.get("/app/review/not-helpful/:reviewId", verifyToken, markNotHelpful);
+
 AppRoute.get("/app/review/product/:productId" , getProductReviews);
 
 AppRoute.post("/app/review/images/delete/:reviewId/:imageIndex", verifyToken, deleteReviewImage);
@@ -82,7 +85,7 @@ AppRoute.get("/app/states", getStates);
 AppRoute.get("/app/cities/:state", getCitiesByState);
 
 
-AppRoute.post("/app/review/delete/:reviewId", verifyToken, deleteReview);
+AppRoute.get("/app/review/delete/:reviewId", verifyToken, deleteReview);
 
 AppRoute.get("/app/maintenance-status", getMaintenanceStatus);
 

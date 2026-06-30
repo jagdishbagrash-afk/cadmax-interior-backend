@@ -368,7 +368,6 @@ exports.updateProduct = CatchAsync(async (req, res) => {
     const record = await product.save();
 
     const oldStockStatus = product.stock_status;
-
     if (
       oldStockStatus === "out_of_stock" &&
       record.stock_status === "in_stock"
@@ -379,11 +378,9 @@ exports.updateProduct = CatchAsync(async (req, res) => {
         deleted_at: null,
         fcmToken: { $ne: null },
       }).select("fcmToken");
-
       const tokens = users.map((u) => u.fcmToken).filter(Boolean);
-
       if (tokens.length > 0) {
-        await sendPushNotification({
+     const record =   await sendPushNotification({
           tokens,
           title: "Back in Stock 🔥",
           body: `${record.title} is back in stock. Order now before it sells out!`,
@@ -392,8 +389,10 @@ exports.updateProduct = CatchAsync(async (req, res) => {
             productId: record._id.toString(),
           },
         });
+        console.log(record)
       }
     }
+    
 
     return successResponse(
       res,
