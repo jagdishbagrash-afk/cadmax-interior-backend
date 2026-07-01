@@ -231,6 +231,22 @@ ProductSchema.pre("save", function (next) {
     });
   }
 
+   // ============================
+  // Stock Status Calculation
+  // ============================
+
+  if (this.variants?.length) {
+    const totalStock = this.variants.reduce(
+      (total, variant) => total + Number(variant.stock || 0),
+      0
+    );
+
+    this.stock_status =
+      totalStock > 0 ? "in_stock" : "out_of_stock";
+  } else {
+    this.stock_status = "out_of_stock";
+  }
+
   next();
 });
 
