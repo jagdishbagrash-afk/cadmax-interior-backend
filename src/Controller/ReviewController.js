@@ -139,7 +139,7 @@ exports.updateReview = catchAsync(async (req, res) => {
   return successResponse(res, "Review updated successfully", 200, updatedReview);
 });
 
-//  3. DELETE REVIEW (soft delete)
+//  3. DELETE REVIEW (soft delete with full cleanup)
 exports.deleteReview = catchAsync(async (req, res) => {
   const userId = req.user.id;
   const { reviewId } = req.params;
@@ -153,6 +153,15 @@ exports.deleteReview = catchAsync(async (req, res) => {
     return errorResponse(res, "Review not found or you are not authorized", 404);
   }
 
+  // Delete associated images from S3
+  if (review.images && review.images.length > 0) {
+    review.images.forEach((imageUrl) => {
+      deleteFile(imageUrl).catch((err) => console.error("S3 delete error during review deletion:", err));
+    });
+  }
+
+  // Clear images array and mark as deleted
+  review.images = [];
   review.isDeleted = true;
   review.deletedAt = new Date();
   await review.save();
@@ -527,7 +536,7 @@ exports.rejectReview = catchAsync(async (req, res) => {
   return successResponse(res, "Review rejected successfully", 200, populatedReview);
 });
 
-//  12. DELETE REVIEW (admin - soft delete)
+//  12. DELETE REVIEW (admin - soft delete with full cleanup)
 exports.adminDeleteReview = catchAsync(async (req, res) => {
   const { reviewId } = req.params;
 
@@ -540,6 +549,15 @@ exports.adminDeleteReview = catchAsync(async (req, res) => {
     return errorResponse(res, "Review not found", 404);
   }
 
+  // Delete associated images from S3
+  if (review.images && review.images.length > 0) {
+    review.images.forEach((imageUrl) => {
+      deleteFile(imageUrl).catch((err) => console.error("S3 delete error during admin review deletion:", err));
+    });
+  }
+
+  // Clear images array and mark as deleted
+  review.images = [];
   review.isDeleted = true;
   review.deletedAt = new Date();
   await review.save();
