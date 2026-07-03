@@ -4,23 +4,81 @@ dotenv.config();
 require("./dbconfigration");
 const express = require("express");
 const app = express();
-const cors = require("cors");
-const corsOptions = {
-  origin: "*", // Allowed origins
-  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-  allowedHeaders: '*', // Allow all headers
-  credentials: true,
-  optionsSuccessStatus: 200, // for legacy browsers
-}
 
-app.use(cors(corsOptions));
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1"]);
+
+const expandLoopbackOrigin = (origin) => {
+  try {
+    const parsedUrl = new URL(origin);
+
+    if (!LOOPBACK_HOSTS.has(parsedUrl.hostname)) {
+      return [parsedUrl.origin];
+    }
+
+    const alternateHost = parsedUrl.hostname === "localhost" ? "127.0.0.1" : "localhost";
+
+    return [
+      parsedUrl.origin,
+      `${parsedUrl.protocol}//${alternateHost}${parsedUrl.port ? `:${parsedUrl.port}` : ""}`,
+    ];
+  } catch (_error) {
+    return [origin];
+  }
+};
+
+const getAllowedOrigins = () => {
+  const configuredOrigins = process.env.CORS_ALLOWED_ORIGINS || process.env.FRONTEND_URL;
+
+  if (!configuredOrigins) {
+    return ["http://localhost:3000", "http://127.0.0.1:3000"];
+  }
+
+  return [...new Set(
+    configuredOrigins
+      .split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean)
+      .flatMap(expandLoopbackOrigin)
+  )];
+};
+
+const allowedOrigins = getAllowedOrigins();
+const allowedMethods = "GET,POST,PUT,PATCH,DELETE,OPTIONS";
+const allowedHeaders = "Content-Type, Authorization";
+const allowCredentials = String(process.env.CORS_ALLOW_CREDENTIALS).toLowerCase() === "true";
+
+app.use((req, res, next) => {
+  const requestOrigin = req.headers.origin;
+
+  if (!requestOrigin) {
+    return next();
+  }
+
+  if (allowedOrigins.includes(requestOrigin)) {
+    res.header("Access-Control-Allow-Origin", requestOrigin);
+    res.header("Vary", "Origin");
+    res.header("Access-Control-Allow-Methods", allowedMethods);
+    res.header("Access-Control-Allow-Headers", allowedHeaders);
+
+    if (allowCredentials) {
+      res.header("Access-Control-Allow-Credentials", "true");
+    }
+
+    if (req.method === "OPTIONS") {
+      return res.sendStatus(204);
+    }
+  }
+
+  return next();
+});
+
 app.use(express.json({ limit: '10000mb' }));
 app.use(express.urlencoded({ extended: true, limit: "10000mb" }));
-app.get("/", (req, res) => {
+app.get("/", (_req, res) => {
   res.json({ message: "Server is running fine 🚀" });
 });
 
-const PORT = process.env.REACT_APP_SERVER_DOMAIN || 5000;
+const PORT = Number(process.env.PORT || process.env.REACT_APP_SERVER_DOMAIN) || 5001;
 app.use("/api", require("./Routes/AuthRoute"));
 app.use("/api", require("./Routes/ContactRoute"));
 app.use("/api", require("./Routes/ServicesRoute"));
@@ -37,9 +95,7 @@ app.use("/api", require("./Routes/Paymentroute"));
 app.use("/api", require("./Routes/MutipleAddressRoute"));
 app.use("/api", require("./Routes/WishlistRoute"));
 app.use("/api", require("./Routes/ReviewRoute"));
-
-
-const Product = require("./Model/Product");
+app.use("/api", require("./Routes/ShipmentRoute"));
 
 /* ==============================
    TEST ROUTE
@@ -47,7 +103,11 @@ const Product = require("./Model/Product");
 
 const DHL_CLIENT_ID = process.env.DHL_CLIENT_ID;
 const DHL_CLIENT_SECRET = process.env.DHL_CLIENT_SECRET;
-const DHL_API_BASE = "https://express.api.dhl.com/mydhlapi";
+const DHL_API_BASE =
+  (process.env.DHL_API_BASE_URL || "https://express.api.dhl.com/mydhlapi").replace(
+    /\/+$/,
+    ""
+  );
 
 // 1. Token लेने का function
 async function getDHLToken() {
