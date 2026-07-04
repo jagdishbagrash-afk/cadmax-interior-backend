@@ -183,8 +183,12 @@ const createDhlShipment = async (shipmentData) => {
       data: response.data,
     };
   } catch (error) {
+<<<<<<< HEAD
 
  
+=======
+    console.log("DHL CREATE SHIPMENT ERROR", extractError(error));
+>>>>>>> 2e061c4 (push the code)
 
     return {
       success: false,

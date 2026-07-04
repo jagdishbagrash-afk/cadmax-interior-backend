@@ -37,7 +37,7 @@ app.use("/api", require("./Routes/Paymentroute"));
 app.use("/api", require("./Routes/MutipleAddressRoute"));
 app.use("/api", require("./Routes/WishlistRoute"));
 app.use("/api", require("./Routes/ShipmentRoute"));
-
+app.use("/api", require("./Routes/ShipmentRoute"));
 const server = app.listen(PORT, () => console.log("Server is running at port : " + PORT));
 server.timeout = 360000;
 

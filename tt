@@ -1,0 +1,657 @@
+ i want to this implemnt so set env and also the all backedn apis and give me basecurl basee url accordig add and 
+ zAluY2MnAKqdGroajOZMziLTind8A3tk api key is this 	 zQgG2xjC2WdXQfOP api secret i want after payment the shipent craeet and tracking now for only teants os make that all flow and curl give me so i test and same add in webstute 
+
+
+
+
+
+
+
+MyDHL API (DHL Express)
+v 3.3.0
+Division: DHL Express
+Best for:
+
+Rating, Shipping, Tracking & more for time-definite international shipments
+Users with a DHL Express customer account
+Available globally
+Region: Global
+Used for: Shipping, Tracking, Information, Additional Services, Location, Pickup
+Overview
+MyDHL API combines the benefits of DHL Express with your in-house shipping processes. Integrating into your website, it connects with your existing order entry,  warehouse management and other business software systems to help you run a more streamlined and efficient operation. Simply integrate!
+
+MyDHL API is your one stop solution for all DHL EXPRESS service operations. It consists of:
+
+ 
+
+Rating Icon 
+ 
+
+Parcel Icon 
+ 
+
+Fully Landed Cost   
+ 
+
+Shipment Icon   
+ 
+
+Pickup Icon 
+ 
+
+Tracking Icon   
+ 
+
+Globe Icon  
+ 
+
+Integrated Solutions
+Rating  Product Landed Cost Shipment    Pickup  Tracking    Address Identifier
+Optimize and grow your business
+Integrate DHL Express functions – such as fulfilment processes – into your existing system seamlessly
+Access shipping options and rates for DHL Express without the need to switch programs or re-enter information
+Retain the user interface your teams are familiar with – no need for timely and costly employee training
+Sell more at your e-commerce checkout by offering DHL Express shipping products, Landed costs and On Demand Delivery
+Created for developers
+A single API based on industry standards that developers know and understand
+Built with the fast-paced warehouse and time-sensitive e-commerce checkout in mind
+Dedicated API environment to test your solution
+Developer support from local DHL Express API experts
+Scope
+Do more with MyDHL API
+MyDHL API Services  Description
+RATING
+The Rating service Operation will return DHL EXPRESS product capabilities (products, value added services and estimated delivery time) and your DHL EXPRESS Account rates. 
+PRODUCT
+A light-weight version of the Rating service to retrieve available DHL Express products for a one-piece shipment.
+LANDED COST
+Retrieve the estimated Landed Cost which includes Duties & Taxes. Please note for this service a catalogue of your items together with the customs data (i.e. HS Codes) needs to be provided upfront. 
+SHIPMENT
+The Shipment service Operation allows you to create complete DHL EXPRESS shipments which includes the shipping labels, optional customs documentation and pickups together with value added services such as Insurance. 
+
+DHL EXPRESS recommends to use the Rating service first to see all the available products and value added services first to then pass the desired DHL EXPRESS product and value added service into the Shipment service Operation.
+
+In addition to creating DHL Express shipments the SHIPMENT service can also provide electronic proof of delivery for certain delivered shipments and upload updated customs invoice images for your shipments.
+
+PICKUP
+The Pickup service can create, update or cancel DHL Express pickup requests 
+TRACKING
+The Tracking service retrieves tracking statuses for DHL Express Shipments
+ADDRESS
+Validates if DHL Express has got pickup/delivery capabilities at origin/destination
+IDENTIFIER
+Service to allocate identifiers upfront for DHL Express Breakbulk or Loose Break Bulk shipments
+_
+Using the API
+The API has been designed for use by developers. You will need basic knowledge of REST APIs, JSON, and HTTPS. Also, your organization must to have an active customer account with DHL Express. If you need to learn more on how to get an account, go to the DHL Express customer account request page. 
+
+ 
+
+Example use cases
+SIMPLY INTEGRATE IN YOUR EXISTING WEBSITE / SOLUTION
+
+Incorporating DHL shipping functionality into your websites, customer service applications or order processing systems makes it easy for you to ship and your customers to receive their parcels. DHL Express API allows you to stay up to date with DHL service availability, transit times, rates, shipment and courier pickup booking, along with shipment tracking from countries around the world. 
+
+ 
+User Guide
+Get Access
+To use the DHL Express API, your organization requires to have an active customer account with DHL Express.
+
+I already have a DHL Express Account number:
+
+[1.] Start your on-boarding process [2.] Get API access
+Login with your Developer Portal account
+Click here to Get Access!
+Your DHL Express API access will be provided and will be able to start developing your integration
+
+ 
+
+If you are not a DHL Express customer, please proceed with the steps below to create a new customer account:
+
+[1.] Request a customer account.    [2.] Account Setup  [3.] Get API access
+Go to the DHL Express customer account request page. Complete the form and click Submit.    The DHL Express team will contact you to set up your account.   Once you have been given your DHL Express Account, simply Click here to get Access! 
+Authentication
+Your DHL EXPRESS consultant will provide you with access credentials to the DHL EXPRESS API (MyDHL API) and assist in technical queries you may have.
+
+Please ensure that the Authorization header as part of the request is set as pre-emptively and following the BasicAuth standards. 
+
+Environments
+The addressable API base URL/URI environment is:  
+
+Environment Description
+https://express.api.dhl.com/mydhlapi/test   Test environment to test your development against
+https://express.api.dhl.com/mydhlapi    Production environment to create real transactions with DHL Express
+Quota Limits
+The DHL EXPRESS Test Environment will provide you a daily limit of 500 Service invocations for your access credentials. This should be used to test your integration development with DHL EXPRESS
+The DHL EXPRESS Test Environment has formal SLA's against it to ensure that support is at hand with availability. 
+Additional Information
+The input data for DHL Express API is validated in several steps. The first step is general schema validation
+based on data cardinality and data content restrictions defined by the request message format (i.e.
+schema validation). In a second step, several business rules are applied on the passed data. The
+results of these validations are placed in the result message of the service operation. The service
+operation always delivers a result message. All errors or validation errors are stored in this result
+messages. 
+
+Implementations should not add a byte order mark to the beginning of a JSON text. 
+
+Legal Terms
+Specific Terms for the use of and access to the DHL Express - MyDHL API ("MyDHL API")
+When using or accessing the MyDHL API and its associated services (the “API Services”; for the avoidance of doubt, a reference to MyDHL API in these Legal Terms is deemed a reference to the MyDHL API including the API Services, unless the context suggests otherwise) you are entering into a legal agreement and you agree to all of these terms without amendment. In agreeing to these terms, you have already agreed to abide by DHL’s General Developer Portal Terms of Use, which represents an additional binding agreement relating to your use of the MyDHL API, the two sets of terms shall be interpreted collectively and known as (the „Legal Terms“) in this document.
+ 
+To register for the use of MyDHL API You and/or the legal entity you are authorized to represent (hereinafter “You”/”Your”) need to have an active customer account with a DHL Express entity. An API Productive Key and access details will be provided to You subject to a successful validation of Your credentials by DHL.
+ 
+If You engage an external developer, or other IT services provider to develop Your Application or any other third party (“Third Parties”) to access and/or use the MyDHL API on Your behalf, You remain fully liable for any acts or omissions of such Third Parties in connection with the access to and/or usage of the MyDHL API.
+ 
+The Legal Terms govern Your use of and/or access to the MyDHL API and, unless otherwise stated herein, do not replace and/or modify the applicable terms and conditions of carriage; any transportation services agreement; or any other agreements with DHL Express or any of its affiliates, which govern services or products provided to You (separately, each an “Agreement”). Notwithstanding the foregoing, You expressly acknowledge and agree that solely with respect to Your use of and access to the MyDHL API the Legal Terms shall take precedence over the terms and conditions in an Agreement, unless an Agreement specifically addresses the use of or access to the MyDHL API by You, in which case the Agreement shall prevail.
+ 
+Additional terms, to be accepted separately by You, may apply to certain API Services. Please be aware that transportation services provided by DHL Express are, and always remain, strictly subject to the DHL Express Terms and Conditions of Carriage.
+ 
+You grant DHL Express the right to use all data, documents, logos or other information transmitted by You to or within the MyDHL API (“Information”), for the purposes specified in the API Services. This includes the use of the Information for the purpose of processing and transporting shipments. You shall ensure that all Information which You transmit to DHL Express via the MyDHL API is complete, correct and accurate. You will be solely responsible for any damage or consequence that may arise from the use of false or incorrect or incomplete Information. You shall be solely responsible for, and shall indemnify DHL Express in full against, any claims, losses, damages or consequences that may arise from the use of or reliance on the Information.
+ 
+You are responsible for all activities conducted via the MyDHL API in accordance with all applicable laws, in particular competition, data protection and customs laws. You shall be responsible for the provision of the correct legal ground to process personal data in order for DHL Express to communicate with receivers and consignees of shipments. In particular, in countries where consent is required, You shall obtain the consent of any receiver for the receipt of any e-mail or SMS from DHL Express or any other data, documents or information in electronic form and in general, from any third party, for personal data owned by any third party and which You provided to DHL Express. On request of DHL Express, You shall provide DHL Express with evidence of such consent. 
+ 
+DHL Express will handle personal data in accordance with applicable data protection laws and the Deutsche Post DHL Data Privacy Policy. More information can be found on DHL Express’ Privacy Notice. You must process all personal data You send to us or obtain from us, according to applicable data protection laws.
+ 
+You accept that DHL Express will incur costs in processing shipping orders made via the MyDHL API and that DHL Express may request that You compensate it in the event that You do not subsequently tender a shipment for the shipping orders at the expected pick-up time. 
+ 
+The API Services are provided on an "as is" basis. DHL Express, to the fullest extent permitted by law, excludes all warranties, whether express, implied, statutory or otherwise, including but not limited to the implied warranties of merchantability, non-infringement of third parties rights and fitness for a particular purpose. DHL Express, its affiliates or agents make no representations or warranties about the accuracy, completeness, security or timeliness of the API Services. No information obtained via the MyDHL API shall create any warranty not expressly stated by DHL Express in the Legal Terms.
+ 
+You shall use the MyDHL API only for the legitimate contractual purposes and only in connection with Your DHL Express shipments.
+ 
+API Services
+The following prerequisites and restrictions apply for the use of and access to the API Services, the data or the information provided via the MyDHL API.
+
+The details below are not an exhaustive list of the API Services available through the MyDHL API, DHL Express just wants You to be aware of specific elements of certain API Services available to You. 
+
+"Create a Shipment"
+When using the API Service “Create a Shipment” this includes, amongst other things, the possibility to create and print shipping labels, to book shipment collections and access other value added services. Please be aware that the booking of the shipment within MyDHL API does not constitute the contract of carriage. The contract of carriage will only be concluded when the shipment is handed over or picked up and accepted by DHL Express.
+ 
+"Product and Rating"
+The API Service “Product” provides You with DHL Express’ product capabilities for a certain piece of a shipment, whereas the API Service “Rating” gives indications on prices and estimated delivery dates/times. 
+The API Service “Landed Cost” calculates an estimated landed cost that includes customs duties, freight charges, and other charges that You may provide to DHL Express. For the “Landed Cost” service as part of the DHL EXPRESS – MyDHL API additional terms and conditions shall apply as set out below.
+Data requested and received, such as product name, product capability, rate(s), lead time(s)/estimated delivery date(s), is hereinafter referred to as “Product and/or Rating Data”. 
+The information about rates and transit time and/or delivery date, is only indicative and not guaranteed. DHL Express has no liability or responsibility for differences between this indicative quote and the actual rate or transit time. The final rate and/or transit time may differ based on the characteristics of the shipment, services requested and the packages actually tendered to DHL Express. Rates quoted may not include duties, taxes, customs charges or all surcharges and fees.
+You shall not reveal to and/or provide any third parties, esp. other transportation and/or logistics services providers, with the Product and/or Rating Data without DHL Express’ prior written consent.
+You shall not store and/or modify Product and/or Rating Data in any form; it is especially prohibited to analyze and/or derive data/information for competitive purposes from the Product and/or Rating Data without our prior written consent.
+ 
+"Landed Cost Service" or ("LC") Cost Service” or (“LC”)
+LC is a service to provide You with landed cost estimates.  Landed costs are the total costs associated with shipping a product to your location from another location and include estimated transportation charges and customs duties.  LC is based on the information you provide. You acknowledge that the data provided via the LC is time-sensitive and may change frequently. You are solely responsible for providing the required shipment data, i.e. shipping values such as freight and insurance, to DHL Express in order to calculate the estimated landed costs. 
+LC does not replace the need for any insurance and the respective risk assessment by your insurance provider.  LC is solely offered to business customers. You may not use LC for any purpose that violates the General Developer Portal Terms of Use and these Legal Terms or any applicable law. You shall not substantially replicate products or services offered by DHL Express including, without limitation, features, functions or clients in LC. You shall not, under any circumstances, through applications or otherwise, repackage or resell LC services, or any part thereof, or data provided via LC and You agree not to create a database using the data/content provided via LC.
+For all shipments, You are solely responsible for the accuracy of information which You fill in on shipment documents and also for complying with all applicable export, import, and other requirements applicable to your shipments.
+
+ 
+
+"Document Image Request Service"
+The Document Image Request API Service enables you to retrieve images of key documents, including the Waybill, Commercial Invoice, and Customs Entry Document.
+To request a Customs Entry Document, you must be the Exporter of Record (EOR).
+Reference Docs
+Download API Spec
+Welcome to the official DHL Express APIs (MyDHL API) below are the published API Documentation to fulfill your shipping needs with DHL Express.
+
+Please follow the process described here to request access to the DHL Express - MyDHL API services
+In case you already have DHL Express - MyDHL API Service credentials please ensure to use the endpoints/environments listed here
+
+DPDHL API Portal Support - Website
+Servers
+
+https://api-mock.dhl.com/mydhlapi - Mock Server (simulate API responses with fixed test data)
+rating
+
+Endpoints
+
+GET
+/rates
+Retrieve Rates for a one piece Shipment
+
+POST
+/rates
+Retrieve Rates for Multi-piece Shipments
+
+POST
+/landed-cost
+Landed Cost
+product
+
+Endpoints
+
+GET
+/products
+Retrieve available DHL Express products for a one piece Shipment
+shipment
+
+Endpoints
+
+GET
+/shipments/{shipmentTrackingNumber}/proof-of-delivery
+Electronic Proof of Delivery
+
+PATCH
+/shipments/{shipmentTrackingNumber}/upload-image
+Upload Paperless Trade shipment (PLT) images of previously created shipment.
+
+POST
+/shipments
+Create Shipment
+
+PATCH
+/shipments/{shipmentTrackingNumber}/upload-invoice-data
+Upload Commercial Invoice data for your DHL Express shipment
+
+GET
+/shipments/{shipmentTrackingNumber}/get-image
+Get Image
+
+PATCH
+/shipments/{shipmentTrackingNumber}/add-piece
+Adding new pieces to a previously created shipment.
+tracking
+
+Endpoints
+
+GET
+/shipments/{shipmentTrackingNumber}/tracking
+Track a single DHL Express Shipment
+
+GET
+/tracking
+Track a single or multiple DHL Express Shipments
+pickup
+
+Endpoints
+
+DELETE
+/pickups/{dispatchConfirmationNumber}
+Cancel a DHL Express pickup booking request
+
+PATCH
+/pickups/{dispatchConfirmationNumber}
+Update pickup information for an existing DHL Express pickup booking request
+
+POST
+/pickups
+Create a DHL Express pickup booking request
+identifier
+
+Endpoints
+
+GET
+/identifiers
+Service to allocate identifiers upfront for DHL Express Breakbulk or Loose Break Bulk shipments
+address
+
+Endpoints
+
+GET
+/address-validate
+Validate DHL Express pickup/delivery capabilities at origin/destination
+invoice
+
+Endpoints
+
+POST
+/invoices/upload-invoice-data
+Upload Commercial invoice data
+servicepoint
+
+Endpoints
+
+GET
+/servicepoints
+Returns list of service points based on the given postal location address, service point ID or geocode details for DHL Express Service points to pick-up and drop-off shipments
+reference-data
+
+Endpoints
+
+GET
+/reference-data
+provide reference data currently used for MyDHL API services usage.
+early-shipment-screening
+
+Endpoints
+
+POST
+/early-shipment-screening
+Early shipment screening for break bulk baby shipments
+Downloads
+By downloading any file, you accept our Terms of Use
+Open API Specification File
+YAML
+MyDHL API Password Reset InstructionsPDF - PDF - 276.64 KB
+MyDHL API Reference data guide (3.3.0).pdfPDF - PDF - 698.66 KB
+ExpressReferenceData_3.3.0.zipZIP - ZIP - 239.91 KB
+Release Notes
+3.3.0
+31.May.2026
+Shipment
+State or Province Code and State or Province Name - shipment manifest mapping adjustments
+Enhanced pickup request validation to consider shipper account number–based pickup cutoff times.
+Enhance Export Line Item Description validation to enforce a minimum of 1 character.
+Enhance shipment and package level customer reference types comply with CI Mask reference data.
+Added fallback support for label-free shipments in locations where the label-free service is unavailable.
+Support Dangerous Goods declaration package count and custom descriptions up to a maximum length of 1000 characters.
+Enhance shipment requests to support courier requests with shipperDetails for shipper role information in the shipment manifest file.
+Enhance shipment notification emails to support printing up to 100 customer references of type 'CU'.
+ 
+Add Piece
+Enhance shipment and package level customer reference types comply with CI Mask reference data.
+ 
+Create Pickup
+Enhanced pickup request validation to consider shipper account number–based pickup cutoff times.
+ 
+Update Pickup
+Enhanced pickup request validation to consider shipper account number–based pickup cutoff times.
+ 
+Rates
+Enhance to return pickup capabilities based on the shipper account number–based pickup cutoff time.
+Rates tariff response BI Data Feed for US team reporting usage
+ 
+Invoice
+Enhance Export Line Item Description validation to enforce a minimum of 1 character.
+ 
+Reference Data
+Enhance the 'country' dataset response to include both the ISO currency code and the currency name.
+Enhance the 'customerShipmentReferenceType' dataset response to include an indicator for allowing multiple references.
+3.2.2
+05.Apr.2026
+Create Shipment
+Enhance the document rendering of Egypt (EG) ACID Number - 'AFM' shipment reference type on Waybill Document and Commercial Invoice printouts.
+3.2.1
+15.Mar.2026
+Create Shipment
+Introducing new 'FII' (FII– ‘Foreign Importer Identifier) type code under Registration Number type code
+Introducing new 'BLI' (Broker License), 'ICD' (Internal Customs Document), 'EAD' (Export Accompanying Document), 'ETD' (Export Transit Document) type code under Export Declaration & Line Item's customsDocuments
+Introducing new 'CLN' (Customer Line Number) type code under Export Declaration Line Item's references
+ 
+Upload Invoice
+Introducing new 'FII' (FII– ‘Foreign Importer Identifier) type code under Registration Number type code
+Introducing new 'BLI' (Broker License), 'ICD' (Internal Customs Document), 'EAD' (Export Accompanying Document), 'ETD' (Export Transit Document) type code under Export Declaration & Line Item's customsDocuments
+Introducing new 'CLN' (Customer Line Number) type code under Export Declaration Line Item's references
+ 
+Service Point
+Updated YAML details for returns list of service points based on the given postal location address, service point ID or geocode details for DHL Express Service points to pick-up and drop-off shipments
+3.2.0
+15.Feb.2026
+ Shipment
+Enables Brazil (BR) shipment manifest mapping with shipper’s registration number type code 'CNP'.
+Invoice   
+Supports up to 100 exportDeclaration (invoices).
+Get Image
+Supports retrieval of uploaded document images using the Payer Account Number as a request parameter.
+Tracking
+Supports tracking by shipment reference using the Payer Account Number.
+3.1.2
+05.Jan.2026
+Create Shipment
+Introducting 'AFM' as shipment reference type to support Egypt’s ACID number (Advance Cargo Information Approval Number).
+Removed 'MID','DLI','GST',and 'SUB' from the Registration Number type codes in the documentation.
+UNCode is an optional field for dangerousGoods (HH) and contentID (E01).
+ 
+Upload Invoice
+Removed 'MID','DLI','GST',and 'SUB' from the Registration Number type codes in the documentation. 
+3.1.1
+02.Nov.2025
+Shipment
+Introducing new 'OEI' (Original Export Invoice), 'RGR' (Return Goods Relief), 'CHA' (CHED-A), 'CP2' (CHED-PP)  type code under Export Declaration & Line Item's customsDocuments
+Introducing new 'AEI' (Original Import Declaration Number), 'EXN' (Mode of Statistics), 'AFK' (Bonded Goods Note), 'AEA' (Competent Authority Designated Code), 'PTA' (Preferential Treatment Agreement) type code under Export Declaration Line Item's references
+Introducing new 'PTA' (Preferential Treatment Agreement) type code under Export Declaration references
+Introducing new 'PEP' (Peppol ID) type code under Registration Number type code
+ 
+Invoice
+Introducing new 'OEI' (Original Export Invoice) type code under Export Declaration & Line Item's customsDocuments
+ - Introducing new 'AEI' (Original Import Declaration Number), 'EXN' (Mode of Statistics), 'AFK' (Bonded Goods Note), 'AEA' (Competent Authority Designated Code), 'PTA' (Preferential Treatment Agreement) type code under Export Declaration Line Item's references
+Introducing new 'PTA' (Preferential Treatment Agreement) type code under Export Declaration references
+Introducing new 'PEP' (Peppol ID) type code under Registration Number type code
+ 
+Early Shipment Screening
+New API enables denied party screening for breakbulk baby shipments to ensure compliance with DHL policies.
+3.1.0
+12.Oct.2025
+Landed Cost
+Enforce Line Item's Manufacturer Country Code
+ 
+Rates
+Return Inbound and Outbound Sort Codes
+ 
+Shipment
+Support Serbia (RS) postal regulation compliance
+Sequence of shipping roles in Commercial Invoice template (COMMERCIAL_INVOICE_P_10 or COMMERCIAL_INVOICE_L_10) enhancement
+Support only greater than 0.001 or positive value entries in package's dimension
+Return Invoice (RET_COM_INVOICE_A4_01) template enhancement
+Request pickup supported additional 3 pickup instructions with maximum length of 80 characters
+ 
+Get Image
+Account opening's date validation against the document image's account enhancement
+3.0.1
+17.Aug.2025
+Shipment
+Introducing new 'TAR' (Export Tariff Concession Order), 'TCO' (Import Tariff Concession Order), 'PX' (Pallet total quantity packages) type code under Export Declaration references
+Introducing new 'ARN' (Original proof of export number), 'OP' (Original purchase order number), 'OSC' (Shipping country code (returns)), 'TAR' (Export Tariff Concession Order) and 'TCO' (Import Tariff Concession Order) type code under Export Declaration Line Item's references
+Introducing new 'ORD' (Organization Registration Documents) type code under Export Declaration customsDocuments
+Introducing new 'ORD' (Organization Registration Documents) type code under Export Declaration Line Item's customsDocuments
+ 
+Invoice
+Introducing new 'TAR' (Export Tariff Concession Order), 'TCO' (Import Tariff Concession Order), 'PX' (Pallet total quantity packages) type code under Export Declaration references
+Introducing new 'ARN' (Original proof of export number), 'OP' (Original purchase order number), 'OSC' (Shipping country code (returns)), 'TAR' (Export Tariff Concession Order) and 'TCO' (Import Tariff Concession Order) type code under Export Declaration Line Item's references
+Introducing new 'ORD' (Organization Registration Documents) type code under Export Declaration customsDocuments
+Introducing new 'ORD' (Organization Registration Documents) type code under Export Declaration Line Item's customsDocuments
+3.0.0
+13.Jul.2025
+Landed Cost
+Introducing a new item-level tariff rate type called "preferential_rate" to account for preferential treatment in the rate calculation
+ 
+Shipment
+If a customer ships using DHL Express standardized packaging materials, each with its own code, there is no need to provide dimensions when the relevant package type code is given. The dimensions will be automatically populated in the background based on the code
+It is not necessary to provide both gross and net weight for each line item under exportDeclaration; only one or the other is required
+New addPiece API allows for additional pieces to be added to a previously created shipment that has not been picked up by DHL Express/had a scan against it
+ 
+Rates
+If a customer ships using DHL Express standardized packaging materials, each with its own code, there is no need to provide dimensions when the relevant package type code is given. The dimensions will be automatically populated in the background based on the code
+ 
+Get Image
+Support to retrieve shipment's DHL Issued proforma invoice (if created) via new document image type code 'DPF'
+2.13.3
+01.Jun.2025
+Shipment
+Support for new registration number type of 'FTN' (Foreign Tax Identification Number) for Mexico country usage  
+ 
+Invoice
+Support for new registration number type of 'FTN' (Foreign Tax Identification Number) for Mexico country usage  
+ 
+2.13.1
+06.Apr.2025
+Shipment
+Considering of special services of 'TF' (Verified Delivery) which is part of customer agreement on DHL Express shipper account level when rendering the Transport Label
+2.13.0
+23.Mar.2025
+Shipment
+Option to return rates for product B (BBX) onboarded customers
+ 
+Rates
+Option to return rates for product B (BBX) onboarded customers
+ 
+Get Image
+Supports document image retrieval of customs document type of 'TAS' (transport-accompanying-document) and 'GES' (generic-entry-summary)
+2.12.1
+19.Jan.2025
+Shipment
+introducing new 'DDS' (Due Diligence Statement Reference Number) type code under Export Declaration/ Line Item references
+Support for new registration number type of 'EIC' (eInvoice Carrier) for Taiwan country usage  
+ 
+Invoice
+introducing new 'DDS' (Due Diligence Statement Reference Number) type code under Export Declaration/ Line Item references
+Support for new registration number type of 'EIC' (eInvoice Carrier) for Taiwan country usage  
+2.12.0
+22.Oct.2024
+Shipment
+Account validation enhancement on allowed product and network type combination
+New release version number 'x-version' to return new 'pickupCutoffSameDayOutboundProcessing' field to replace legacy field 'GMTCutoffTime' in shipment response
+ 
+Reference Data
+New language codes details for document rendering Commercial Invoice, Shipment Receipt, Email Notification and Tracking localization
+Updated new supported values for 'unitOfMeasurement' category
+Rates
+New release version number 'x-version' to return new 'pickupCutoffSameDayOutboundProcessing' field to replace legacy field 'GMTCutoffTime' in rates response
+
+ 
+
+2.11.4
+29.Sep.2024
+Shipment
+Support for new Registration number type of 'IMS'  
+Note: 'IMS' code will be available in Production by the end of March 2025.
+2.11.2
+28.Jul.2024
+Shipment
+Invoice date field description updates
+Reference Data updates on registration number information for Malaysia (MY) e-Invoice regulatory changes 
+ 
+Tracking
+Tracking response with event remarks fields at shipment and pieces level
+2.11.1
+26.May.2024
+Shipment
+Support for manufacturerDetails customer role
+exportDeclaration's and lineItems's customsDocuments typeCode updates with new 'PCH' value
+'PPY' - Proof Of Payment typeCode is replaced with 'PCH' - Proof Of Purchase.
+Invoice
+Support for manufacturerDetails customer role
+exportDeclaration's and lineItems's customsDocuments typeCode updates with new 'PCH' value
+'PPY' - Proof Of Payment typeCode is replaced with 'PCH' - Proof Of Purchase.
+2.11.0
+31.Mar.2024
+Shipment
+Handling of export line item’s taxes paid indicator applicable to the provided destination country dynamically
+Support for Broker customer role
+New 'linkLabelsByPieces' option under getAdditionalInformation's typeCode that return additional response fields in shipment response for linkage of individual piece’s reference number and its transport label or waybill document image type.
+Invoice
+Support for Broker customer role
+Tracking
+Tracking response with masking protected data and authorization process implementation
+New request parameter to return GMT offset per event/ checkpoint
+2.10.1
+10.Mar.2024
+Tracking
+
+Support for trackingView of 'all-check-with-remarks' and new parameter for requesting array of controlled access data codes in tracking response.
+2.10.0
+22.Oct.2023
+Shipment
+Support for multilingual Global Shipment Receipt
+2.9.0
+27.Aug.2023
+Shipment
+bypassPLTError query parameter made publicly available without any restriction to all the DHL Express MyDHL API customers
+Updated invoice display logic to individually and consistently show Freight and Insurance charges, preventing them from being categorized under "Other Charges" for enhanced clarity.
+Considering of special services (CIN2, GoGreen/ GoGreen+) which is part of Customer agreement on DHL Express account level when rendering the Transport label
+Enhanced data validation:  positive values are enforced for parameters such as totalNetWeight, totalGrossWeight, price, netValue weight, grossValue weight, additionalCharges's value, importCustomsDutyValue, and importTaxesValue.
+Invoice
+Updated invoice display logic to individually and consistently show Freight and Insurance charges, preventing them from being categorized under "Other Charges" for enhanced clarity.
+Get Image
+Support document image retrieval of customs document with both the Export and Import document function type
+Reference Data – new API
+Introduced new resource allowing to retrieve various DHL Express related reference data
+2.8.2
+27.Jul.2023
+Service Point
+Returns list of service points based on the given postal location address, service point ID or geocode details for DHL Express Service points to pick-up and drop-off shipments
+2.8.0
+07.May.2023
+Shipment
+Support for Customer own calculated totals and sub-totals amounts on the Commercial invoice ('preCalculatedTotalGoodsValue','preCalculatedTotalInvoiceValue','preCalculatedLineItemTotalValue' and 'totalWithImportDutiesAndTaxes'). If all of these provided in the request then DHL Express will not auto-calculate the values but will use what is provided by the customer in the request
+Currency Code made optional for non-declarable shipments 
+Incoterm made optional for all non-declarable shipments
+Introduced Shipment data validation flow to support data validation without label creation
+Automated Digital Imaging (ADI) enablement
+ 
+
+Invoice
+Support for Customer own calculated totals and sub-totals amounts on the Commercial invoice ('preCalculatedTotalGoodsValue','preCalculatedTotalInvoiceValue','preCalculatedLineItemTotalValue' and 'totalWithImportDutiesAndTaxes'). If all of these provided in the request then DHL Express will not auto-calculate the values but will use what is provided by the customer in the request
+2.7.2
+05.Mar.2023
+Shipment
+Support for multiple UN code values for Excepted Quantities(HH)  under valueAddedServices/dangerousGoods
+Support for multiple MRN (Movement Reference number) values under content/exportDeclaration/invoice/customerReferences
+Invoice
+Support for Commercial Invoice’s indicative duty and tax amount rendering for customs purpose using   COMMERCIAL_INVOICE_P_10 and COMMERCIAL_INVOICE_L_10 templates
+Support for multiple MRN (Movement Reference number) values under content/exportDeclaration/invoice/customerReferences
+2.7.0
+16.Oct.2022
+Shipment
+Support Singapore OVR GSTN registration number and GST taxes
+Support for Dangerous Goods customized statement on Shipment level
+Validation of any Country code provided in the request message
+Invoice
+Validation of any Country code provided in the request message
+Rates
+Option to decide whether Quoted or Committed Estimated Delivery Date to be returned
+Address
+Support for County name (Suburb)
+2.6.0
+11.Sep.2022
+Shipment
+Mandatory "exportDeclaration" section for declarable (non-documents) shipments
+Support for Ultimate Consignee customer role
+Introduced option that allows exact-match validation of postal address provided under Shipper and Receiver customer details
+Support for Commercial Invoice’s indicative duty and tax amount rendering for customs purpose using COMMERCIAL_INVOICE_P_10 and COMMERCIAL_INVOICE_L_10 templates
+Invoice
+Support for Ultimate Consignee customer role
+Rates
+Introduced option to return dependent / mutual exclusive services list  
+Introduced option that allows exact-match validation of postal address provided under Shipper and Receiver customer details
+2.5.0
+09.Jul.2022
+Shipment
+Support for Global Returns Invoice templateName 'RET_COM_INVOICE_A4_01'
+2.4.0
+20.Feb.2022
+Shipment
+Support for non-DHL barcode Licence plate identification number types
+Added Export Line Item Reference Type of ECCN - No License Required indicator (NLR)
+Ability to return provinceName in rendered Transport Label and Waybill document
+List of supported incoterms updated
+Invoice
+Added Export Line Item Reference Type of ECCN - No License Required indicator (NLR)
+Get Image – new API
+Retrieve shipment related document images (Commercial Invoice, Waybill Document, Customs document)
+2.3.1
+14.Dec.2021
+Shipment 
+Removed <function> field in Shipment request
+2.3.0
+25.Oct.2021
+Shipment
+PDF Labels rendered can be requested to fit to A4 page size
+2.2.0
+06.Sep.2021
+Landed Cost 
+Return landed cost with partial or no commodity code
+Improved error messages
+Ability to return tariff formula
+2.1.0
+11.Jul.2021
+Shipment
+
+Support for upload Invoice data for existing shipment
+Support for additional customs related e-commerce rules
+Invoice – new API
+
+Support for upload Invoice data before shipment is created
+2.0.0
+12.Mar.2021
+Shipment
+Support for the new European Union VAT and customs e-commerce rules for the import of low value consignments as of July 1st 2021
+Support for Loose BBX shipments
+Support for Label-Less return shipments
+Support for Cash-On-Delivery shipments
+Support for upload of additional document images for Advanced Shipments
+1.1.0
+20.Jul.2020
+Added new endpoints to the API:
+
+Tracking
+Pickup
+Identifier
+Address
+1.0.0
+27.Mar.2020
+Initial Release of Rates, Shipments & Fully Landed Cost - ready for Pilot
