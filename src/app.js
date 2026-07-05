@@ -4,7 +4,16 @@ dotenv.config();
 require("./dbconfigration");
 const express = require("express");
 const app = express();
+const cors = require("cors");
+const corsOptions = {
+  origin: "*", // Allowed origins
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  allowedHeaders: '*', // Allow all headers
+  credentials: true,
+  optionsSuccessStatus: 200, // for legacy browsers
+}
 
+app.use(cors(corsOptions));
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1"]);
 
 const expandLoopbackOrigin = (origin) => {
@@ -78,7 +87,7 @@ app.get("/", (_req, res) => {
   res.json({ message: "Server is running fine 🚀" });
 });
 
-const PORT = Number(process.env.PORT || process.env.REACT_APP_SERVER_DOMAIN) || 5001;
+const PORT = Number(process.env.PORT || process.env.REACT_APP_SERVER_DOMAIN) || 5000;
 app.use("/api", require("./Routes/AuthRoute"));
 app.use("/api", require("./Routes/ContactRoute"));
 app.use("/api", require("./Routes/ServicesRoute"));
@@ -134,7 +143,7 @@ app.get("/api/dhl/track/:trackingNumber", async (req, res) => {
     );
 
     const trackingData = await response.json();
-    
+
     // Simple format में बदलें
     const events = trackingData.shipments[0]?.events.map(event => ({
       status: event.description,
@@ -142,10 +151,10 @@ app.get("/api/dhl/track/:trackingNumber", async (req, res) => {
       timestamp: event.timestamp,
     })) || [];
 
-    res.json({ 
-      trackingNumber, 
+    res.json({
+      trackingNumber,
       status: trackingData.shipments[0]?.status,
-      events 
+      events
     });
   } catch (error) {
     res.status(500).json({ error: "Tracking failed" });
