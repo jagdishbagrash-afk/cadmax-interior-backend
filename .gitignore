@@ -1,4 +1,11 @@
 /node_modules
 .env
 .env.local
-/logs
+.logs
+.history/
+history/
+.env.development.local
+.env.test.local
+.env.production.local
+.history/
+.env

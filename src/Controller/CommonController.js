@@ -490,10 +490,11 @@ const cart = await Cart.findOne({
 
 
 
-const admin = require("../Utill/firebase");
+const { getFirebaseAdmin } = require("../Utill/firebase");
 
 exports.testNotification = async (req, res) => {
   try {
+    const admin = getFirebaseAdmin();
     const { token, title, body } = req.body;
 
     if (!token) {
