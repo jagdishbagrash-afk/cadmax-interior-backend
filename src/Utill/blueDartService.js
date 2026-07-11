@@ -28,6 +28,18 @@ const getBlueDartLicenceKey = () =>
   process.env.BLUE_DART_LICENCEKEY ||
   "";
 
+const getBlueDartShippingLicenceKey = () =>
+  process.env.BLUE_DART_SHIPPING_LICENCE_KEY ||
+  process.env.BLUE_DART_SHIPPING_LICENSE_KEY ||
+  process.env.BLUE_DART_SHIPPING_LICENCEKEY ||
+  getBlueDartLicenceKey();
+
+const getBlueDartTrackingLicenceKey = () =>
+  process.env.BLUE_DART_TRACKING_LICENCE_KEY ||
+  process.env.BLUE_DART_TRACKING_LICENSE_KEY ||
+  process.env.BLUE_DART_TRACKING_LICENCEKEY ||
+  getBlueDartLicenceKey();
+
 const getBlueDartCustomerCode = () =>
   process.env.BLUE_DART_CUSTOMER_CODE ||
   process.env.BLUE_DART_CUSTOMERCODE ||
@@ -308,7 +320,7 @@ const buildGenerateWaybillPayload = ({
     },
     Profile: {
       Api_type: process.env.BLUE_DART_API_TYPE || "S",
-      LicenceKey: getBlueDartLicenceKey(),
+      LicenceKey: getBlueDartShippingLicenceKey(),
       LoginID: getBlueDartLoginId(),
     },
   };
@@ -464,7 +476,7 @@ const trackBlueDartShipment = async (trackingNumber, options = {}) => {
     const params = {
       numbers: trackingNumber,
       loginid: getBlueDartLoginId(),
-      lickey: getBlueDartLicenceKey(),
+      lickey: getBlueDartTrackingLicenceKey(),
       scan: options.scan ?? process.env.BLUE_DART_TRACK_SCAN ?? "1",
       action: options.action ?? process.env.BLUE_DART_TRACK_ACTION ?? "custawbquery",
       verno: options.verno ?? process.env.BLUE_DART_TRACK_VERNO ?? "1",
