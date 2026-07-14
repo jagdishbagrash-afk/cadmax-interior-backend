@@ -7,8 +7,12 @@ const OrderEmail = require("../EmailTemplate/Order");
 const { sendPushNotification } = require("../Utill/notificationService");
 const User = require("../Model/User");
 const Cart = require("../Model/Cart");
-const { default: axios } = require("axios");
 const Product = require("../Model/Product");
+const {
+  buildLegacyAddressString,
+  buildShippingAddressSnapshot,
+  resolveOwnedAddress,
+} = require("../Utill/orderAddress");
 
 // exports.addOrder = catchAsync(async (req, res) => {
 //   try {
@@ -182,12 +186,35 @@ exports.addOrder = catchAsync(async (req, res) => {
 
   const userId = req.user?.id;
 
-  if (!name || !mobile || !product?.length || !amount) {
+  if (!userId) {
+    return errorResponse(res, "Unauthorized", 401);
+  }
+
+  if (!name || !mobile || !product?.length || !amount || !addressId) {
     return validationErrorResponse(
       res,
-      "Name, mobile, product and amount are required"
+      "Name, mobile, addressId, product and amount are required"
     );
   }
+
+  const addressResult = await resolveOwnedAddress({ addressId, userId });
+
+  if (!addressResult.ok) {
+    if (addressResult.reason === "invalid" || addressResult.reason === "not_found") {
+      return validationErrorResponse(res, "Invalid addressId");
+    }
+
+    if (addressResult.reason === "unauthorized") {
+      return errorResponse(res, "Selected address does not belong to this user", 403);
+    }
+  }
+
+  const shippingAddress = buildShippingAddressSnapshot({
+    name,
+    mobile,
+    addressRecord: addressResult.address,
+  });
+  const legacyAddress = buildLegacyAddressString(shippingAddress) || address;
 
   const numericAmount = Number(
     typeof amount === "string"
@@ -254,8 +281,9 @@ exports.addOrder = catchAsync(async (req, res) => {
   const newOrder = new Order({
     name,
     mobile,
-    address,
+    address: legacyAddress,
     addressId,
+    shippingAddress,
     product: orderProducts,
     amount: numericAmount,
     userId,

@@ -1,11 +1,14 @@
 const crypto = require("crypto");
 const Payment = require("../Model/Payment");
 const Order = require("../Model/Order");
-const Address = require("../Model/MultipleAddress");
 const Razorpay = require("razorpay");
 const catchAsync = require("../Utill/catchAsync");
-const { createDhlShipment, normalizeAddress } = require("../Utill/createDhlShipment");
-const { createBlueDartWaybill } = require("../Utill/blueDartService");
+const { createDhlShipment } = require("../Utill/createDhlShipment");
+const {
+  createBlueDartWaybill,
+  resolveBlueDartShipFrom,
+} = require("../Utill/blueDartService");
+const { ensureOrderShippingAddress, toCourierAddress } = require("../Utill/orderAddress");
 require("dotenv").config();
 
 const razorpayInstance = new Razorpay({
@@ -44,19 +47,38 @@ const resolveDefaultShippingProvider = (value) =>
   normalizeShippingProvider(process.env.DEFAULT_SHIPPING_PROVIDER) ||
   "DHL";
 
+const ensureOrderShipFrom = (order) => {
+  const shouldReuseSavedShipFrom =
+    order?.shipping_status === "shipment_created" && String(order?.tracking_number || "").trim() !== "";
+  const shipFrom = resolveBlueDartShipFrom(
+    shouldReuseSavedShipFrom ? order?.labelData?.shipFrom : null
+  );
+  order.labelData = {
+    ...(order.labelData || {}),
+    shipFrom,
+  };
+
+  return shipFrom;
+};
+
 const createShipmentForOrder = async ({
   order,
   receiverAddress,
   shippingProvider,
 }) => {
   const provider = resolveDefaultShippingProvider(shippingProvider);
+  const receiverName = receiverAddress?.name || order?.shippingAddress?.name || order?.name;
+  const receiverMobile = receiverAddress?.mobile || order?.shippingAddress?.mobile || order?.mobile;
 
   if (provider === "BLUE_DART") {
+    const shipFrom = ensureOrderShipFrom(order);
+
     const shipment = await createBlueDartWaybill({
       orderId: order.orderId,
-      name: order.name,
-      mobile: order.mobile,
+      name: receiverName,
+      mobile: receiverMobile,
       receiverAddress,
+      shipFrom,
       products: order.product,
       declaredValue: order.amount,
       isCod: false,
@@ -72,8 +94,8 @@ const createShipmentForOrder = async ({
   }
 
   const shipment = await createDhlShipment({
-    name: order.name,
-    mobile: order.mobile,
+    name: receiverName,
+    mobile: receiverMobile,
     address: receiverAddress,
     products: order.product,
     totalAmount: order.amount,
@@ -102,17 +124,6 @@ const verifyRazorpaySignature = ({ orderId, paymentId, signature }) => {
     .digest("hex");
 
   return generatedSignature === signature;
-};
-
-const resolveOrderAddress = async (order) => {
-  if (order?.addressId) {
-    const savedAddress = await Address.findById(order.addressId).lean();
-    if (savedAddress) {
-      return normalizeAddress(savedAddress);
-    }
-  }
-
-  return normalizeAddress(order?.address);
 };
 
 exports.createOrder = async (req, res) => {
@@ -233,6 +244,11 @@ exports.paymentAdd = catchAsync(async (req, res) => {
 
   let shipment = null;
 
+  const { shippingAddress } = await ensureOrderShippingAddress(order, {
+    userId: user_id,
+  });
+  ensureOrderShipFrom(order);
+
   order.PaymentId = effectivePaymentId;
 
   if (normalizedPaymentStatus === "success") {
@@ -248,12 +264,17 @@ exports.paymentAdd = catchAsync(async (req, res) => {
         reusedExistingShipment: true,
       };
     } else {
-      const receiverAddress = await resolveOrderAddress(order);
+      if (!shippingAddress) {
+        return res.status(400).json({
+          status: false,
+          message: "Order shipping address is missing",
+        });
+      }
 
       const desiredProvider = shipping_provider || shippingProvider;
       const created = await createShipmentForOrder({
         order,
-        receiverAddress,
+        receiverAddress: toCourierAddress(shippingAddress),
         shippingProvider: desiredProvider,
       });
 

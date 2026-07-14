@@ -50,7 +50,31 @@ const getBlueDartHeaders = () => ({
   "content-type": "application/json",
 });
 
+const logBlueDartApiHit = ({ action, method, url, payload, params }) => {
+  console.log(
+    `[BLUE_DART API] ${action}`,
+    JSON.stringify(
+      {
+        method,
+        url,
+        ...(payload ? { payload } : {}),
+        ...(params ? { params } : {}),
+      },
+      null,
+      2
+    )
+  );
+};
+
 const extractError = (error) => error?.response?.data || error.message;
+
+const toSafeString = (value) => {
+  if (value === undefined || value === null) {
+    return "";
+  }
+
+  return String(value).trim();
+};
 
 const coerceNumber = (value) => {
   const numeric = Number(value);
@@ -72,6 +96,134 @@ const toLimitedString = (value, maxLength, fallback = "") => {
 const toBlueDartDateLiteral = (date) => {
   const timestamp = date instanceof Date ? date.getTime() : Date.now();
   return `/Date(${timestamp})/`;
+};
+
+const buildFullAddress = ({
+  addressLine1 = "",
+  addressLine2 = "",
+  addressLine3 = "",
+  city = "",
+  state = "",
+  pincode = "",
+  country = "",
+}) =>
+  [addressLine1, addressLine2, addressLine3, city, state, pincode, country]
+    .map(toSafeString)
+    .filter(Boolean)
+    .join(", ");
+
+const resolveBlueDartShipFrom = (shipFrom = {}) => {
+  const addressLine1 = toSafeString(
+    shipFrom?.addressLine1 ||
+      shipFrom?.CustomerAddress1 ||
+      process.env.BLUE_DART_SHIPPER_ADDRESS1 ||
+      process.env.DHL_SHIPPER_ADDRESS_LINE1
+  );
+  const addressLine2 = toSafeString(
+    shipFrom?.addressLine2 ||
+      shipFrom?.CustomerAddress2 ||
+      process.env.BLUE_DART_SHIPPER_ADDRESS2 ||
+      process.env.DHL_SHIPPER_ADDRESS_LINE2
+  );
+  const addressLine3 = toSafeString(
+    shipFrom?.addressLine3 ||
+      shipFrom?.CustomerAddress3 ||
+      process.env.BLUE_DART_SHIPPER_ADDRESS3
+  );
+  const city = toSafeString(
+    shipFrom?.city ||
+      shipFrom?.City ||
+      process.env.BLUE_DART_SHIPPER_CITY ||
+      process.env.DHL_SHIPPER_CITY
+  );
+  const state = toSafeString(
+    shipFrom?.state || shipFrom?.State || process.env.BLUE_DART_SHIPPER_STATE || process.env.DHL_SHIPPER_STATE
+  );
+  const pincode = toSafeString(
+    shipFrom?.pincode ||
+      shipFrom?.CustomerPincode ||
+      process.env.BLUE_DART_SHIPPER_PINCODE ||
+      process.env.DHL_SHIPPER_POSTAL_CODE
+  );
+  const country = toSafeString(
+    shipFrom?.country ||
+      shipFrom?.Country ||
+      process.env.BLUE_DART_SHIPPER_COUNTRY ||
+      process.env.DHL_SHIPPER_COUNTRY ||
+      "India"
+  );
+  const name = toSafeString(
+    shipFrom?.name ||
+      shipFrom?.CustomerName ||
+      process.env.BLUE_DART_SHIPPER_NAME ||
+      process.env.DHL_SHIPPER_NAME ||
+      "Cadmax"
+  );
+  const mobile = toSafeString(
+    shipFrom?.mobile ||
+      shipFrom?.phone ||
+      shipFrom?.CustomerMobile ||
+      process.env.BLUE_DART_SHIPPER_MOBILE ||
+      process.env.DHL_SHIPPER_PHONE
+  );
+  const telephone = toSafeString(
+    shipFrom?.telephone ||
+      shipFrom?.CustomerTelephone ||
+      process.env.BLUE_DART_SHIPPER_TELEPHONE ||
+      process.env.BLUE_DART_SHIPPER_PHONE ||
+      process.env.DHL_SHIPPER_PHONE
+  );
+  const email = toSafeString(
+    shipFrom?.email || shipFrom?.CustomerEmailID || process.env.BLUE_DART_SHIPPER_EMAIL
+  );
+  const gstNumber = toSafeString(
+    shipFrom?.gstNumber ||
+      shipFrom?.CustomerGSTNumber ||
+      process.env.BLUE_DART_SHIPPER_GST
+  );
+  const sender = toSafeString(
+    shipFrom?.sender || shipFrom?.Sender || process.env.BLUE_DART_SENDER
+  );
+  const vendorCode = toSafeString(
+    shipFrom?.vendorCode || shipFrom?.VendorCode || process.env.BLUE_DART_VENDOR_CODE
+  );
+  const customerCode = toSafeString(
+    shipFrom?.customerCode || shipFrom?.CustomerCode || getBlueDartCustomerCode()
+  );
+  const originArea = toSafeString(
+    shipFrom?.originArea || shipFrom?.OriginArea || process.env.BLUE_DART_ORIGIN_AREA
+  );
+
+  return {
+    name,
+    mobile,
+    phone: mobile,
+    telephone,
+    email,
+    gstNumber,
+    addressLine1,
+    addressLine2,
+    addressLine3,
+    city,
+    state,
+    pincode,
+    country,
+    fullAddress:
+      toSafeString(shipFrom?.fullAddress) ||
+      buildFullAddress({
+        addressLine1,
+        addressLine2,
+        addressLine3,
+        city,
+        state,
+        pincode,
+        country,
+      }),
+    sender,
+    vendorCode,
+    customerCode,
+    originArea,
+  };
 };
 
 const getTotalPieces = (products = []) => {
@@ -169,6 +321,7 @@ const buildGenerateWaybillPayload = ({
   name,
   mobile,
   receiverAddress,
+  shipFrom,
   products,
   declaredValue,
   isCod,
@@ -193,14 +346,7 @@ const buildGenerateWaybillPayload = ({
     throw new Error("Receiver address must include pincode and address line 1");
   }
 
-  const shipperAddress1 =
-    process.env.BLUE_DART_SHIPPER_ADDRESS1 || process.env.DHL_SHIPPER_ADDRESS_LINE1 || "";
-  const shipperPincode =
-    process.env.BLUE_DART_SHIPPER_PINCODE || process.env.DHL_SHIPPER_POSTAL_CODE || "";
-  const shipperMobile =
-    process.env.BLUE_DART_SHIPPER_MOBILE || process.env.DHL_SHIPPER_PHONE || "";
-  const shipperName =
-    process.env.BLUE_DART_SHIPPER_NAME || process.env.DHL_SHIPPER_NAME || "Cadmax";
+  const resolvedShipFrom = resolveBlueDartShipFrom(shipFrom);
 
   const payload = {
     Request: {
@@ -226,24 +372,17 @@ const buildGenerateWaybillPayload = ({
       },
       Returnadds: {
         ManifestNumber: "",
-        ReturnAddress1:
-          process.env.BLUE_DART_RETURN_ADDRESS1 || shipperAddress1 || "",
-        ReturnAddress2: process.env.BLUE_DART_RETURN_ADDRESS2 || "",
-        ReturnAddress3: process.env.BLUE_DART_RETURN_ADDRESS3 || "",
-        ReturnContact:
-          process.env.BLUE_DART_RETURN_CONTACT ||
-          process.env.DHL_SHIPPER_NAME ||
-          "Cadmax",
-        ReturnEmailID: process.env.BLUE_DART_RETURN_EMAIL || "",
+        ReturnAddress1: resolvedShipFrom.addressLine1,
+        ReturnAddress2: resolvedShipFrom.addressLine2,
+        ReturnAddress3: resolvedShipFrom.addressLine3,
+        ReturnContact: resolvedShipFrom.name,
+        ReturnEmailID: resolvedShipFrom.email,
         ReturnLatitude: "",
         ReturnLongitude: "",
         ReturnMaskedContactNumber: "",
-        ReturnMobile:
-          process.env.BLUE_DART_RETURN_MOBILE ||
-          process.env.DHL_SHIPPER_PHONE ||
-          "",
-        ReturnPincode: process.env.BLUE_DART_RETURN_PINCODE || shipperPincode || "",
-        ReturnTelephone: "",
+        ReturnMobile: resolvedShipFrom.mobile,
+        ReturnPincode: resolvedShipFrom.pincode,
+        ReturnTelephone: resolvedShipFrom.telephone,
       },
       Services: {
         AWBNo: "",
@@ -297,25 +436,24 @@ const buildGenerateWaybillPayload = ({
         ECCN: "",
       },
       Shipper: {
-        CustomerAddress1: shipperAddress1,
-        CustomerAddress2: process.env.BLUE_DART_SHIPPER_ADDRESS2 || "",
-        CustomerAddress3: process.env.BLUE_DART_SHIPPER_ADDRESS3 || "",
+        CustomerAddress1: resolvedShipFrom.addressLine1,
+        CustomerAddress2: resolvedShipFrom.addressLine2,
+        CustomerAddress3: resolvedShipFrom.addressLine3,
         CustomerAddressinfo: "",
-        CustomerCode: getBlueDartCustomerCode(),
-        CustomerEmailID: process.env.BLUE_DART_SHIPPER_EMAIL || "",
-        CustomerGSTNumber: process.env.BLUE_DART_SHIPPER_GST || "",
+        CustomerCode: resolvedShipFrom.customerCode,
+        CustomerEmailID: resolvedShipFrom.email,
+        CustomerGSTNumber: resolvedShipFrom.gstNumber,
         CustomerLatitude: "",
         CustomerLongitude: "",
         CustomerMaskedContactNumber: "",
-        CustomerMobile: shipperMobile,
-        CustomerName: shipperName,
-        CustomerPincode: shipperPincode,
-        CustomerTelephone:
-          process.env.BLUE_DART_SHIPPER_TELEPHONE || process.env.BLUE_DART_SHIPPER_PHONE || "",
+        CustomerMobile: resolvedShipFrom.mobile,
+        CustomerName: resolvedShipFrom.name,
+        CustomerPincode: resolvedShipFrom.pincode,
+        CustomerTelephone: resolvedShipFrom.telephone,
         IsToPayCustomer: false,
-        OriginArea: process.env.BLUE_DART_ORIGIN_AREA || "",
-        Sender: process.env.BLUE_DART_SENDER || "",
-        VendorCode: process.env.BLUE_DART_VENDOR_CODE || "",
+        OriginArea: resolvedShipFrom.originArea,
+        Sender: resolvedShipFrom.sender,
+        VendorCode: resolvedShipFrom.vendorCode,
       },
     },
     Profile: {
@@ -428,6 +566,7 @@ const createBlueDartWaybill = async ({
   name,
   mobile,
   receiverAddress,
+  shipFrom,
   products,
   declaredValue,
   isCod = false,
@@ -440,18 +579,23 @@ const createBlueDartWaybill = async ({
       name,
       mobile,
       receiverAddress,
+      shipFrom,
       products,
       declaredValue,
       isCod,
       collectableAmount,
       overrides,
     });
+    const url = `${buildBlueDartBaseUrl()}/waybill/v1/GenerateWayBill`;
 
-    const response = await axios.post(
-      `${buildBlueDartBaseUrl()}/waybill/v1/GenerateWayBill`,
+    logBlueDartApiHit({
+      action: "Generate waybill request",
+      method: "POST",
+      url,
       payload,
-      { headers: getBlueDartHeaders() }
-    );
+    });
+
+    const response = await axios.post(url, payload, { headers: getBlueDartHeaders() });
 
     return {
       success: true,
@@ -460,6 +604,8 @@ const createBlueDartWaybill = async ({
       ...extractBlueDartStatus(response.data),
     };
   } catch (error) {
+    console.log("BLUE_DART GENERATE WAYBILL ERROR", extractError(error));
+
     return {
       success: false,
       error: extractError(error),
@@ -485,20 +631,27 @@ const trackBlueDartShipment = async (trackingNumber, options = {}) => {
       tnt: options.tnt ?? process.env.BLUE_DART_TRACK_TNT ?? "",
       awb: options.awb ?? "",
     };
+    const url = `${buildBlueDartBaseUrl()}/tracking/v1/shipment`;
 
-    const response = await axios.get(
-      `${buildBlueDartBaseUrl()}/tracking/v1/shipment`,
-      {
-        headers: { JWTToken: getBlueDartJwtToken() },
-        params,
-      }
-    );
+    logBlueDartApiHit({
+      action: "Track shipment request",
+      method: "GET",
+      url,
+      params,
+    });
+
+    const response = await axios.get(url, {
+      headers: { JWTToken: getBlueDartJwtToken() },
+      params,
+    });
 
     return {
       success: true,
       data: response.data,
     };
   } catch (error) {
+    console.log("BLUE_DART TRACK SHIPMENT ERROR", extractError(error));
+
     return {
       success: false,
       error: extractError(error),
@@ -510,4 +663,5 @@ module.exports = {
   createBlueDartWaybill,
   trackBlueDartShipment,
   extractAwbNumber,
+  resolveBlueDartShipFrom,
 };

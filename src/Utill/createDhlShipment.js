@@ -24,6 +24,22 @@ const getAxiosConfig = () => ({
   },
 });
 
+const logDhlApiHit = ({ label, method, url, payload, params }) => {
+  console.log(
+    `\n================ ${label} ================`,
+    JSON.stringify(
+      {
+        method,
+        url,
+        ...(payload ? { payload } : {}),
+        ...(params ? { params } : {}),
+      },
+      null,
+      2
+    )
+  );
+};
+
 const normalizeCountryCode = (country) => {
   if (!country) {
     return DEFAULT_COUNTRY_CODE;
@@ -171,20 +187,23 @@ const extractError = (error) => error?.response?.data || error.message;
 const createDhlShipment = async (shipmentData) => {
   try {
     const payload = buildShipmentPayload(shipmentData);
+    const url = `${getDhlBaseUrl()}/shipments`;
 
-    const response = await axios.post(
-      `${getDhlBaseUrl()}/shipments`,
+    logDhlApiHit({
+      label: "DHL PAYLOAD CREATE SHIPMENT",
+      method: "POST",
+      url,
       payload,
-      getAxiosConfig()
-    );
+    });
+
+    const response = await axios.post(url, payload, getAxiosConfig());
 
     return {
       success: true,
       data: response.data,
     };
   } catch (error) {
-
- 
+    console.log("DHL CREATE SHIPMENT ERROR", extractError(error));
 
     return {
       success: false,
@@ -195,10 +214,16 @@ const createDhlShipment = async (shipmentData) => {
 
 const trackDhlShipment = async (trackingNumber) => {
   try {
-    const response = await axios.get(
-      `${getDhlBaseUrl()}/shipments/${trackingNumber}/tracking`,
-      getAxiosConfig()
-    );
+    const url = `${getDhlBaseUrl()}/shipments/${trackingNumber}/tracking`;
+
+    logDhlApiHit({
+      label: "DHL PAYLOAD TRACK SHIPMENT",
+      method: "GET",
+      url,
+      params: { trackingNumber },
+    });
+
+    const response = await axios.get(url, getAxiosConfig());
 
     return {
       success: true,
