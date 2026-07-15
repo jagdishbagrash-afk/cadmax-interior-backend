@@ -356,7 +356,7 @@ const buildGenerateWaybillPayload = ({
         ConsigneeAddress1: consigneeAddress1,
         ConsigneeAddress2: receiverAddress?.addressLine2 || "",
         ConsigneeAddress3: receiverAddress?.addressLine3 || "",
-        ConsigneeAddressType: receiverAddress?.addressType || "R",
+        ConsigneeAddressType: "R",
         ConsigneeAddressinfo: "",
         ConsigneeAttention: "",
         ConsigneeEmailID: "",
