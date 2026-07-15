@@ -1,8 +1,16 @@
 const Order = require("../Model/Order");
-const Address = require("../Model/MultipleAddress");
 const catchAsync = require("../Utill/catchAsync");
-const { trackDhlShipment, createDhlShipment, normalizeAddress } = require("../Utill/createDhlShipment");
-const { trackBlueDartShipment, createBlueDartWaybill } = require("../Utill/blueDartService");
+const { trackDhlShipment, createDhlShipment } = require("../Utill/createDhlShipment");
+const {
+  trackBlueDartShipment,
+  createBlueDartWaybill,
+  resolveBlueDartShipFrom,
+} = require("../Utill/blueDartService");
+const {
+  ensureOrderShippingAddress,
+  resolveOrderShippingAddressSnapshot,
+  toCourierAddress,
+} = require("../Utill/orderAddress");
 
 const formatTrackingPayload = (trackingNumber, data) => {
   const shipment = data?.shipments?.[0] || data;
@@ -84,17 +92,6 @@ const normalizeCourier = (value) => {
   return "DHL";
 };
 
-const resolveOrderAddress = async (order) => {
-  if (order?.addressId) {
-    const savedAddress = await Address.findById(order.addressId).lean();
-    if (savedAddress) {
-      return normalizeAddress(savedAddress);
-    }
-  }
-
-  return normalizeAddress(order?.address);
-};
-
 const getShipmentTrackingNumber = (shipmentResponse = {}) =>
   shipmentResponse?.shipmentTrackingNumber ||
   shipmentResponse?.trackingNumber ||
@@ -112,13 +109,18 @@ const resolveDefaultShippingProvider = (value) =>
 
 const createShipmentForOrder = async ({ order, receiverAddress, shippingProvider }) => {
   const provider = resolveDefaultShippingProvider(shippingProvider);
+  const receiverName = receiverAddress?.name || order?.shippingAddress?.name || order?.name;
+  const receiverMobile = receiverAddress?.mobile || order?.shippingAddress?.mobile || order?.mobile;
 
   if (provider === "BLUE_DART") {
+    const shipFrom = resolveBlueDartShipFrom(order?.labelData?.shipFrom);
+
     const shipment = await createBlueDartWaybill({
       orderId: order.orderId,
-      name: order.name,
-      mobile: order.mobile,
+      name: receiverName,
+      mobile: receiverMobile,
       receiverAddress,
+      shipFrom,
       products: order.product,
       declaredValue: order.amount,
       isCod: false,
@@ -134,8 +136,8 @@ const createShipmentForOrder = async ({ order, receiverAddress, shippingProvider
   }
 
   const shipment = await createDhlShipment({
-    name: order.name,
-    mobile: order.mobile,
+    name: receiverName,
+    mobile: receiverMobile,
     address: receiverAddress,
     products: order.product,
     totalAmount: order.amount,
@@ -214,37 +216,54 @@ const buildFullAddress = ({
     .join(", ");
 
 const getEnvShipperAddress = () => {
-  const addressLine1 = toSafeString(
-    process.env.BLUE_DART_SHIPPER_ADDRESS1 || process.env.DHL_SHIPPER_ADDRESS_LINE1
-  );
-  const addressLine2 = toSafeString(
-    process.env.BLUE_DART_SHIPPER_ADDRESS2 || process.env.DHL_SHIPPER_ADDRESS_LINE2
-  );
-  const city = toSafeString(process.env.DHL_SHIPPER_CITY);
-  const state = toSafeString(process.env.BLUE_DART_SHIPPER_STATE || process.env.DHL_SHIPPER_STATE);
-  const pincode = toSafeString(
-    process.env.BLUE_DART_SHIPPER_PINCODE || process.env.DHL_SHIPPER_POSTAL_CODE
-  );
-  const country = toSafeString(process.env.BLUE_DART_SHIPPER_COUNTRY || process.env.DHL_SHIPPER_COUNTRY || "India");
+  return resolveBlueDartShipFrom();
+};
 
-  return {
-    name: toSafeString(process.env.BLUE_DART_SHIPPER_NAME || process.env.DHL_SHIPPER_NAME || "Cadmax"),
-    phone: toSafeString(process.env.BLUE_DART_SHIPPER_MOBILE || process.env.DHL_SHIPPER_PHONE),
-    addressLine1,
-    addressLine2,
-    city,
-    state,
-    pincode,
-    country,
-    fullAddress: buildFullAddress({
-      addressLine1,
-      addressLine2,
-      city,
-      state,
-      pincode,
-      country,
-    }),
+const mergeLabelData = (computedLabelData = {}, savedLabelData = {}) => ({
+  ...computedLabelData,
+  ...savedLabelData,
+  carrier: {
+    ...(computedLabelData.carrier || {}),
+    ...(savedLabelData?.carrier || {}),
+    blueDart: {
+      ...(computedLabelData?.carrier?.blueDart || {}),
+      ...(savedLabelData?.carrier?.blueDart || {}),
+    },
+  },
+  shipTo: {
+    ...(computedLabelData.shipTo || {}),
+    ...(savedLabelData?.shipTo || {}),
+  },
+  shipFrom: {
+    ...(computedLabelData.shipFrom || {}),
+    ...(savedLabelData?.shipFrom || {}),
+  },
+  payment: {
+    ...(computedLabelData.payment || {}),
+    ...(savedLabelData?.payment || {}),
+  },
+  package: {
+    ...(computedLabelData.package || {}),
+    ...(savedLabelData?.package || {}),
+    dimensionsCm: {
+      ...(computedLabelData?.package?.dimensionsCm || {}),
+      ...(savedLabelData?.package?.dimensionsCm || {}),
+    },
+  },
+});
+
+const ensureOrderShipFrom = (order) => {
+  const shouldReuseSavedShipFrom =
+    order?.shipping_status === "shipment_created" && toSafeString(order?.tracking_number) !== "";
+  const shipFrom = resolveBlueDartShipFrom(
+    shouldReuseSavedShipFrom ? order?.labelData?.shipFrom : null
+  );
+  order.labelData = {
+    ...(order.labelData || {}),
+    shipFrom,
   };
+
+  return shipFrom;
 };
 
 const getSavedAddressDetails = (savedAddress = {}) => ({
@@ -359,8 +378,9 @@ const getShipmentItemDetails = (shipmentResponse = {}, order = {}) => {
 const buildLabelData = ({ order, savedAddress, shipmentResponse }) => {
   const fallbackAddress = getOrderAddressFallback(order);
   const savedAddressDetails = getSavedAddressDetails(savedAddress);
+  const shippingAddress = resolveOrderShippingAddressSnapshot(order, savedAddress);
   const shipmentReceiver = getShipmentReceiverDetails(shipmentResponse);
-  const shipFrom = getEnvShipperAddress();
+  const shipFrom = resolveBlueDartShipFrom(order?.labelData?.shipFrom || getEnvShipperAddress());
   const packageDetails = getShipmentPackageDetails(shipmentResponse, order);
   const items = getShipmentItemDetails(shipmentResponse, order);
   const serviceDetails = shipmentResponse?.Request?.Services || shipmentResponse?.Services || {};
@@ -375,21 +395,50 @@ const buildLabelData = ({ order, savedAddress, shipmentResponse }) => {
   );
 
   const shipTo = {
-    name: toSafeString(pickFirstValue(shipmentReceiver.name, order?.name)),
-    phone: toSafeString(pickFirstValue(shipmentReceiver.phone, order?.mobile)),
+    name: toSafeString(
+      pickFirstValue(shipmentReceiver.name, shippingAddress?.name, order?.name)
+    ),
+    phone: toSafeString(
+      pickFirstValue(shipmentReceiver.phone, shippingAddress?.mobile, order?.mobile)
+    ),
     addressLine1: toSafeString(
-      pickFirstValue(shipmentReceiver.addressLine1, savedAddressDetails.addressLine1, fallbackAddress.addressLine1)
+      pickFirstValue(
+        shipmentReceiver.addressLine1,
+        shippingAddress?.street_address,
+        savedAddressDetails.addressLine1,
+        fallbackAddress.addressLine1
+      )
     ),
     addressLine2: toSafeString(
       pickFirstValue(shipmentReceiver.addressLine2, savedAddressDetails.addressLine2, fallbackAddress.addressLine2)
     ),
-    city: toSafeString(pickFirstValue(shipmentReceiver.city, savedAddressDetails.city, fallbackAddress.city)),
-    state: toSafeString(pickFirstValue(shipmentReceiver.state, savedAddressDetails.state, fallbackAddress.state)),
+    city: toSafeString(
+      pickFirstValue(shipmentReceiver.city, shippingAddress?.city, savedAddressDetails.city, fallbackAddress.city)
+    ),
+    state: toSafeString(
+      pickFirstValue(
+        shipmentReceiver.state,
+        shippingAddress?.state,
+        savedAddressDetails.state,
+        fallbackAddress.state
+      )
+    ),
     pincode: toSafeString(
-      pickFirstValue(shipmentReceiver.pincode, savedAddressDetails.pincode, fallbackAddress.pincode)
+      pickFirstValue(
+        shipmentReceiver.pincode,
+        shippingAddress?.pincode,
+        savedAddressDetails.pincode,
+        fallbackAddress.pincode
+      )
     ),
     country: toSafeString(
-      pickFirstValue(shipmentReceiver.country, savedAddressDetails.country, fallbackAddress.country, "India")
+      pickFirstValue(
+        shipmentReceiver.country,
+        shippingAddress?.country,
+        savedAddressDetails.country,
+        fallbackAddress.country,
+        "India"
+      )
     ),
   };
 
@@ -398,6 +447,7 @@ const buildLabelData = ({ order, savedAddress, shipmentResponse }) => {
   const blueDartMeta = {
     originArea: toSafeString(
       pickFirstValue(
+        shipFrom.originArea,
         shipperDetails?.OriginArea,
         shipmentResponse?.originArea,
         process.env.BLUE_DART_ORIGIN_AREA
@@ -461,6 +511,7 @@ const buildLabelData = ({ order, savedAddress, shipmentResponse }) => {
     ),
     sender: toSafeString(
       pickFirstValue(
+        shipFrom.sender,
         shipperDetails?.Sender,
         shipmentResponse?.sender,
         process.env.BLUE_DART_SENDER
@@ -468,6 +519,7 @@ const buildLabelData = ({ order, savedAddress, shipmentResponse }) => {
     ),
     vendorCode: toSafeString(
       pickFirstValue(
+        shipFrom.vendorCode,
         shipperDetails?.VendorCode,
         shipmentResponse?.vendorCode,
         process.env.BLUE_DART_VENDOR_CODE
@@ -475,6 +527,7 @@ const buildLabelData = ({ order, savedAddress, shipmentResponse }) => {
     ),
     customerCode: toSafeString(
       pickFirstValue(
+        shipFrom.customerCode,
         shipperDetails?.CustomerCode,
         shipmentResponse?.customerCode,
         process.env.BLUE_DART_CUSTOMER_CODE
@@ -539,18 +592,27 @@ const buildLabelData = ({ order, savedAddress, shipmentResponse }) => {
   };
 };
 
+const getOrderLabelData = ({ order, savedAddress }) =>
+  mergeLabelData(
+    buildLabelData({
+      order,
+      savedAddress,
+      shipmentResponse: order.shipping_response || {},
+    }),
+    order.labelData || {}
+  );
+
 const buildShipmentResponseData = ({ order, savedAddress }) => ({
   orderId: order._id,
   orderNumber: order.orderId,
+  addressId: order.addressId || null,
+  address: toSafeString(order.address),
+  shippingAddress: resolveOrderShippingAddressSnapshot(order, savedAddress),
   paymentId: order.PaymentId || "",
   shippingStatus: toSafeString(order.shipping_status),
   courierName: toSafeString(order.courier_name),
   trackingNumber: toSafeString(order.tracking_number),
-  labelData: buildLabelData({
-    order,
-    savedAddress,
-    shipmentResponse: order.shipping_response || {},
-  }),
+  labelData: getOrderLabelData({ order, savedAddress }),
   shipmentResponse: order.shipping_response || {},
 });
 
@@ -608,12 +670,23 @@ exports.CreateOrderShipment = catchAsync(async (req, res) => {
     });
   }
 
+  const { shippingAddress, hydrated, addressRecord } = await ensureOrderShippingAddress(order, {
+    userId: req.user.id,
+  });
+  const shipFrom = ensureOrderShipFrom(order);
+
+  if (hydrated) {
+    await order.save();
+  }
+
   if (order.shipping_status === "shipment_created" && order.tracking_number) {
-    const savedAddress = order.addressId ? await Address.findById(order.addressId).lean() : null;
+    order.labelData = getOrderLabelData({ order, savedAddress: addressRecord });
+    await order.save();
+
     return res.status(200).json({
       status: true,
       message: "Shipment already exists for this order",
-      data: buildShipmentResponseData({ order, savedAddress }),
+      data: buildShipmentResponseData({ order, savedAddress: addressRecord }),
     });
   }
 
@@ -624,12 +697,18 @@ exports.CreateOrderShipment = catchAsync(async (req, res) => {
     });
   }
 
-  const receiverAddress = await resolveOrderAddress(order);
+  if (!shippingAddress) {
+    return res.status(400).json({
+      status: false,
+      message: "Order shipping address is missing",
+    });
+  }
+
   const desiredProvider = req.body?.shipping_provider || req.body?.shippingProvider;
 
   const created = await createShipmentForOrder({
     order,
-    receiverAddress,
+    receiverAddress: toCourierAddress(shippingAddress),
     shippingProvider: desiredProvider,
   });
 
@@ -645,16 +724,30 @@ exports.CreateOrderShipment = catchAsync(async (req, res) => {
     order.shipping_response = shipment.error;
   }
 
-  await order.save();
+  order.labelData = mergeLabelData(
+    buildLabelData({
+      order: {
+        ...order.toObject(),
+        labelData: {
+          ...(order.labelData || {}),
+          shipFrom,
+        },
+        shipping_response: order.shipping_response || {},
+      },
+      savedAddress: addressRecord,
+      shipmentResponse: order.shipping_response || {},
+    }),
+    order.labelData || {}
+  );
 
-  const savedAddress = order.addressId ? await Address.findById(order.addressId).lean() : null;
+  await order.save();
 
   return res.status(200).json({
     status: shipment.success,
     message: shipment.success
       ? "Shipment created successfully"
       : "Shipment creation failed",
-    data: buildShipmentResponseData({ order, savedAddress }),
+    data: buildShipmentResponseData({ order, savedAddress: addressRecord }),
     shipment,
   });
 });
@@ -663,7 +756,7 @@ exports.GetOrderShipment = catchAsync(async (req, res) => {
   const order = await Order.findOne({
     _id: req.params.id,
     userId: req.user.id,
-  }).lean();
+  });
 
   if (!order) {
     return res.status(404).json({
@@ -672,12 +765,14 @@ exports.GetOrderShipment = catchAsync(async (req, res) => {
     });
   }
 
-  const savedAddress = order.addressId ? await Address.findById(order.addressId).lean() : null;
+  ensureOrderShipFrom(order);
+  order.labelData = getOrderLabelData({ order });
+  await order.save();
 
   return res.status(200).json({
     status: true,
     message: "Shipment details fetched successfully",
-    data: buildShipmentResponseData({ order, savedAddress }),
+    data: buildShipmentResponseData({ order }),
   });
 });
 
