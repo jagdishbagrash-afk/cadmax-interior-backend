@@ -139,7 +139,6 @@ exports.updateReview = catchAsync(async (req, res) => {
   return successResponse(res, "Review updated successfully", 200, updatedReview);
 });
 
-//  3. DELETE REVIEW (soft delete with full cleanup)
 exports.deleteReview = catchAsync(async (req, res) => {
   const userId = req.user.id;
   const { reviewId } = req.params;
@@ -148,28 +147,51 @@ exports.deleteReview = catchAsync(async (req, res) => {
     return errorResponse(res, "Invalid review ID", 400);
   }
 
-  const review = await Review.findOne({ _id: reviewId, user: userId, isDeleted: false });
+  const review = await Review.findOneAndUpdate(
+    {
+      _id: reviewId,
+      user: userId,
+      isDeleted: false,
+    },
+    {
+      $set: {
+        isDeleted: true,
+        deletedAt: new Date(),
+        images: [],
+      },
+    },
+    {
+      new: true,
+      runValidators: true,
+    }
+  );
+
   if (!review) {
-    return errorResponse(res, "Review not found or you are not authorized", 404);
+    return errorResponse(
+      res,
+      "Review not found or you are not authorized",
+      404
+    );
   }
 
-  // Delete associated images from S3
-  if (review.images && review.images.length > 0) {
-    review.images.forEach((imageUrl) => {
-      deleteFile(imageUrl).catch((err) => console.error("S3 delete error during review deletion:", err));
-    });
-  }
-
-  // Clear images array and mark as deleted
-  review.images = [];
-  review.isDeleted = true;
-  review.deletedAt = new Date();
-  await review.save();
-
-  // Recalculate product rating
   await recalculateProductRating(review.product);
 
-  return successResponse(res, "Review deleted successfully", 200);
+  // Temporary verification
+  const checkReview = await Review.findById(reviewId)
+    .select("_id isDeleted deletedAt")
+    .lean();
+
+  console.log("Review after deletion:", checkReview);
+
+  return successResponse(
+    res,
+    "Review deleted successfully",
+    200,
+    {
+      deletedReviewId: review._id,
+      isDeleted: review.isDeleted,
+    }
+  );
 });
 
 //  4. GET PRODUCT REVIEWS (with visibility logic)
