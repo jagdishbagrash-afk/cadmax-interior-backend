@@ -30,6 +30,11 @@ const Lead = require("../Model/Lead");
 const axios = require("axios");
 const Wishlist = require("../Model/Wishlist");
 const Review = require("../Model/Review");
+const {
+  buildLegacyAddressString,
+  buildShippingAddressSnapshot,
+  resolveOwnedAddress,
+} = require("../Utill/orderAddress");
 
 // const twilio = require("twilio");
 
@@ -886,20 +891,40 @@ exports.AppOrder = catchAsync(async (req, res) => {
 
     const orderId = `ORD-${uuidv4().slice(0, 8).toUpperCase()}`;
 
-    if (!name || !mobile || !product || !amount) {
+    if (!name || !mobile || !product || !amount || !addressId) {
       return validationErrorResponse(
         res,
-        "All fields (name, mobile, product, amount) are required"
+        "All fields (name, mobile, addressId, product, amount) are required"
       );
     }
+
+    const addressResult = await resolveOwnedAddress({ addressId, userId });
+
+    if (!addressResult.ok) {
+      if (addressResult.reason === "invalid" || addressResult.reason === "not_found") {
+        return validationErrorResponse(res, "Invalid addressId");
+      }
+
+      if (addressResult.reason === "unauthorized") {
+        return errorResponse(res, "Selected address does not belong to this user", 403);
+      }
+    }
+
+    const shippingAddress = buildShippingAddressSnapshot({
+      name,
+      mobile,
+      addressRecord: addressResult.address,
+    });
+    const legacyAddress = buildLegacyAddressString(shippingAddress) || address;
 
     // ✅ Save Order
     const newOrder = new Order({
       name,
       mobile,
-      address,
+      address: legacyAddress,
       product,
       addressId,
+      shippingAddress,
       amount,
       userId,
       orderId,
@@ -950,7 +975,9 @@ exports.OrderList = catchAsync(async (req, res) => {
     _id: order._id,
     name: order.name,
     mobile: order.mobile,
+    addressId: order.addressId || null,
     address: order.address,
+    shippingAddress: order.shippingAddress || null,
     status: order.status,
     amount: order.amount,
     createdAt: order.createdAt,

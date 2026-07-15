@@ -51,6 +51,20 @@ const OrderProductSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const OrderShippingAddressSchema = new mongoose.Schema(
+  {
+    name: { type: String, default: "" },
+    mobile: { type: String, default: "" },
+    street_address: { type: String, default: "" },
+    city: { type: String, default: "" },
+    state: { type: String, default: "" },
+    country: { type: String, default: "" },
+    pincode: { type: String, default: "" },
+    addressType: { type: String, default: "" },
+  },
+  { _id: false }
+);
+
 const OrderSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
@@ -65,11 +79,13 @@ const OrderSchema = new mongoose.Schema(
     },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     addressId: { type: mongoose.Schema.Types.ObjectId, ref: "Address" },
+    shippingAddress: { type: OrderShippingAddressSchema, default: null },
     PaymentId: { type: String },
     amount: { type: Number, required: true },
     tracking_number: { type: String },
     shipping_status: { type: String, default: "pending" },
     courier_name: { type: String },
+    labelData: { type: Object, default: null },
     shipping_response: { type: Object },
   },
   { timestamps: true }
