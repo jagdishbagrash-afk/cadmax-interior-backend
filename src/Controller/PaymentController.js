@@ -167,49 +167,92 @@ exports.createOrder = async (req, res) => {
 
 exports.paymentAdd = catchAsync(async (req, res) => {
   const user_id = req.user.id;
+
   const {
     order_id,
     payment_id,
     amount,
     currency = "INR",
     payment_status,
+    payment_method,
+    paymentMethod,
     type,
     OrderID,
+
     razorpay_order_id,
     razorpay_payment_id,
     razorpay_signature,
+
     shipping_provider,
     shippingProvider,
   } = req.body;
 
-  const effectiveOrderId = order_id || razorpay_order_id;
-  const effectivePaymentId = payment_id || razorpay_payment_id;
-  const normalizedPaymentStatus = payment_status === "failed" ? "failed" : "success";
-  const status = normalizedPaymentStatus === "failed" ? "failed" : "success";
+  // Payment method normalize
+  const selectedPaymentMethod = String(
+    payment_method || paymentMethod || "ONLINE"
+  ).toUpperCase();
+
+  const isCOD = selectedPaymentMethod === "COD";
+
+  const effectiveOrderId =
+    order_id ||
+    razorpay_order_id ||
+    (isCOD ? `COD-ORDER-${OrderID}` : null);
+
+  const effectivePaymentId =
+    payment_id ||
+    razorpay_payment_id ||
+    (isCOD ? `COD-PAYMENT-${OrderID}` : null);
+
   const numericAmount = Number(
-    String(amount).replace(/,/g, "")
+    String(amount ?? "").replace(/,/g, "")
   );
 
-  if (!effectiveOrderId || !effectivePaymentId || !OrderID || !Number.isFinite(numericAmount)) {
-    return res.status(400).json({
-      status: false,
-      message: "order_id, payment_id, OrderID and a valid amount are required",
-    });
-  }
-
+  // Common validation
   if (
-    !verifyRazorpaySignature({
-      orderId: effectiveOrderId,
-      paymentId: effectivePaymentId,
-      signature: razorpay_signature,
-    })
+    !OrderID ||
+    !Number.isFinite(numericAmount) ||
+    numericAmount <= 0
   ) {
     return res.status(400).json({
       status: false,
-      message: "Invalid Razorpay signature",
+      message: "OrderID and a valid amount are required",
     });
   }
 
+  // Online payment validation only
+  if (
+    !isCOD &&
+    (
+      !effectiveOrderId ||
+      !effectivePaymentId ||
+      !razorpay_signature
+    )
+  ) {
+    return res.status(400).json({
+      status: false,
+      message:
+        "Razorpay order ID, payment ID and signature are required for online payment",
+    });
+  }
+
+  // Verify Razorpay only for online payment
+  if (!isCOD) {
+    const signatureValid = verifyRazorpaySignature({
+      orderId: effectiveOrderId,
+      paymentId: effectivePaymentId,
+      signature: razorpay_signature,
+    });
+
+    if (!signatureValid) {
+      return res.status(400).json({
+        status: false,
+        message: "Invalid Razorpay signature",
+      });
+    }
+  }
+
+  // Find linked order
   const order = await Order.findOne({
     _id: OrderID,
     userId: user_id,
@@ -222,17 +265,45 @@ exports.paymentAdd = catchAsync(async (req, res) => {
     });
   }
 
+  /*
+   * COD    -> pending
+   * Online -> success/failed based on request
+   */
+  let normalizedPaymentStatus;
+
+  if (isCOD) {
+    normalizedPaymentStatus = "pending";
+  } else {
+    normalizedPaymentStatus =
+      payment_status === "failed"
+        ? "failed"
+        : "success";
+  }
+
+  const paymentRecordStatus =
+    normalizedPaymentStatus === "failed"
+      ? "failed"
+      : normalizedPaymentStatus === "pending"
+        ? "pending"
+        : "success";
+
+  // Save payment record
   const record = await Payment.findOneAndUpdate(
-    { payment_id: effectivePaymentId },
+    {
+      payment_id: effectivePaymentId,
+    },
     {
       order_id: effectiveOrderId,
       currency,
       user_id,
       payment_id: effectivePaymentId,
       amount: numericAmount,
+
+      payment_method: selectedPaymentMethod,
       payment_status: normalizedPaymentStatus,
+
       type,
-      status,
+      status: paymentRecordStatus,
       OrderID,
     },
     {
@@ -244,19 +315,56 @@ exports.paymentAdd = catchAsync(async (req, res) => {
 
   let shipment = null;
 
-  const { shippingAddress } = await ensureOrderShippingAddress(order, {
-    userId: user_id,
-  });
+  const { shippingAddress } =
+    await ensureOrderShippingAddress(order, {
+      userId: user_id,
+    });
+
   ensureOrderShipFrom(order);
 
-  order.PaymentId = effectivePaymentId;
+  if (!shippingAddress) {
+    return res.status(400).json({
+      status: false,
+      message: "Order shipping address is missing",
+    });
+  }
 
-  if (normalizedPaymentStatus === "success") {
+  // Update order payment details
+  order.paymentMethod = selectedPaymentMethod;
+  order.payment_status = normalizedPaymentStatus;
+
+  if (isCOD) {
+    // Synthetic reference; not an actual Razorpay payment ID
+    order.PaymentId = effectivePaymentId;
+
+    // Use your actual schema field names
+    order.cod_amount = numericAmount;
+    order.collectable_amount = numericAmount;
+  } else {
+    order.PaymentId = effectivePaymentId;
+    order.cod_amount = 0;
+    order.collectable_amount = 0;
+  }
+
+  /*
+   * Create shipment when:
+   * Online payment is successful
+   * OR payment method is COD
+   */
+  const shouldCreateShipment =
+    isCOD ||
+    normalizedPaymentStatus === "success";
+
+  if (shouldCreateShipment) {
     if (order.status === "pending") {
       order.status = "confirmed";
     }
 
-    if (order.shipping_status === "shipment_created" && order.tracking_number) {
+    // Reuse existing shipment
+    if (
+      order.shipping_status === "shipment_created" &&
+      order.tracking_number
+    ) {
       shipment = {
         success: true,
         data: order.shipping_response,
@@ -264,53 +372,111 @@ exports.paymentAdd = catchAsync(async (req, res) => {
         reusedExistingShipment: true,
       };
     } else {
-      if (!shippingAddress) {
-        return res.status(400).json({
-          status: false,
-          message: "Order shipping address is missing",
-        });
-      }
+      const desiredProvider =
+        shipping_provider || shippingProvider;
 
-      const desiredProvider = shipping_provider || shippingProvider;
       const created = await createShipmentForOrder({
         order,
-        receiverAddress: toCourierAddress(shippingAddress),
-        shippingProvider: desiredProvider,
+
+        receiverAddress:
+          toCourierAddress(shippingAddress),
+
+        shippingProvider:
+          desiredProvider,
+
+        // Pass COD details to courier service
+        paymentMethod:
+          selectedPaymentMethod,
+
+        isCOD,
+
+        codAmount:
+          isCOD ? numericAmount : 0,
+
+        collectableAmount:
+          isCOD ? numericAmount : 0,
       });
 
       shipment = created.shipment;
-      order.courier_name = created.provider;
 
-      if (shipment.success) {
-        order.tracking_number = created.trackingNumber;
-        order.shipping_status = "shipment_created";
-        order.shipping_response = shipment.data;
+      order.courier_name =
+        created.provider;
+
+      if (shipment?.success) {
+        order.tracking_number =
+          created.trackingNumber ||
+          shipment.trackingNumber ||
+          "";
+
+        order.shipping_status =
+          "shipment_created";
+
+        order.shipping_response =
+          shipment.data;
       } else {
-        order.shipping_status = "shipment_failed";
-        order.shipping_response = shipment.error;
+        order.shipping_status =
+          "shipment_failed";
+
+        order.shipping_response =
+          shipment?.error ||
+          "Shipment creation failed";
       }
     }
   }
 
   await order.save();
 
-  if (normalizedPaymentStatus === "failed") {
+  // Online failed response
+  if (
+    !isCOD &&
+    normalizedPaymentStatus === "failed"
+  ) {
     return res.status(200).json({
       status: "failed",
-      message: "Payment failed and was saved successfully",
+      message:
+        "Payment failed and was saved successfully",
       record,
       order,
+      shipment: null,
     });
   }
 
+  // COD response
+  if (isCOD) {
+    return res.status(200).json({
+      status: shipment?.success
+        ? "success"
+        : "failed",
+
+      message: shipment?.success
+        ? "COD order and shipment created successfully"
+        : "COD order saved but shipment creation failed",
+
+      record,
+      order,
+      shipment,
+
+      trackingNumber:
+        order.tracking_number || null,
+    });
+  }
+
+  // Online success response
   return res.status(200).json({
-    status: "success",
+    status: shipment?.success
+      ? "success"
+      : "failed",
+
     message: shipment?.success
       ? "Payment verified and shipment created successfully"
       : "Payment verified but shipment creation failed",
+
     record,
     order,
     shipment,
+
+    trackingNumber:
+      order.tracking_number || null,
   });
 });
 
