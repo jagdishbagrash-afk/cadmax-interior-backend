@@ -81,6 +81,11 @@ const OrderSchema = new mongoose.Schema(
     addressId: { type: mongoose.Schema.Types.ObjectId, ref: "Address" },
     shippingAddress: { type: OrderShippingAddressSchema, default: null },
     PaymentId: { type: String },
+    paymentMethod: {
+      type: String,
+      enum: ["ONLINE", "COD"],
+      default: "ONLINE",
+    },
     amount: { type: Number, required: true },
     tracking_number: { type: String },
     shipping_status: { type: String, default: "pending" },

@@ -182,6 +182,7 @@ exports.addOrder = catchAsync(async (req, res) => {
     amount,
     addressId,
     PaymentId,
+    paymentMethod,
   } = req.body;
 
   const userId = req.user?.id;
@@ -288,6 +289,7 @@ exports.addOrder = catchAsync(async (req, res) => {
     amount: numericAmount,
     userId,
     PaymentId,
+    paymentMethod: paymentMethod || "ONLINE",
     orderId,
     status: "pending",
     shipping_status: "pending",
