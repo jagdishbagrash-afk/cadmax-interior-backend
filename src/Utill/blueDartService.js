@@ -40,6 +40,11 @@ const getBlueDartTrackingLicenceKey = () =>
   process.env.BLUE_DART_TRACKING_LICENCEKEY ||
   getBlueDartLicenceKey();
 
+const getBlueDartTrackingApiType = () =>
+  process.env.BLUE_DART_TRACKING_API_TYPE ||
+  process.env.BLUE_DART_TRANSIT_API_TYPE ||
+  "T";
+
 const getBlueDartCustomerCode = () =>
   process.env.BLUE_DART_CUSTOMER_CODE ||
   process.env.BLUE_DART_CUSTOMERCODE ||
@@ -48,6 +53,16 @@ const getBlueDartCustomerCode = () =>
 const getBlueDartHeaders = () => ({
   JWTToken: getBlueDartJwtToken(),
   "content-type": "application/json",
+});
+
+const buildBlueDartProfile = ({
+  apiType = process.env.BLUE_DART_API_TYPE || "S",
+  licenceKey = getBlueDartShippingLicenceKey(),
+  loginId = getBlueDartLoginId(),
+} = {}) => ({
+  LoginID: loginId,
+  LicenceKey: licenceKey,
+  Api_type: apiType,
 });
 
 const logBlueDartApiHit = ({ action, method, url, payload, params }) => {
@@ -67,6 +82,23 @@ const logBlueDartApiHit = ({ action, method, url, payload, params }) => {
 };
 
 const extractError = (error) => error?.response?.data || error.message;
+
+const postBlueDartJson = async ({ path, payload, action }) => {
+  const url = `${buildBlueDartBaseUrl()}${path}`;
+
+  logBlueDartApiHit({
+    action,
+    method: "POST",
+    url,
+    payload,
+  });
+
+  const response = await axios.post(url, payload, {
+    headers: getBlueDartHeaders(),
+  });
+
+  return response.data;
+};
 
 const toSafeString = (value) => {
   if (value === undefined || value === null) {
@@ -547,6 +579,13 @@ const extractAwbNumber = (payload) => {
 const extractGenerateWayBillResult = (payload) =>
   payload?.GenerateWayBillResult || payload?.generateWayBillResult || null;
 
+const extractPickupRegistrationDate = (payload) =>
+  payload?.Request?.Services?.PickupDate ||
+  payload?.request?.Services?.PickupDate ||
+  payload?.PickupRegistrationDate ||
+  payload?.pickupRegistrationDate ||
+  null;
+
 const extractBlueDartStatus = (payload) => {
   const result = extractGenerateWayBillResult(payload);
   const statusList = Array.isArray(result?.Status) ? result.Status : [];
@@ -600,7 +639,9 @@ const createBlueDartWaybill = async ({
     return {
       success: true,
       data: response.data,
+      requestPayload: payload,
       awbNumber: extractAwbNumber(response.data),
+      pickupRegistrationDate: extractPickupRegistrationDate(payload),
       ...extractBlueDartStatus(response.data),
     };
   } catch (error) {
@@ -608,6 +649,8 @@ const createBlueDartWaybill = async ({
 
     return {
       success: false,
+      requestPayload: null,
+      pickupRegistrationDate: null,
       error: extractError(error),
     };
   }
@@ -659,9 +702,153 @@ const trackBlueDartShipment = async (trackingNumber, options = {}) => {
   }
 };
 
+const cancelBlueDartPickup = async ({
+  tokenNumber,
+  pickupRegistrationDate,
+  remarks = null,
+  loginId,
+  licenceKey,
+} = {}) => {
+  try {
+    if (!tokenNumber || !pickupRegistrationDate) {
+      throw new Error("tokenNumber and pickupRegistrationDate are required");
+    }
+
+    const payload = {
+      request: {
+        PickupRegistrationDate: pickupRegistrationDate,
+        Remarks: remarks,
+        TokenNumber: Number(tokenNumber),
+      },
+      profile: buildBlueDartProfile({
+        apiType: process.env.BLUE_DART_API_TYPE || "S",
+        licenceKey: licenceKey || getBlueDartShippingLicenceKey(),
+        loginId: loginId || getBlueDartLoginId(),
+      }),
+    };
+
+    const data = await postBlueDartJson({
+      path: "/cancel-pickup/v1/CancelPickup",
+      payload,
+      action: "Cancel pickup request",
+    });
+
+    return {
+      success: true,
+      data,
+      requestPayload: payload,
+    };
+  } catch (error) {
+    console.log("BLUE_DART CANCEL PICKUP ERROR", extractError(error));
+
+    return {
+      success: false,
+      error: extractError(error),
+    };
+  }
+};
+
+const getBlueDartTransitTime = async ({
+  fromPincode,
+  toPincode,
+  pickupTime,
+  pickupDate,
+  productCode,
+  subProductCode,
+  apiType,
+  licenceKey,
+  loginId,
+} = {}) => {
+  try {
+    if (!fromPincode || !toPincode) {
+      throw new Error("fromPincode and toPincode are required");
+    }
+
+    const payload = {
+      pPinCodeFrom: String(fromPincode),
+      pPinCodeTo: String(toPincode),
+      pProductCode: String(productCode || process.env.BLUE_DART_PRODUCT_CODE || "A"),
+      pSubProductCode: String(
+        subProductCode || process.env.BLUE_DART_SUB_PRODUCT_CODE || "P"
+      ),
+      pPudate: String(pickupDate || toBlueDartDateLiteral(new Date())),
+      pPickupTime: String(pickupTime || process.env.BLUE_DART_PICKUP_TIME || "0800"),
+      profile: buildBlueDartProfile({
+        apiType: apiType || getBlueDartTrackingApiType(),
+        licenceKey: licenceKey || getBlueDartTrackingLicenceKey(),
+        loginId: loginId || getBlueDartLoginId(),
+      }),
+    };
+
+    const data = await postBlueDartJson({
+      path: "/transit/v1/GetDomesticTransitTimeForPinCodeandProduct",
+      payload,
+      action: "Transit time request",
+    });
+
+    return {
+      success: true,
+      data,
+      requestPayload: payload,
+    };
+  } catch (error) {
+    console.log("BLUE_DART TRANSIT TIME ERROR", extractError(error));
+
+    return {
+      success: false,
+      error: extractError(error),
+    };
+  }
+};
+
+const getBlueDartServicesForPincode = async ({
+  pinCode,
+  apiType,
+  licenceKey,
+  loginId,
+} = {}) => {
+  try {
+    if (!pinCode) {
+      throw new Error("pinCode is required");
+    }
+
+    const payload = {
+      pinCode: String(pinCode),
+      profile: buildBlueDartProfile({
+        apiType: apiType || getBlueDartTrackingApiType(),
+        licenceKey: licenceKey || getBlueDartTrackingLicenceKey(),
+        loginId: loginId || getBlueDartLoginId(),
+      }),
+    };
+
+    const data = await postBlueDartJson({
+      path: "/finder/v1/GetServicesforPincode",
+      payload,
+      action: "Serviceability request",
+    });
+
+    return {
+      success: true,
+      data,
+      requestPayload: payload,
+    };
+  } catch (error) {
+    console.log("BLUE_DART SERVICEABILITY ERROR", extractError(error));
+
+    return {
+      success: false,
+      error: extractError(error),
+    };
+  }
+};
+
 module.exports = {
+  cancelBlueDartPickup,
   createBlueDartWaybill,
-  trackBlueDartShipment,
   extractAwbNumber,
+  extractPickupRegistrationDate,
+  getBlueDartServicesForPincode,
+  getBlueDartTransitTime,
   resolveBlueDartShipFrom,
+  trackBlueDartShipment,
 };

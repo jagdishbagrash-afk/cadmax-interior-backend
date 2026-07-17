@@ -65,6 +65,17 @@ const OrderShippingAddressSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const ShipmentTimelineEventSchema = new mongoose.Schema(
+  {
+    timestamp: { type: String, default: "" },
+    status: { type: String, default: "" },
+    location: { type: String, default: "" },
+    remarks: { type: String, default: "" },
+    source: { type: String, default: "" },
+  },
+  { _id: false }
+);
+
 const OrderSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
@@ -91,6 +102,10 @@ const OrderSchema = new mongoose.Schema(
     shipping_status: { type: String, default: "pending" },
     courier_name: { type: String },
     labelData: { type: Object, default: null },
+    shipping_meta: { type: Object, default: null },
+    shipping_timeline: { type: [ShipmentTimelineEventSchema], default: [] },
+    dispatched_at: { type: Date, default: null },
+    delivered_at: { type: Date, default: null },
     shipping_response: { type: Object },
   },
   { timestamps: true }

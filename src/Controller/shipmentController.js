@@ -2,8 +2,11 @@ const Order = require("../Model/Order");
 const catchAsync = require("../Utill/catchAsync");
 const { trackDhlShipment, createDhlShipment } = require("../Utill/createDhlShipment");
 const {
+  cancelBlueDartPickup,
   trackBlueDartShipment,
   createBlueDartWaybill,
+  getBlueDartServicesForPincode,
+  getBlueDartTransitTime,
   resolveBlueDartShipFrom,
 } = require("../Utill/blueDartService");
 const {
@@ -90,6 +93,298 @@ const normalizeCourier = (value) => {
     return "DHL";
   }
   return "DHL";
+};
+
+const findNestedValueByKeys = (input, candidateKeys = []) => {
+  const queue = [input];
+  const normalizedKeys = candidateKeys.map((key) => String(key).toLowerCase());
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+
+    if (!current || typeof current !== "object") {
+      continue;
+    }
+
+    for (const [key, value] of Object.entries(current)) {
+      if (normalizedKeys.includes(String(key).toLowerCase()) && value !== undefined && value !== null && `${value}`.trim() !== "") {
+        return value;
+      }
+
+      if (value && typeof value === "object") {
+        queue.push(value);
+      }
+    }
+  }
+
+  return null;
+};
+
+const parseBlueDartDateLiteral = (value) => {
+  if (!value) {
+    return null;
+  }
+
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString();
+  }
+
+  const normalized = toSafeString(value);
+  const match = normalized.match(/\/Date\((\d+)\)\//);
+
+  if (match) {
+    const parsed = new Date(Number(match[1]));
+    return Number.isNaN(parsed.getTime()) ? normalized : parsed.toISOString();
+  }
+
+  const parsed = new Date(normalized);
+  return Number.isNaN(parsed.getTime()) ? normalized : parsed.toISOString();
+};
+
+const buildTimelineEvent = ({
+  timestamp,
+  status,
+  location = "",
+  remarks = "",
+  source = "system",
+}) => ({
+  timestamp: toSafeString(timestamp || new Date().toISOString()),
+  status: toSafeString(status),
+  location: toSafeString(location),
+  remarks: toSafeString(remarks),
+  source: toSafeString(source),
+});
+
+const mergeTimelineEvents = (events = []) => {
+  const unique = new Map();
+
+  for (const event of events) {
+    const normalizedEvent = buildTimelineEvent(event || {});
+    const key = JSON.stringify(normalizedEvent);
+    unique.set(key, normalizedEvent);
+  }
+
+  return Array.from(unique.values()).sort((left, right) =>
+    toSafeString(right.timestamp).localeCompare(toSafeString(left.timestamp))
+  );
+};
+
+const extractTransitEstimate = (payload = {}) => {
+  const estimatedDeliveryDate =
+    parseBlueDartDateLiteral(
+      findNestedValueByKeys(payload, [
+        "ExpectedDateDelivery",
+        "expectedDateDelivery",
+        "ExpectedDatePOD",
+        "expectedDatePod",
+        "ExpectedDeliveryDate",
+        "expectedDeliveryDate",
+        "DeliveryDate",
+        "deliveryDate",
+        "estimatedDate",
+        "EstimatedDate",
+        "EDD",
+        "edd",
+        "PDeliveryDate",
+        "pDeliveryDate",
+      ])
+    ) ||
+    toSafeString(
+      findNestedValueByKeys(payload, [
+        "ExpectedDateDelivery",
+        "expectedDateDelivery",
+        "ExpectedDatePOD",
+        "expectedDatePod",
+      ])
+    ) ||
+    null;
+
+  return {
+    estimatedDeliveryDate,
+    expectedPodDate: toSafeString(
+      findNestedValueByKeys(payload, [
+        "ExpectedDatePOD",
+        "expectedDatePod",
+        "PODDate",
+        "podDate",
+      ])
+    ),
+    deliveryDays: findNestedValueByKeys(payload, [
+      "TransitDays",
+      "transitDays",
+      "NoofDays",
+      "noofDays",
+      "Days",
+      "days",
+      "AdditionalDays",
+      "additionalDays",
+      "GroundAdditionalDays",
+      "groundAdditionalDays",
+      "ApexAdditionalDays",
+      "apexAdditionalDays",
+    ]),
+    cutoffTime: findNestedValueByKeys(payload, [
+      "PickupCutOffTime",
+      "pickupCutOffTime",
+      "CutOffTime",
+      "cutOffTime",
+    ]),
+    area: toSafeString(
+      findNestedValueByKeys(payload, [
+        "Area",
+        "area",
+      ])
+    ),
+    originCity: toSafeString(
+      findNestedValueByKeys(payload, [
+        "CityDesc_Origin",
+        "cityDescOrigin",
+      ])
+    ),
+    destinationCity: toSafeString(
+      findNestedValueByKeys(payload, [
+        "CityDesc_Destination",
+        "cityDescDestination",
+      ])
+    ),
+    serviceCenter: toSafeString(
+      findNestedValueByKeys(payload, [
+        "ServiceCenter",
+        "serviceCenter",
+      ])
+    ),
+    isValid: !Boolean(
+      findNestedValueByKeys(payload, [
+        "IsError",
+        "isError",
+      ])
+    ),
+    message: toSafeString(
+    findNestedValueByKeys(payload, [
+        "ErrorMessage",
+        "errorMessage",
+      ])
+    ),
+    raw: payload,
+  };
+};
+
+const extractServiceability = (payload = {}) => ({
+  isServiceable: Boolean(
+    findNestedValueByKeys(payload, [
+      "IsPincodeServiceable",
+      "isPincodeServiceable",
+      "serviceable",
+      "Serviceable",
+      "IsServiceable",
+      "isServiceable",
+    ])
+  ),
+  serviceCenter: toSafeString(
+    findNestedValueByKeys(payload, [
+      "ServiceCenter",
+      "serviceCenter",
+      "BranchName",
+      "branchName",
+    ])
+  ),
+  area: toSafeString(
+    findNestedValueByKeys(payload, [
+      "Area",
+      "area",
+      "AreaName",
+      "areaName",
+      "CityName",
+      "cityName",
+    ])
+  ),
+  raw: payload,
+});
+
+const buildShipmentManagement = (order = {}) => ({
+  canTrack: Boolean(order?.tracking_number),
+  canReprintLabel: Boolean(order?.labelData),
+  canCancelShipment:
+    normalizeCourier(order?.courier_name) === "BLUE_DART" &&
+    ["shipment_created", "dispatched", "in_transit"].includes(
+      toSafeString(order?.shipping_status)
+    ),
+  canMarkDispatched: ["shipment_created", "pending", "confirmed"].includes(
+    toSafeString(order?.shipping_status)
+  ),
+  canUpdateDeliveryStatus: Boolean(order?._id),
+});
+
+const syncOrderShipmentState = async (order) => {
+  const courier = normalizeCourier(order?.courier_name);
+  let tracking = null;
+  let trackingError = null;
+
+  if (order?.tracking_number) {
+    const trackingResult =
+      courier === "BLUE_DART"
+        ? await trackBlueDartShipment(order.tracking_number)
+        : await trackDhlShipment(order.tracking_number);
+
+    if (trackingResult.success) {
+      tracking =
+        courier === "BLUE_DART"
+          ? formatBlueDartTrackingPayload(order.tracking_number, trackingResult.data)
+          : formatTrackingPayload(order.tracking_number, trackingResult.data);
+    } else {
+      trackingError = trackingResult.error;
+    }
+  }
+
+  let transitEstimate = null;
+  let serviceability = null;
+
+  if (courier === "BLUE_DART") {
+    const shipFromPincode = order?.labelData?.shipFrom?.pincode;
+    const shipToPincode =
+      order?.shippingAddress?.pincode || order?.labelData?.shipTo?.pincode;
+    const productCode =
+      order?.labelData?.carrier?.blueDart?.productCode || process.env.BLUE_DART_PRODUCT_CODE;
+    const subProductCode =
+      order?.labelData?.carrier?.blueDart?.subProductCode ||
+      process.env.BLUE_DART_SUB_PRODUCT_CODE;
+    const pickupTime =
+      order?.labelData?.carrier?.blueDart?.pickupTime || process.env.BLUE_DART_PICKUP_TIME;
+    const pickupDate =
+      order?.shipping_meta?.pickupRegistrationDate ||
+      order?.shipping_meta?.requestPayload?.Request?.Services?.PickupDate ||
+      null;
+
+    if (shipFromPincode && shipToPincode) {
+      const transitResult = await getBlueDartTransitTime({
+        fromPincode: shipFromPincode,
+        toPincode: shipToPincode,
+        pickupTime,
+        pickupDate,
+        productCode,
+        subProductCode,
+      });
+
+      if (transitResult.success) {
+        transitEstimate = extractTransitEstimate(transitResult.data);
+      }
+
+      const serviceabilityResult = await getBlueDartServicesForPincode({
+        pinCode: shipToPincode,
+      });
+
+      if (serviceabilityResult.success) {
+        serviceability = extractServiceability(serviceabilityResult.data);
+      }
+    }
+  }
+
+  return {
+    tracking,
+    trackingError,
+    transitEstimate,
+    serviceability,
+  };
 };
 
 const getShipmentTrackingNumber = (shipmentResponse = {}) =>
@@ -602,19 +897,175 @@ const getOrderLabelData = ({ order, savedAddress }) =>
     order.labelData || {}
   );
 
-const buildShipmentResponseData = ({ order, savedAddress }) => ({
-  orderId: order._id,
-  orderNumber: order.orderId,
-  addressId: order.addressId || null,
-  address: toSafeString(order.address),
-  shippingAddress: resolveOrderShippingAddressSnapshot(order, savedAddress),
-  paymentId: order.PaymentId || "",
-  shippingStatus: toSafeString(order.shipping_status),
-  courierName: toSafeString(order.courier_name),
-  trackingNumber: toSafeString(order.tracking_number),
-  labelData: getOrderLabelData({ order, savedAddress }),
-  shipmentResponse: order.shipping_response || {},
+const buildShipmentResponseData = ({
+  order,
+  savedAddress,
+  liveTracking = null,
+  trackingError = null,
+  transitEstimate = null,
+  serviceability = null,
+}) => {
+  const labelData = getOrderLabelData({ order, savedAddress });
+
+  return {
+    orderId: order._id,
+    orderNumber: order.orderId,
+    addressId: order.addressId || null,
+    address: toSafeString(order.address),
+    shippingAddress: resolveOrderShippingAddressSnapshot(order, savedAddress),
+    paymentId: order.PaymentId || "",
+    shippingStatus: toSafeString(order.shipping_status),
+    courierName: toSafeString(order.courier_name),
+    trackingNumber: toSafeString(order.tracking_number),
+    labelData,
+    labelReprint: {
+      available: Boolean(labelData),
+      labelData,
+    },
+    liveTracking,
+    trackingError,
+    trackingPending: Boolean(!liveTracking && transitEstimate),
+    estimatedDelivery: transitEstimate?.estimatedDeliveryDate || null,
+    transitEstimate,
+    serviceability,
+    shippingMeta: order.shipping_meta || {},
+    shippingTimeline: Array.isArray(order.shipping_timeline)
+      ? order.shipping_timeline
+      : [],
+    shipmentManagement: buildShipmentManagement(order),
+    shipmentResponse: order.shipping_response || {},
+  };
+};
+
+const appendOrderTimelineEvents = (order, events = []) => {
+  order.shipping_timeline = mergeTimelineEvents([
+    ...(Array.isArray(order.shipping_timeline) ? order.shipping_timeline : []),
+    ...events,
+  ]);
+};
+
+const buildTrackingTimelineEvents = (tracking = null, source = "courier") =>
+  Array.isArray(tracking?.events)
+    ? tracking.events.map((event) =>
+        buildTimelineEvent({
+          ...event,
+          source,
+        })
+      )
+    : [];
+
+const persistShipmentMeta = ({
+  order,
+  shipment,
+  tracking = null,
+  transitEstimate = null,
+  serviceability = null,
+  provider = null,
+}) => {
+  order.shipping_meta = {
+    ...(order.shipping_meta || {}),
+    ...(provider ? { provider } : {}),
+    ...(shipment?.tokenNumber ? { tokenNumber: shipment.tokenNumber } : {}),
+    ...(shipment?.pickupRegistrationDate
+      ? { pickupRegistrationDate: shipment.pickupRegistrationDate }
+      : {}),
+    ...(shipment?.requestPayload ? { requestPayload: shipment.requestPayload } : {}),
+    ...(tracking ? { liveTracking: tracking } : {}),
+    ...(transitEstimate ? { transitEstimate } : {}),
+    ...(serviceability ? { serviceability } : {}),
+    lastSyncedAt: new Date().toISOString(),
+  };
+};
+
+const updateOrderShippingStatusFromTracking = (order, tracking = null) => {
+  const status = toSafeString(tracking?.status).toLowerCase();
+
+  if (!status) {
+    return;
+  }
+
+  if (status.includes("delivered")) {
+    order.shipping_status = "delivered";
+    order.status = "delivered";
+    order.delivered_at = order.delivered_at || new Date();
+    return;
+  }
+
+  if (status.includes("out for delivery")) {
+    order.shipping_status = "out_for_delivery";
+    order.status = order.status === "delivered" ? "delivered" : "shipped";
+    return;
+  }
+
+  if (
+    status.includes("in transit") ||
+    status.includes("manifested") ||
+    status.includes("dispatched")
+  ) {
+    order.shipping_status = "in_transit";
+    order.status = order.status === "delivered" ? "delivered" : "shipped";
+  }
+};
+
+const getPickupCancellationPayload = (order) => ({
+  tokenNumber:
+    order?.shipping_meta?.tokenNumber ||
+    order?.shipping_response?.GenerateWayBillResult?.TokenNumber ||
+    null,
+  pickupRegistrationDate:
+    order?.shipping_meta?.pickupRegistrationDate ||
+    order?.shipping_meta?.requestPayload?.Request?.Services?.PickupDate ||
+    null,
 });
+
+const hydrateOrderShipmentDetails = async (
+  order,
+  { userId, persist = true, syncCourier = true, applyTrackingStatus = true } = {}
+) => {
+  const { addressRecord } = await ensureOrderShippingAddress(order, {
+    userId,
+  });
+
+  ensureOrderShipFrom(order);
+  order.labelData = getOrderLabelData({ order, savedAddress: addressRecord });
+
+  let liveTracking = null;
+  let trackingError = null;
+  let transitEstimate = null;
+  let serviceability = null;
+
+  if (syncCourier && (order.tracking_number || normalizeCourier(order.courier_name) === "BLUE_DART")) {
+    const synced = await syncOrderShipmentState(order);
+    liveTracking = synced.tracking;
+    trackingError = synced.trackingError;
+    transitEstimate = synced.transitEstimate;
+    serviceability = synced.serviceability;
+
+    persistShipmentMeta({
+      order,
+      tracking: liveTracking,
+      transitEstimate,
+      serviceability,
+      provider: normalizeCourier(order.courier_name),
+    });
+    appendOrderTimelineEvents(order, buildTrackingTimelineEvents(liveTracking));
+    if (applyTrackingStatus) {
+      updateOrderShippingStatusFromTracking(order, liveTracking);
+    }
+  }
+
+  if (persist && typeof order.save === "function") {
+    await order.save();
+  }
+
+  return {
+    addressRecord,
+    liveTracking,
+    trackingError,
+    transitEstimate,
+    serviceability,
+  };
+};
 
 exports.TrackShipment = async (req, res) => {
   try {
@@ -719,10 +1170,32 @@ exports.CreateOrderShipment = catchAsync(async (req, res) => {
     order.tracking_number = created.trackingNumber;
     order.shipping_status = "shipment_created";
     order.shipping_response = shipment.data;
+    appendOrderTimelineEvents(order, [
+      buildTimelineEvent({
+        status: "Shipment created",
+        location: shipFrom.city,
+        remarks: `Shipment created with ${created.provider}`,
+        source: "system",
+      }),
+    ]);
   } else {
     order.shipping_status = "shipment_failed";
     order.shipping_response = shipment.error;
+    appendOrderTimelineEvents(order, [
+      buildTimelineEvent({
+        status: "Shipment failed",
+        location: shipFrom.city,
+        remarks: toSafeString(shipment?.error?.title || shipment?.error?.message || shipment?.error),
+        source: "system",
+      }),
+    ]);
   }
+
+  persistShipmentMeta({
+    order,
+    shipment,
+    provider: created.provider,
+  });
 
   order.labelData = mergeLabelData(
     buildLabelData({
@@ -740,6 +1213,18 @@ exports.CreateOrderShipment = catchAsync(async (req, res) => {
     order.labelData || {}
   );
 
+  const synced = shipment.success
+    ? await hydrateOrderShipmentDetails(order, {
+        userId: req.user.id,
+        persist: false,
+      })
+    : {
+        addressRecord,
+        liveTracking: null,
+        transitEstimate: null,
+        serviceability: null,
+      };
+
   await order.save();
 
   return res.status(200).json({
@@ -747,7 +1232,14 @@ exports.CreateOrderShipment = catchAsync(async (req, res) => {
     message: shipment.success
       ? "Shipment created successfully"
       : "Shipment creation failed",
-    data: buildShipmentResponseData({ order, savedAddress: addressRecord }),
+    data: buildShipmentResponseData({
+      order,
+      savedAddress: synced.addressRecord || addressRecord,
+      liveTracking: synced.liveTracking,
+      trackingError: synced.trackingError,
+      transitEstimate: synced.transitEstimate,
+      serviceability: synced.serviceability,
+    }),
     shipment,
   });
 });
@@ -765,14 +1257,21 @@ exports.GetOrderShipment = catchAsync(async (req, res) => {
     });
   }
 
-  ensureOrderShipFrom(order);
-  order.labelData = getOrderLabelData({ order });
-  await order.save();
+  const synced = await hydrateOrderShipmentDetails(order, {
+    userId: req.user.id,
+  });
 
   return res.status(200).json({
     status: true,
     message: "Shipment details fetched successfully",
-    data: buildShipmentResponseData({ order }),
+    data: buildShipmentResponseData({
+      order,
+      savedAddress: synced.addressRecord,
+      liveTracking: synced.liveTracking,
+      trackingError: synced.trackingError,
+      transitEstimate: synced.transitEstimate,
+      serviceability: synced.serviceability,
+    }),
   });
 });
 
@@ -780,7 +1279,7 @@ exports.TrackOrderShipment = catchAsync(async (req, res) => {
   const order = await Order.findOne({
     _id: req.params.id,
     userId: req.user.id,
-  }).lean();
+  });
 
   if (!order) {
     return res.status(404).json({
@@ -796,26 +1295,267 @@ exports.TrackOrderShipment = catchAsync(async (req, res) => {
     });
   }
 
-  const courier = normalizeCourier(order.courier_name);
-  const tracking =
-    courier === "BLUE_DART"
-      ? await trackBlueDartShipment(order.tracking_number)
-      : await trackDhlShipment(order.tracking_number);
-
-  if (!tracking.success) {
-    return res.status(502).json({
-      status: false,
-      message: "Tracking failed",
-      error: tracking.error,
-    });
-  }
+  const synced = await hydrateOrderShipmentDetails(order, {
+    userId: req.user.id,
+  });
 
   return res.status(200).json({
     status: true,
-    message: "Order tracking fetched successfully",
-    data:
-      courier === "BLUE_DART"
-        ? formatBlueDartTrackingPayload(order.tracking_number, tracking.data)
-        : formatTrackingPayload(order.tracking_number, tracking.data),
+    message: synced.liveTracking
+      ? "Order tracking fetched successfully"
+      : "Tracking is not live yet, estimated delivery returned",
+    data: {
+      ...(synced.liveTracking || {}),
+      trackingPending: Boolean(!synced.liveTracking && synced.transitEstimate),
+      trackingError: synced.trackingError,
+      estimatedDelivery: synced.transitEstimate?.estimatedDeliveryDate || null,
+      transitEstimate: synced.transitEstimate,
+      serviceability: synced.serviceability,
+      shippingTimeline: order.shipping_timeline || [],
+    },
+  });
+});
+
+exports.RefreshOrderShipment = catchAsync(async (req, res) => {
+  const order = await Order.findOne({
+    _id: req.params.id,
+    userId: req.user.id,
+  });
+
+  if (!order) {
+    return res.status(404).json({
+      status: false,
+      message: "Order not found",
+    });
+  }
+
+  const synced = await hydrateOrderShipmentDetails(order, {
+    userId: req.user.id,
+  });
+
+  return res.status(200).json({
+    status: true,
+    message: "Shipment status refreshed successfully",
+    data: buildShipmentResponseData({
+      order,
+      savedAddress: synced.addressRecord,
+      liveTracking: synced.liveTracking,
+      trackingError: synced.trackingError,
+      transitEstimate: synced.transitEstimate,
+      serviceability: synced.serviceability,
+    }),
+  });
+});
+
+exports.CancelOrderShipment = catchAsync(async (req, res) => {
+  const order = await Order.findOne({
+    _id: req.params.id,
+    userId: req.user.id,
+  });
+
+  if (!order) {
+    return res.status(404).json({
+      status: false,
+      message: "Order not found",
+    });
+  }
+
+  if (normalizeCourier(order.courier_name) !== "BLUE_DART") {
+    return res.status(400).json({
+      status: false,
+      message: "Shipment cancellation is only supported for Blue Dart orders",
+    });
+  }
+
+  const { tokenNumber, pickupRegistrationDate } = getPickupCancellationPayload(order);
+
+  if (!tokenNumber || !pickupRegistrationDate) {
+    return res.status(400).json({
+      status: false,
+      message: "Pickup token or pickup registration date is missing for this order",
+    });
+  }
+
+  const cancellation = await cancelBlueDartPickup({
+    tokenNumber,
+    pickupRegistrationDate,
+    remarks: req.body?.remarks || null,
+  });
+
+  if (!cancellation.success) {
+    return res.status(502).json({
+      status: false,
+      message: "Shipment cancellation failed",
+      error: cancellation.error,
+    });
+  }
+
+  order.shipping_status = "cancelled";
+  order.status = "cancelled";
+  order.shipping_meta = {
+    ...(order.shipping_meta || {}),
+    cancellation: {
+      requestPayload: cancellation.requestPayload,
+      response: cancellation.data,
+      cancelledAt: new Date().toISOString(),
+    },
+  };
+  appendOrderTimelineEvents(order, [
+    buildTimelineEvent({
+      status: "Shipment cancelled",
+      remarks: req.body?.remarks || "Pickup cancelled from backend",
+      source: "manual",
+    }),
+  ]);
+
+  const synced = await hydrateOrderShipmentDetails(order, {
+    userId: req.user.id,
+    persist: false,
+    syncCourier: false,
+    applyTrackingStatus: false,
+  });
+  await order.save();
+
+  return res.status(200).json({
+    status: true,
+    message: "Shipment cancelled successfully",
+    data: buildShipmentResponseData({
+      order,
+      savedAddress: synced.addressRecord,
+      liveTracking: synced.liveTracking,
+      trackingError: synced.trackingError,
+      transitEstimate: synced.transitEstimate,
+      serviceability: synced.serviceability,
+    }),
+    cancellation,
+  });
+});
+
+exports.MarkOrderDispatched = catchAsync(async (req, res) => {
+  const order = await Order.findOne({
+    _id: req.params.id,
+    userId: req.user.id,
+  });
+
+  if (!order) {
+    return res.status(404).json({
+      status: false,
+      message: "Order not found",
+    });
+  }
+
+  order.status = "shipped";
+  order.shipping_status = "dispatched";
+  order.dispatched_at = new Date();
+  appendOrderTimelineEvents(order, [
+    buildTimelineEvent({
+      status: "Dispatched",
+      location: req.body?.location || order?.labelData?.shipFrom?.city || "",
+      remarks: req.body?.remarks || "Order marked as dispatched",
+      source: "manual",
+    }),
+  ]);
+
+  const synced = await hydrateOrderShipmentDetails(order, {
+    userId: req.user.id,
+    persist: false,
+    syncCourier: false,
+    applyTrackingStatus: false,
+  });
+  await order.save();
+
+  return res.status(200).json({
+    status: true,
+    message: "Order marked as dispatched successfully",
+    data: buildShipmentResponseData({
+      order,
+      savedAddress: synced.addressRecord,
+      liveTracking: synced.liveTracking,
+      trackingError: synced.trackingError,
+      transitEstimate: synced.transitEstimate,
+      serviceability: synced.serviceability,
+    }),
+  });
+});
+
+exports.UpdateOrderDeliveryStatus = catchAsync(async (req, res) => {
+  const order = await Order.findOne({
+    _id: req.params.id,
+    userId: req.user.id,
+  });
+
+  if (!order) {
+    return res.status(404).json({
+      status: false,
+      message: "Order not found",
+    });
+  }
+
+  const status = toSafeString(req.body?.status).toLowerCase();
+
+  if (!status) {
+    return res.status(400).json({
+      status: false,
+      message: "status is required",
+    });
+  }
+
+  if (status === "delivered") {
+    order.status = "delivered";
+    order.shipping_status = "delivered";
+    order.delivered_at = new Date();
+  } else if (status === "out_for_delivery") {
+    order.status = "shipped";
+    order.shipping_status = "out_for_delivery";
+  } else if (status === "in_transit") {
+    order.status = "shipped";
+    order.shipping_status = "in_transit";
+  } else if (status === "cancelled") {
+    order.status = "cancelled";
+    order.shipping_status = "cancelled";
+  } else {
+    order.shipping_status = status;
+  }
+
+  appendOrderTimelineEvents(order, [
+    buildTimelineEvent({
+      status: status.replace(/_/g, " "),
+      location: req.body?.location || "",
+      remarks: req.body?.remarks || "Manual delivery status update",
+      source: "manual",
+      timestamp: req.body?.timestamp || new Date().toISOString(),
+    }),
+  ]);
+
+  order.shipping_meta = {
+    ...(order.shipping_meta || {}),
+    manualDeliveryUpdate: {
+      status,
+      location: toSafeString(req.body?.location),
+      remarks: toSafeString(req.body?.remarks),
+      estimatedDeliveryDate: toSafeString(req.body?.estimatedDeliveryDate),
+      updatedAt: new Date().toISOString(),
+    },
+  };
+
+  const synced = await hydrateOrderShipmentDetails(order, {
+    userId: req.user.id,
+    persist: false,
+    syncCourier: false,
+    applyTrackingStatus: false,
+  });
+  await order.save();
+
+  return res.status(200).json({
+    status: true,
+    message: "Delivery status updated successfully",
+    data: buildShipmentResponseData({
+      order,
+      savedAddress: synced.addressRecord,
+      liveTracking: synced.liveTracking,
+      trackingError: synced.trackingError,
+      transitEstimate: synced.transitEstimate,
+      serviceability: synced.serviceability,
+    }),
   });
 });

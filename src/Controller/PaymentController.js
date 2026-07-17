@@ -61,6 +61,38 @@ const ensureOrderShipFrom = (order) => {
   return shipFrom;
 };
 
+const appendTimelineEvent = (order, event) => {
+  const currentTimeline = Array.isArray(order.shipping_timeline)
+    ? order.shipping_timeline
+    : [];
+  const normalizedEvent = {
+    timestamp: event.timestamp || new Date().toISOString(),
+    status: String(event.status || "").trim(),
+    location: String(event.location || "").trim(),
+    remarks: String(event.remarks || "").trim(),
+    source: String(event.source || "system").trim(),
+  };
+
+  order.shipping_timeline = [normalizedEvent, ...currentTimeline].filter(
+    (item, index, list) =>
+      list.findIndex((candidate) => JSON.stringify(candidate) === JSON.stringify(item)) ===
+      index
+  );
+};
+
+const persistShipmentMeta = ({ order, shipment, provider }) => {
+  order.shipping_meta = {
+    ...(order.shipping_meta || {}),
+    provider,
+    ...(shipment?.tokenNumber ? { tokenNumber: shipment.tokenNumber } : {}),
+    ...(shipment?.pickupRegistrationDate
+      ? { pickupRegistrationDate: shipment.pickupRegistrationDate }
+      : {}),
+    ...(shipment?.requestPayload ? { requestPayload: shipment.requestPayload } : {}),
+    lastSyncedAt: new Date().toISOString(),
+  };
+};
+
 const createShipmentForOrder = async ({
   order,
   receiverAddress,
@@ -399,27 +431,33 @@ exports.paymentAdd = catchAsync(async (req, res) => {
 
       shipment = created.shipment;
 
-      order.courier_name =
-        created.provider;
-
-      if (shipment?.success) {
-        order.tracking_number =
-          created.trackingNumber ||
-          shipment.trackingNumber ||
-          "";
-
-        order.shipping_status =
-          "shipment_created";
-
-        order.shipping_response =
-          shipment.data;
+      if (shipment.success) {
+        order.tracking_number = created.trackingNumber;
+        order.shipping_status = "shipment_created";
+        order.shipping_response = shipment.data;
+        persistShipmentMeta({
+          order,
+          shipment,
+          provider: created.provider,
+        });
+        appendTimelineEvent(order, {
+          status: "Shipment created",
+          location: order?.labelData?.shipFrom?.city || "",
+          remarks: `Shipment created with ${created.provider}`,
+        });
       } else {
-        order.shipping_status =
-          "shipment_failed";
-
-        order.shipping_response =
-          shipment?.error ||
-          "Shipment creation failed";
+        order.shipping_status = "shipment_failed";
+        order.shipping_response = shipment.error;
+        persistShipmentMeta({
+          order,
+          shipment,
+          provider: created.provider,
+        });
+        appendTimelineEvent(order, {
+          status: "Shipment failed",
+          location: order?.labelData?.shipFrom?.city || "",
+          remarks: shipment?.error?.message || shipment?.error?.title || "Shipment creation failed",
+        });
       }
     }
   }
