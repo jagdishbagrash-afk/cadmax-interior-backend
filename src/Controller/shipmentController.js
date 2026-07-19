@@ -170,45 +170,37 @@ const mergeTimelineEvents = (events = []) => {
 };
 
 const extractTransitEstimate = (payload = {}) => {
-  const estimatedDeliveryDate =
-    parseBlueDartDateLiteral(
-      findNestedValueByKeys(payload, [
-        "ExpectedDateDelivery",
-        "expectedDateDelivery",
-        "ExpectedDatePOD",
-        "expectedDatePod",
-        "ExpectedDeliveryDate",
-        "expectedDeliveryDate",
-        "DeliveryDate",
-        "deliveryDate",
-        "estimatedDate",
-        "EstimatedDate",
-        "EDD",
-        "edd",
-        "PDeliveryDate",
-        "pDeliveryDate",
-      ])
-    ) ||
-    toSafeString(
-      findNestedValueByKeys(payload, [
-        "ExpectedDateDelivery",
-        "expectedDateDelivery",
-        "ExpectedDatePOD",
-        "expectedDatePod",
-      ])
-    ) ||
-    null;
+  const estimatedDelivery = toSafeString(
+    findNestedValueByKeys(payload, [
+      "ExpectedDateDelivery",
+      "expectedDateDelivery",
+      "ExpectedDeliveryDate",
+      "expectedDeliveryDate",
+      "DeliveryDate",
+      "deliveryDate",
+      "estimatedDate",
+      "EstimatedDate",
+      "EDD",
+      "edd",
+      "PDeliveryDate",
+      "pDeliveryDate",
+    ])
+  );
+  const expectedPod = toSafeString(
+    findNestedValueByKeys(payload, [
+      "ExpectedDatePOD",
+      "expectedDatePod",
+      "PODDate",
+      "podDate",
+    ])
+  );
 
   return {
-    estimatedDeliveryDate,
-    expectedPodDate: toSafeString(
-      findNestedValueByKeys(payload, [
-        "ExpectedDatePOD",
-        "expectedDatePod",
-        "PODDate",
-        "podDate",
-      ])
-    ),
+    estimatedDelivery: estimatedDelivery || null,
+    estimatedDeliveryDate:
+      estimatedDelivery || parseBlueDartDateLiteral(expectedPod) || null,
+    expectedPod: expectedPod || null,
+    expectedPodDate: expectedPod || null,
     deliveryDays: findNestedValueByKeys(payload, [
       "TransitDays",
       "transitDays",
@@ -223,6 +215,27 @@ const extractTransitEstimate = (payload = {}) => {
       "ApexAdditionalDays",
       "apexAdditionalDays",
     ]),
+    additionalDays:
+      Number(
+        findNestedValueByKeys(payload, [
+          "AdditionalDays",
+          "additionalDays",
+        ])
+      ) || 0,
+    apexAdditionalDays:
+      Number(
+        findNestedValueByKeys(payload, [
+          "ApexAdditionalDays",
+          "apexAdditionalDays",
+        ])
+      ) || 0,
+    groundAdditionalDays:
+      Number(
+        findNestedValueByKeys(payload, [
+          "GroundAdditionalDays",
+          "groundAdditionalDays",
+        ])
+      ) || 0,
     cutoffTime: findNestedValueByKeys(payload, [
       "PickupCutOffTime",
       "pickupCutOffTime",
@@ -259,8 +272,26 @@ const extractTransitEstimate = (payload = {}) => {
         "isError",
       ])
     ),
+    edlMessage: toSafeString(
+      findNestedValueByKeys(payload, [
+        "EDLMessage",
+        "edlMessage",
+      ])
+    ),
+    isError: Boolean(
+      findNestedValueByKeys(payload, [
+        "IsError",
+        "isError",
+      ])
+    ),
     message: toSafeString(
-    findNestedValueByKeys(payload, [
+      findNestedValueByKeys(payload, [
+        "ErrorMessage",
+        "errorMessage",
+      ])
+    ),
+    errorMessage: toSafeString(
+      findNestedValueByKeys(payload, [
         "ErrorMessage",
         "errorMessage",
       ])
@@ -315,6 +346,104 @@ const buildShipmentManagement = (order = {}) => ({
   canUpdateDeliveryStatus: Boolean(order?._id),
 });
 
+const normalizePickupTimeForTransit = (value) => {
+  const normalized = toSafeString(value).replace(/\./g, ":");
+  if (/^\d{2}:\d{2}$/.test(normalized)) {
+    return normalized;
+  }
+
+  const compact = normalized.match(/^(\d{2})(\d{2})$/);
+  if (compact) {
+    return `${compact[1]}:${compact[2]}`;
+  }
+
+  return "08:00";
+};
+
+const toBlueDartDateLiteralString = (value) => {
+  const normalized = toSafeString(value);
+  if (/^\/Date\(\d+\)\/$/.test(normalized)) {
+    return normalized;
+  }
+
+  const parsed = normalized ? new Date(normalized) : new Date();
+  const safeDate = Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+  return `/Date(${safeDate.getTime()})/`;
+};
+
+const resolveBlueDartTransitContext = (order = {}) => {
+  const labelData = order?.labelData || {};
+  const requestPayload = order?.shipping_meta?.requestPayload || {};
+  const requestServices = requestPayload?.Request?.Services || requestPayload?.request?.Services || {};
+  const requestShipper = requestPayload?.Request?.Shipper || requestPayload?.request?.Shipper || {};
+  const requestConsignee =
+    requestPayload?.Request?.Consignee || requestPayload?.request?.Consignee || {};
+
+  return {
+    fromPincode: toSafeString(
+      labelData?.shipFrom?.pincode ||
+        requestShipper?.CustomerPincode ||
+        requestPayload?.shipFrom?.pincode ||
+        process.env.BLUE_DART_SHIPPER_PINCODE
+    ),
+    toPincode: toSafeString(
+      labelData?.shipTo?.pincode ||
+        order?.shippingAddress?.pincode ||
+        requestConsignee?.ConsigneePincode ||
+        requestPayload?.shipTo?.pincode
+    ),
+    productCode: toSafeString(
+      labelData?.carrier?.blueDart?.productCode ||
+        requestServices?.ProductCode ||
+        process.env.BLUE_DART_PRODUCT_CODE ||
+        "A"
+    ),
+    subProductCode: toSafeString(
+      labelData?.carrier?.blueDart?.subProductCode ||
+        requestServices?.SubProductCode ||
+        process.env.BLUE_DART_SUB_PRODUCT_CODE ||
+        "P"
+    ),
+    pickupDate: toBlueDartDateLiteralString(
+      requestServices?.PickupDate ||
+        order?.shipping_meta?.pickupRegistrationDate ||
+        labelData?.bookingDate ||
+        order?.createdAt
+    ),
+    pickupTime: normalizePickupTimeForTransit(
+      labelData?.carrier?.blueDart?.pickupTime ||
+        requestServices?.PickupTime ||
+        process.env.BLUE_DART_PICKUP_TIME ||
+        "08:00"
+    ),
+  };
+};
+
+const buildPendingTransitTimelineEvents = (order, transitEstimate = null) => {
+  if (!transitEstimate || order?.tracking_number) {
+    return [];
+  }
+
+  return [
+    buildTimelineEvent({
+      timestamp:
+        parseBlueDartDateLiteral(order?.shipping_meta?.pickupRegistrationDate) ||
+        toSafeString(order?.createdAt) ||
+        new Date().toISOString(),
+      status: "Pickup pending",
+      location:
+        transitEstimate.destinationCity ||
+        order?.labelData?.shipTo?.city ||
+        order?.shippingAddress?.city ||
+        "",
+      remarks: transitEstimate.estimatedDelivery
+        ? `Tracking is not live yet. Estimated delivery ${transitEstimate.estimatedDelivery}`
+        : "Tracking is not live yet. Pickup scan pending.",
+      source: "transit_estimate",
+    }),
+  ];
+};
+
 const syncOrderShipmentState = async (order) => {
   const courier = normalizeCourier(order?.courier_name);
   let tracking = null;
@@ -338,39 +467,34 @@ const syncOrderShipmentState = async (order) => {
 
   let transitEstimate = null;
   let serviceability = null;
+  let transitError = null;
+  let transitRequestPayload = null;
+  let transitResponsePayload = null;
+  let trackingPending = false;
 
   if (courier === "BLUE_DART") {
-    const shipFromPincode = order?.labelData?.shipFrom?.pincode;
-    const shipToPincode =
-      order?.shippingAddress?.pincode || order?.labelData?.shipTo?.pincode;
-    const productCode =
-      order?.labelData?.carrier?.blueDart?.productCode || process.env.BLUE_DART_PRODUCT_CODE;
-    const subProductCode =
-      order?.labelData?.carrier?.blueDart?.subProductCode ||
-      process.env.BLUE_DART_SUB_PRODUCT_CODE;
-    const pickupTime =
-      order?.labelData?.carrier?.blueDart?.pickupTime || process.env.BLUE_DART_PICKUP_TIME;
-    const pickupDate =
-      order?.shipping_meta?.pickupRegistrationDate ||
-      order?.shipping_meta?.requestPayload?.Request?.Services?.PickupDate ||
-      null;
+    const transitContext = resolveBlueDartTransitContext(order);
 
-    if (shipFromPincode && shipToPincode) {
+    if (transitContext.fromPincode && transitContext.toPincode) {
       const transitResult = await getBlueDartTransitTime({
-        fromPincode: shipFromPincode,
-        toPincode: shipToPincode,
-        pickupTime,
-        pickupDate,
-        productCode,
-        subProductCode,
+        fromPincode: transitContext.fromPincode,
+        toPincode: transitContext.toPincode,
+        pickupTime: transitContext.pickupTime,
+        pickupDate: transitContext.pickupDate,
+        productCode: transitContext.productCode,
+        subProductCode: transitContext.subProductCode,
       });
 
       if (transitResult.success) {
         transitEstimate = extractTransitEstimate(transitResult.data);
+        transitRequestPayload = transitResult.requestPayload;
+        transitResponsePayload = transitResult.data;
+      } else {
+        transitError = transitResult.error;
       }
 
       const serviceabilityResult = await getBlueDartServicesForPincode({
-        pinCode: shipToPincode,
+        pinCode: transitContext.toPincode,
       });
 
       if (serviceabilityResult.success) {
@@ -379,11 +503,17 @@ const syncOrderShipmentState = async (order) => {
     }
   }
 
+  trackingPending = Boolean(courier === "BLUE_DART" && !tracking && transitEstimate);
+
   return {
     tracking,
     trackingError,
     transitEstimate,
     serviceability,
+    transitError,
+    transitRequestPayload,
+    transitResponsePayload,
+    trackingPending,
   };
 };
 
@@ -904,8 +1034,19 @@ const buildShipmentResponseData = ({
   trackingError = null,
   transitEstimate = null,
   serviceability = null,
+  trackingPending = false,
 }) => {
   const labelData = getOrderLabelData({ order, savedAddress });
+  const resolvedLiveTracking = liveTracking || order?.shipping_meta?.liveTracking || null;
+  const resolvedTrackingError = trackingError || order?.shipping_meta?.trackingError || null;
+  const resolvedTransitEstimate =
+    transitEstimate || order?.shipping_meta?.transitEstimate || null;
+  const resolvedServiceability =
+    serviceability || order?.shipping_meta?.serviceability || null;
+  const resolvedTrackingPending =
+    typeof trackingPending === "boolean"
+      ? trackingPending
+      : Boolean(order?.shipping_meta?.trackingPending);
 
   return {
     orderId: order._id,
@@ -922,12 +1063,18 @@ const buildShipmentResponseData = ({
       available: Boolean(labelData),
       labelData,
     },
-    liveTracking,
-    trackingError,
-    trackingPending: Boolean(!liveTracking && transitEstimate),
-    estimatedDelivery: transitEstimate?.estimatedDeliveryDate || null,
-    transitEstimate,
-    serviceability,
+    liveTracking: resolvedLiveTracking,
+    trackingError: resolvedTrackingError,
+    trackingPending: Boolean(
+      resolvedTrackingPending || (!resolvedLiveTracking && resolvedTransitEstimate)
+    ),
+    estimatedDelivery:
+      resolvedTransitEstimate?.estimatedDelivery ||
+      resolvedTransitEstimate?.estimatedDeliveryDate ||
+      order?.shipping_meta?.estimatedDelivery ||
+      null,
+    transitEstimate: resolvedTransitEstimate,
+    serviceability: resolvedServiceability,
     shippingMeta: order.shipping_meta || {},
     shippingTimeline: Array.isArray(order.shipping_timeline)
       ? order.shipping_timeline
@@ -958,8 +1105,13 @@ const persistShipmentMeta = ({
   order,
   shipment,
   tracking = null,
+  trackingError = null,
   transitEstimate = null,
   serviceability = null,
+  trackingPending = false,
+  transitRequestPayload = null,
+  transitResponsePayload = null,
+  transitError = null,
   provider = null,
 }) => {
   order.shipping_meta = {
@@ -971,8 +1123,19 @@ const persistShipmentMeta = ({
       : {}),
     ...(shipment?.requestPayload ? { requestPayload: shipment.requestPayload } : {}),
     ...(tracking ? { liveTracking: tracking } : {}),
-    ...(transitEstimate ? { transitEstimate } : {}),
+    trackingError: trackingError || null,
+    ...(transitEstimate
+      ? {
+          estimatedDelivery:
+            transitEstimate.estimatedDelivery || transitEstimate.estimatedDeliveryDate || null,
+          transitEstimate,
+        }
+      : {}),
     ...(serviceability ? { serviceability } : {}),
+    ...(transitRequestPayload ? { transitRequestPayload } : {}),
+    ...(transitResponsePayload ? { transitResponsePayload } : {}),
+    transitError: transitError || null,
+    trackingPending: Boolean(trackingPending),
     lastSyncedAt: new Date().toISOString(),
   };
 };
@@ -1033,6 +1196,7 @@ const hydrateOrderShipmentDetails = async (
   let trackingError = null;
   let transitEstimate = null;
   let serviceability = null;
+  let trackingPending = false;
 
   if (syncCourier && (order.tracking_number || normalizeCourier(order.courier_name) === "BLUE_DART")) {
     const synced = await syncOrderShipmentState(order);
@@ -1040,15 +1204,22 @@ const hydrateOrderShipmentDetails = async (
     trackingError = synced.trackingError;
     transitEstimate = synced.transitEstimate;
     serviceability = synced.serviceability;
+    trackingPending = synced.trackingPending;
 
     persistShipmentMeta({
       order,
       tracking: liveTracking,
+      trackingError,
       transitEstimate,
       serviceability,
+      trackingPending,
+      transitRequestPayload: synced.transitRequestPayload,
+      transitResponsePayload: synced.transitResponsePayload,
+      transitError: synced.transitError,
       provider: normalizeCourier(order.courier_name),
     });
     appendOrderTimelineEvents(order, buildTrackingTimelineEvents(liveTracking));
+    appendOrderTimelineEvents(order, buildPendingTransitTimelineEvents(order, transitEstimate));
     if (applyTrackingStatus) {
       updateOrderShippingStatusFromTracking(order, liveTracking);
     }
@@ -1064,6 +1235,7 @@ const hydrateOrderShipmentDetails = async (
     trackingError,
     transitEstimate,
     serviceability,
+    trackingPending,
   };
 };
 
@@ -1221,8 +1393,10 @@ exports.CreateOrderShipment = catchAsync(async (req, res) => {
     : {
         addressRecord,
         liveTracking: null,
+        trackingError: null,
         transitEstimate: null,
         serviceability: null,
+        trackingPending: false,
       };
 
   await order.save();
@@ -1239,6 +1413,7 @@ exports.CreateOrderShipment = catchAsync(async (req, res) => {
       trackingError: synced.trackingError,
       transitEstimate: synced.transitEstimate,
       serviceability: synced.serviceability,
+      trackingPending: synced.trackingPending,
     }),
     shipment,
   });
@@ -1271,6 +1446,7 @@ exports.GetOrderShipment = catchAsync(async (req, res) => {
       trackingError: synced.trackingError,
       transitEstimate: synced.transitEstimate,
       serviceability: synced.serviceability,
+      trackingPending: synced.trackingPending,
     }),
   });
 });
@@ -1288,7 +1464,7 @@ exports.TrackOrderShipment = catchAsync(async (req, res) => {
     });
   }
 
-  if (!order.tracking_number) {
+  if (!order.tracking_number && normalizeCourier(order.courier_name) !== "BLUE_DART") {
     return res.status(404).json({
       status: false,
       message: "Shipment has not been created for this order yet",
@@ -1306,9 +1482,12 @@ exports.TrackOrderShipment = catchAsync(async (req, res) => {
       : "Tracking is not live yet, estimated delivery returned",
     data: {
       ...(synced.liveTracking || {}),
-      trackingPending: Boolean(!synced.liveTracking && synced.transitEstimate),
+      trackingPending: Boolean(synced.trackingPending),
       trackingError: synced.trackingError,
-      estimatedDelivery: synced.transitEstimate?.estimatedDeliveryDate || null,
+      estimatedDelivery:
+        synced.transitEstimate?.estimatedDelivery ||
+        synced.transitEstimate?.estimatedDeliveryDate ||
+        null,
       transitEstimate: synced.transitEstimate,
       serviceability: synced.serviceability,
       shippingTimeline: order.shipping_timeline || [],
@@ -1343,6 +1522,7 @@ exports.RefreshOrderShipment = catchAsync(async (req, res) => {
       trackingError: synced.trackingError,
       transitEstimate: synced.transitEstimate,
       serviceability: synced.serviceability,
+      trackingPending: synced.trackingPending,
     }),
   });
 });
@@ -1426,6 +1606,7 @@ exports.CancelOrderShipment = catchAsync(async (req, res) => {
       trackingError: synced.trackingError,
       transitEstimate: synced.transitEstimate,
       serviceability: synced.serviceability,
+      trackingPending: synced.trackingPending,
     }),
     cancellation,
   });
@@ -1474,6 +1655,7 @@ exports.MarkOrderDispatched = catchAsync(async (req, res) => {
       trackingError: synced.trackingError,
       transitEstimate: synced.transitEstimate,
       serviceability: synced.serviceability,
+      trackingPending: synced.trackingPending,
     }),
   });
 });
@@ -1556,6 +1738,7 @@ exports.UpdateOrderDeliveryStatus = catchAsync(async (req, res) => {
       trackingError: synced.trackingError,
       transitEstimate: synced.transitEstimate,
       serviceability: synced.serviceability,
+      trackingPending: synced.trackingPending,
     }),
   });
 });

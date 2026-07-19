@@ -3,19 +3,17 @@ const axios = require("axios");
 const DEFAULT_BLUE_DART_BASE_URL =
   "https://apigateway-sandbox.bluedart.com/in/transportation";
 
+let blueDartTokenCache = {
+  value: null,
+  expiresAt: 0,
+  source: null,
+};
+
 const buildBlueDartBaseUrl = () =>
   String(process.env.BLUE_DART_API_BASE_URL || DEFAULT_BLUE_DART_BASE_URL).replace(
     /\/+$/,
     ""
   );
-
-const getBlueDartJwtToken = () => {
-  const token = process.env.BLUE_DART_JWT_TOKEN;
-  if (!token) {
-    throw new Error("BLUE_DART_JWT_TOKEN is missing in environment variables");
-  }
-  return token;
-};
 
 const getBlueDartLoginId = () =>
   process.env.BLUE_DART_LOGIN_ID ||
@@ -45,18 +43,210 @@ const getBlueDartTrackingApiType = () =>
   process.env.BLUE_DART_TRANSIT_API_TYPE ||
   "T";
 
+const getBlueDartShippingApiType = () =>
+  process.env.BLUE_DART_SHIPPING_API_TYPE ||
+  process.env.BLUE_DART_API_TYPE ||
+  "S";
+
+const getBlueDartClientId = () => process.env.BLUE_DART_CLIENT_ID || "";
+
+const getBlueDartClientSecret = () => process.env.BLUE_DART_CLIENT_SECRET || "";
+
+const getBlueDartTokenUrl = () => process.env.BLUE_DART_TOKEN_URL || "";
+
 const getBlueDartCustomerCode = () =>
   process.env.BLUE_DART_CUSTOMER_CODE ||
   process.env.BLUE_DART_CUSTOMERCODE ||
   "";
 
-const getBlueDartHeaders = () => ({
-  JWTToken: getBlueDartJwtToken(),
+const maskValue = (key, value) => {
+  const normalizedKey = String(key || "").toLowerCase();
+  if (
+    normalizedKey.includes("jwt") ||
+    normalizedKey.includes("token") ||
+    normalizedKey.includes("secret") ||
+    normalizedKey.includes("licencekey") ||
+    normalizedKey.includes("licensekey") ||
+    normalizedKey === "authorization"
+  ) {
+    return value ? "[MASKED]" : value;
+  }
+
+  return value;
+};
+
+const maskObject = (input) => {
+  if (Array.isArray(input)) {
+    return input.map(maskObject);
+  }
+
+  if (!input || typeof input !== "object") {
+    return input;
+  }
+
+  return Object.entries(input).reduce((acc, [key, value]) => {
+    if (value && typeof value === "object") {
+      acc[key] = maskObject(value);
+      return acc;
+    }
+
+    acc[key] = maskValue(key, value);
+    return acc;
+  }, {});
+};
+
+const decodeJwtExpiry = (token) => {
+  try {
+    const parts = String(token || "").split(".");
+    if (parts.length < 2) {
+      return 0;
+    }
+
+    const payload = JSON.parse(
+      Buffer.from(parts[1], "base64url").toString("utf8")
+    );
+    return Number(payload?.exp || 0) * 1000;
+  } catch (error) {
+    return 0;
+  }
+};
+
+const getBlueDartStaticJwtToken = () => {
+  const token = process.env.BLUE_DART_JWT_TOKEN;
+  if (!token) {
+    throw new Error("BLUE_DART_JWT_TOKEN is missing in environment variables");
+  }
+  return token;
+};
+
+const hasDynamicBlueDartTokenConfig = () =>
+  Boolean(getBlueDartClientId() && getBlueDartClientSecret() && getBlueDartTokenUrl());
+
+const readBlueDartTokenResponse = (payload = {}) =>
+  payload?.access_token ||
+  payload?.token ||
+  payload?.jwtToken ||
+  payload?.JWTToken ||
+  payload?.id_token ||
+  payload?.data?.access_token ||
+  payload?.data?.token ||
+  payload?.data?.jwtToken ||
+  null;
+
+const readBlueDartTokenExpiry = (payload = {}, fallbackToken = "") => {
+  const expiresInSeconds =
+    Number(
+      payload?.expires_in ||
+        payload?.expiresIn ||
+        payload?.data?.expires_in ||
+        payload?.data?.expiresIn ||
+        0
+    ) || 0;
+
+  if (expiresInSeconds > 0) {
+    return Date.now() + Math.max(expiresInSeconds - 60, 30) * 1000;
+  }
+
+  const decoded = decodeJwtExpiry(fallbackToken);
+  if (decoded > Date.now()) {
+    return decoded - 60 * 1000;
+  }
+
+  return Date.now() + 55 * 60 * 1000;
+};
+
+const fetchBlueDartJwtToken = async ({ forceRefresh = false } = {}) => {
+  if (
+    !forceRefresh &&
+    blueDartTokenCache.value &&
+    blueDartTokenCache.expiresAt > Date.now() + 5 * 1000
+  ) {
+    return blueDartTokenCache.value;
+  }
+
+  if (!hasDynamicBlueDartTokenConfig()) {
+    const staticToken = getBlueDartStaticJwtToken();
+    blueDartTokenCache = {
+      value: staticToken,
+      expiresAt: readBlueDartTokenExpiry({}, staticToken),
+      source: "env",
+    };
+    return staticToken;
+  }
+
+  console.log(
+    "[BLUE_DART TOKEN] Refresh attempt",
+    JSON.stringify(
+      maskObject({
+        tokenUrl: getBlueDartTokenUrl(),
+        clientId: getBlueDartClientId(),
+        forceRefresh,
+      })
+    )
+  );
+
+  const tokenPayload = new URLSearchParams({
+    grant_type: process.env.BLUE_DART_TOKEN_GRANT_TYPE || "client_credentials",
+    client_id: getBlueDartClientId(),
+    client_secret: getBlueDartClientSecret(),
+  });
+
+  if (process.env.BLUE_DART_TOKEN_SCOPE) {
+    tokenPayload.append("scope", process.env.BLUE_DART_TOKEN_SCOPE);
+  }
+
+  if (process.env.BLUE_DART_TOKEN_AUDIENCE) {
+    tokenPayload.append("audience", process.env.BLUE_DART_TOKEN_AUDIENCE);
+  }
+
+  try {
+    const response = await axios.post(getBlueDartTokenUrl(), tokenPayload.toString(), {
+      headers: {
+        accept: "application/json",
+        "content-type": "application/x-www-form-urlencoded",
+      },
+    });
+
+    const token = readBlueDartTokenResponse(response.data);
+    if (!token) {
+      throw new Error("Blue Dart token response does not contain an access token");
+    }
+
+    blueDartTokenCache = {
+      value: token,
+      expiresAt: readBlueDartTokenExpiry(response.data, token),
+      source: "oauth",
+    };
+
+    return token;
+  } catch (error) {
+    console.log(
+      "[BLUE_DART TOKEN] Refresh failed",
+      JSON.stringify(maskObject(error?.response?.data || { message: error.message }))
+    );
+
+    if (!forceRefresh && process.env.BLUE_DART_JWT_TOKEN) {
+      const staticToken = getBlueDartStaticJwtToken();
+      blueDartTokenCache = {
+        value: staticToken,
+        expiresAt: readBlueDartTokenExpiry({}, staticToken),
+        source: "env-fallback",
+      };
+      return staticToken;
+    }
+
+    throw error;
+  }
+};
+
+const getBlueDartHeaders = async () => ({
+  accept: "application/json",
+  JWTToken: await fetchBlueDartJwtToken(),
   "content-type": "application/json",
 });
 
 const buildBlueDartProfile = ({
-  apiType = process.env.BLUE_DART_API_TYPE || "S",
+  apiType = getBlueDartShippingApiType(),
   licenceKey = getBlueDartShippingLicenceKey(),
   loginId = getBlueDartLoginId(),
 } = {}) => ({
@@ -69,35 +259,82 @@ const logBlueDartApiHit = ({ action, method, url, payload, params }) => {
   console.log(
     `[BLUE_DART API] ${action}`,
     JSON.stringify(
-      {
+      maskObject({
         method,
         url,
         ...(payload ? { payload } : {}),
         ...(params ? { params } : {}),
-      },
+      }),
       null,
       2
     )
   );
 };
 
-const extractError = (error) => error?.response?.data || error.message;
+const extractError = (error) => maskObject(error?.response?.data || error.message);
 
-const postBlueDartJson = async ({ path, payload, action }) => {
-  const url = `${buildBlueDartBaseUrl()}${path}`;
+const requestBlueDart = async ({
+  method = "GET",
+  path,
+  payload,
+  params,
+  action,
+  retryOn401 = true,
+} = {}) => {
+  const url = path.startsWith("http") ? path : `${buildBlueDartBaseUrl()}${path}`;
 
   logBlueDartApiHit({
     action,
-    method: "POST",
+    method,
     url,
     payload,
+    params,
   });
 
-  const response = await axios.post(url, payload, {
-    headers: getBlueDartHeaders(),
-  });
+  try {
+    const response = await axios({
+      method,
+      url,
+      data: payload,
+      params,
+      headers: await getBlueDartHeaders(),
+    });
 
-  return response.data;
+    console.log(
+      `[BLUE_DART API] ${action} response`,
+      JSON.stringify(maskObject(response.data), null, 2)
+    );
+
+    return response.data;
+  } catch (error) {
+    console.log(
+      `[BLUE_DART API] ${action} error`,
+      JSON.stringify(maskObject(error?.response?.data || { message: error.message }), null, 2)
+    );
+
+    if (error?.response?.status === 401 && retryOn401) {
+      await fetchBlueDartJwtToken({ forceRefresh: true });
+      return requestBlueDart({
+        method,
+        path,
+        payload,
+        params,
+        action: `${action} retry`,
+        retryOn401: false,
+      });
+    }
+
+    throw error;
+  }
+};
+
+const postBlueDartJson = async ({ path, payload, action }) => {
+  return requestBlueDart({
+    method: "POST",
+    path,
+    payload,
+    action,
+  });
 };
 
 const toSafeString = (value) => {
@@ -128,6 +365,42 @@ const toLimitedString = (value, maxLength, fallback = "") => {
 const toBlueDartDateLiteral = (date) => {
   const timestamp = date instanceof Date ? date.getTime() : Date.now();
   return `/Date(${timestamp})/`;
+};
+
+const normalizeBlueDartDateLiteral = (value) => {
+  if (!value) {
+    return toBlueDartDateLiteral(new Date());
+  }
+
+  const normalized = String(value).trim();
+  if (/^\/Date\(\d+\)\/$/.test(normalized)) {
+    return normalized;
+  }
+
+  const parsed = new Date(normalized);
+  if (!Number.isNaN(parsed.getTime())) {
+    return toBlueDartDateLiteral(parsed);
+  }
+
+  return toBlueDartDateLiteral(new Date());
+};
+
+const normalizeBlueDartPickupTime = (value) => {
+  const normalized = String(value || process.env.BLUE_DART_PICKUP_TIME || "08:00")
+    .trim()
+    .replace(/\./g, ":");
+
+  const fourDigitMatch = normalized.match(/^(\d{2})(\d{2})$/);
+  if (fourDigitMatch) {
+    return `${fourDigitMatch[1]}:${fourDigitMatch[2]}`;
+  }
+
+  const hhmmMatch = normalized.match(/^(\d{1,2}):(\d{2})$/);
+  if (hhmmMatch) {
+    return `${hhmmMatch[1].padStart(2, "0")}:${hhmmMatch[2]}`;
+  }
+
+  return "08:00";
 };
 
 const buildFullAddress = ({
@@ -449,7 +722,7 @@ const buildGenerateWaybillPayload = ({
         PayableAt: "",
         PickupDate: toBlueDartDateLiteral(new Date()),
         PickupMode: "",
-        PickupTime: process.env.BLUE_DART_PICKUP_TIME || "0800",
+        PickupTime: normalizeBlueDartPickupTime(process.env.BLUE_DART_PICKUP_TIME),
         PickupType: "",
         PieceCount: String(pieceCount),
         PreferredPickupTimeSlot: "",
@@ -489,7 +762,7 @@ const buildGenerateWaybillPayload = ({
       },
     },
     Profile: {
-      Api_type: process.env.BLUE_DART_API_TYPE || "S",
+      Api_type: getBlueDartShippingApiType(),
       LicenceKey: getBlueDartShippingLicenceKey(),
       LoginID: getBlueDartLoginId(),
     },
@@ -625,24 +898,21 @@ const createBlueDartWaybill = async ({
       collectableAmount,
       overrides,
     });
-    const url = `${buildBlueDartBaseUrl()}/waybill/v1/GenerateWayBill`;
 
-    logBlueDartApiHit({
-      action: "Generate waybill request",
+    const response = await requestBlueDart({
       method: "POST",
-      url,
+      path: "/waybill/v1/GenerateWayBill",
       payload,
+      action: "Generate waybill request",
     });
-
-    const response = await axios.post(url, payload, { headers: getBlueDartHeaders() });
 
     return {
       success: true,
-      data: response.data,
+      data: response,
       requestPayload: payload,
-      awbNumber: extractAwbNumber(response.data),
+      awbNumber: extractAwbNumber(response),
       pickupRegistrationDate: extractPickupRegistrationDate(payload),
-      ...extractBlueDartStatus(response.data),
+      ...extractBlueDartStatus(response),
     };
   } catch (error) {
     console.log("BLUE_DART GENERATE WAYBILL ERROR", extractError(error));
@@ -674,23 +944,16 @@ const trackBlueDartShipment = async (trackingNumber, options = {}) => {
       tnt: options.tnt ?? process.env.BLUE_DART_TRACK_TNT ?? "",
       awb: options.awb ?? "",
     };
-    const url = `${buildBlueDartBaseUrl()}/tracking/v1/shipment`;
-
-    logBlueDartApiHit({
-      action: "Track shipment request",
+    const response = await requestBlueDart({
       method: "GET",
-      url,
+      path: "/tracking/v1/shipment",
       params,
-    });
-
-    const response = await axios.get(url, {
-      headers: { JWTToken: getBlueDartJwtToken() },
-      params,
+      action: "Track shipment request",
     });
 
     return {
       success: true,
-      data: response.data,
+      data: response,
     };
   } catch (error) {
     console.log("BLUE_DART TRACK SHIPMENT ERROR", extractError(error));
@@ -721,7 +984,7 @@ const cancelBlueDartPickup = async ({
         TokenNumber: Number(tokenNumber),
       },
       profile: buildBlueDartProfile({
-        apiType: process.env.BLUE_DART_API_TYPE || "S",
+        apiType: getBlueDartShippingApiType(),
         licenceKey: licenceKey || getBlueDartShippingLicenceKey(),
         loginId: loginId || getBlueDartLoginId(),
       }),
@@ -771,11 +1034,11 @@ const getBlueDartTransitTime = async ({
       pSubProductCode: String(
         subProductCode || process.env.BLUE_DART_SUB_PRODUCT_CODE || "P"
       ),
-      pPudate: String(pickupDate || toBlueDartDateLiteral(new Date())),
-      pPickupTime: String(pickupTime || process.env.BLUE_DART_PICKUP_TIME || "0800"),
+      pPudate: normalizeBlueDartDateLiteral(pickupDate),
+      pPickupTime: normalizeBlueDartPickupTime(pickupTime),
       profile: buildBlueDartProfile({
-        apiType: apiType || getBlueDartTrackingApiType(),
-        licenceKey: licenceKey || getBlueDartTrackingLicenceKey(),
+        apiType: apiType || getBlueDartShippingApiType(),
+        licenceKey: licenceKey || getBlueDartShippingLicenceKey(),
         loginId: loginId || getBlueDartLoginId(),
       }),
     };
@@ -790,6 +1053,7 @@ const getBlueDartTransitTime = async ({
       success: true,
       data,
       requestPayload: payload,
+      normalizedRequestPayload: maskObject(payload),
     };
   } catch (error) {
     console.log("BLUE_DART TRANSIT TIME ERROR", extractError(error));
@@ -831,6 +1095,7 @@ const getBlueDartServicesForPincode = async ({
       success: true,
       data,
       requestPayload: payload,
+      normalizedRequestPayload: maskObject(payload),
     };
   } catch (error) {
     console.log("BLUE_DART SERVICEABILITY ERROR", extractError(error));
