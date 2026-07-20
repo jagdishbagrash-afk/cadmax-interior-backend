@@ -13,6 +13,8 @@ const {
   buildShippingAddressSnapshot,
   resolveOwnedAddress,
 } = require("../Utill/orderAddress");
+const { createDhlShipment } = require("../Utill/createDhlShipment");
+const { createBlueDartWaybill } = require("../Utill/blueDartService");
 
 // exports.addOrder = catchAsync(async (req, res) => {
 //   try {
@@ -389,11 +391,139 @@ exports.addOrder = catchAsync(async (req, res) => {
     }
   }
 
+  // ==========================
+  // Create Shipment
+  // ==========================
+  let shipmentData = null;
+  let shipmentError = null;
+
+  try {
+    // Build shipment payload
+    const shipmentPayload = {
+      name: shippingAddress.name,
+      mobile: shippingAddress.mobile,
+      address: legacyAddress,
+      products: orderProducts,
+      totalAmount: numericAmount,
+      orderId: savedOrder.orderId,
+    };
+
+    // Create shipment based on courier preference
+    const courierName = process.env.DEFAULT_COURIER || "DHL";
+    let shipmentResponse = null;
+
+    if (courierName === "BLUE_DART" || courierName === "BlueDart") {
+      // Use Blue Dart
+      shipmentResponse = await createBlueDartWaybill(shipmentPayload);
+      
+      if (shipmentResponse?.success || shipmentResponse?.awbNumber) {
+        shipmentData = {
+          courierName: "BLUE_DART",
+          trackingNumber: shipmentResponse.awbNumber,
+          waybillNumber: shipmentResponse.awbNumber,
+          labelData: shipmentResponse.labelData || null,
+          shipmentDetails: {
+            status: "created",
+            timestamp: new Date().toISOString(),
+            ...shipmentResponse,
+          },
+        };
+      } else {
+        shipmentError = shipmentResponse?.error || "Blue Dart shipment creation failed";
+      }
+    } else {
+      // Use DHL (default)
+      shipmentResponse = await createDhlShipment(shipmentPayload);
+
+      if (shipmentResponse?.success && shipmentResponse?.data) {
+        const shipmentId = shipmentResponse.data?.shipmentTrackingNumber;
+        shipmentData = {
+          courierName: "DHL",
+          trackingNumber: shipmentId,
+          labelData: shipmentResponse.data?.labelData || null,
+          shipmentDetails: {
+            status: "created",
+            timestamp: new Date().toISOString(),
+            estimatedDeliveryDate: shipmentResponse.data?.estimatedDeliveryDate,
+            warnings: shipmentResponse.data?.warnings || [],
+          },
+          rawResponse: shipmentResponse.data,
+        };
+      } else {
+        shipmentError = shipmentResponse?.error || "DHL shipment creation failed";
+      }
+    }
+
+    // Update order with shipment information
+    if (shipmentData) {
+      savedOrder.tracking_number = shipmentData.trackingNumber;
+      savedOrder.shipping_status = "shipment_created";
+      savedOrder.courier_name = shipmentData.courierName;
+      savedOrder.shipping_response = shipmentData.shipmentDetails;
+      savedOrder.labelData = shipmentData.labelData;
+    } else {
+      savedOrder.shipping_status = "shipment_creation_failed";
+      savedOrder.shipping_response = {
+        status: "failed",
+        error: shipmentError,
+        timestamp: new Date().toISOString(),
+      };
+    }
+
+    await savedOrder.save();
+  } catch (shipmentException) {
+    console.error("Shipment creation exception:", shipmentException);
+    
+    savedOrder.shipping_status = "shipment_creation_failed";
+    savedOrder.shipping_response = {
+      status: "failed",
+      error: shipmentException.message,
+      timestamp: new Date().toISOString(),
+    };
+
+    await savedOrder.save();
+  }
+
+  // ==========================
+  // Build Response
+  // ==========================
+  const responseData = {
+    order: savedOrder,
+    paymentMethod: newOrder.paymentMethod,
+    shipment: shipmentData || {
+      status: "failed",
+      error: shipmentError,
+      trackingNumber: null,
+    },
+  };
+
+  // Add COD specific details if payment method is COD
+  if (newOrder.paymentMethod === "COD") {
+    responseData.paymentDetails = {
+      paymentMethod: "COD",
+      amount: numericAmount,
+      status: "pending",
+      message: "Payment will be collected at delivery",
+      instructions: {
+        vendor: "Please collect ₹" + numericAmount + " from customer on delivery",
+        customer: "You will pay ₹" + numericAmount + " when the product is delivered",
+      },
+    };
+  } else {
+    // ONLINE payment details
+    responseData.paymentDetails = {
+      paymentMethod: "ONLINE",
+      amount: numericAmount,
+      transactionId: PaymentId || null,
+      status: "completed",
+    };
+  }
+
   return successResponse(
     res,
-    "Order added successfully",
+    `Order added successfully. Shipment ${shipmentData ? 'created with tracking ID: ' + shipmentData.trackingNumber : 'creation pending'}. Payment method: ${newOrder.paymentMethod}`,
     201,
-    savedOrder
+    responseData
   );
 });
 
