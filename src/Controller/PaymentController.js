@@ -97,6 +97,10 @@ const createShipmentForOrder = async ({
   order,
   receiverAddress,
   shippingProvider,
+  paymentMethod,
+  isCOD = false,
+  codAmount = 0,
+  collectableAmount = 0,
 }) => {
   const provider = resolveDefaultShippingProvider(shippingProvider);
   const receiverName = receiverAddress?.name || order?.shippingAddress?.name || order?.name;
@@ -113,7 +117,10 @@ const createShipmentForOrder = async ({
       shipFrom,
       products: order.product,
       declaredValue: order.amount,
-      isCod: false,
+      paymentMethod,
+      isCod: isCOD,
+      codAmount,
+      collectableAmount,
     });
 
     return {

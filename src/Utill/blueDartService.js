@@ -403,6 +403,11 @@ const normalizeBlueDartPickupTime = (value) => {
   return "08:00";
 };
 
+const normalizeBlueDartWaybillPickupTime = (value) => {
+  const hhmm = normalizeBlueDartPickupTime(value);
+  return hhmm.replace(":", "");
+};
+
 const buildFullAddress = ({
   addressLine1 = "",
   addressLine2 = "",
@@ -652,6 +657,9 @@ const buildGenerateWaybillPayload = ({
   }
 
   const resolvedShipFrom = resolveBlueDartShipFrom(shipFrom);
+  const resolvedSubProductCode = isCod
+    ? process.env.BLUE_DART_COD_SUB_PRODUCT_CODE || "C"
+    : process.env.BLUE_DART_SUB_PRODUCT_CODE || "P";
 
   const payload = {
     Request: {
@@ -722,7 +730,7 @@ const buildGenerateWaybillPayload = ({
         PayableAt: "",
         PickupDate: toBlueDartDateLiteral(new Date()),
         PickupMode: "",
-        PickupTime: normalizeBlueDartPickupTime(process.env.BLUE_DART_PICKUP_TIME),
+        PickupTime: normalizeBlueDartWaybillPickupTime(process.env.BLUE_DART_PICKUP_TIME),
         PickupType: "",
         PieceCount: String(pieceCount),
         PreferredPickupTimeSlot: "",
@@ -733,8 +741,7 @@ const buildGenerateWaybillPayload = ({
           String(process.env.BLUE_DART_REGISTER_PICKUP || "true").toLowerCase() ===
           "true",
         SpecialInstruction: "",
-        SubProductCode:
-          process.env.BLUE_DART_SUB_PRODUCT_CODE || (isCod ? "C" : "P"),
+        SubProductCode: resolvedSubProductCode,
         TotalCashPaytoCustomer: 0,
         itemdtl: itemDetails,
         noOfDCGiven: 0,
