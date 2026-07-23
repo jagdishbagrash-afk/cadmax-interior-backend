@@ -20,15 +20,15 @@ const formatTrackingPayload = (trackingNumber, data) => {
 
   const events = Array.isArray(shipment?.events)
     ? shipment.events.map((event) => ({
-        timestamp: event.timestamp,
-        status: event.description || event.status,
-        location:
-          event?.serviceArea &&
-          [event.serviceArea.city, event.serviceArea.countryCode]
-            .filter(Boolean)
-            .join(", "),
-        remarks: event.remarks || null,
-      }))
+      timestamp: event.timestamp,
+      status: event.description || event.status,
+      location:
+        event?.serviceArea &&
+        [event.serviceArea.city, event.serviceArea.countryCode]
+          .filter(Boolean)
+          .join(", "),
+      remarks: event.remarks || null,
+    }))
     : [];
 
   return {
@@ -382,39 +382,39 @@ const resolveBlueDartTransitContext = (order = {}) => {
   return {
     fromPincode: toSafeString(
       labelData?.shipFrom?.pincode ||
-        requestShipper?.CustomerPincode ||
-        requestPayload?.shipFrom?.pincode ||
-        process.env.BLUE_DART_SHIPPER_PINCODE
+      requestShipper?.CustomerPincode ||
+      requestPayload?.shipFrom?.pincode ||
+      process.env.BLUE_DART_SHIPPER_PINCODE
     ),
     toPincode: toSafeString(
       labelData?.shipTo?.pincode ||
-        order?.shippingAddress?.pincode ||
-        requestConsignee?.ConsigneePincode ||
-        requestPayload?.shipTo?.pincode
+      order?.shippingAddress?.pincode ||
+      requestConsignee?.ConsigneePincode ||
+      requestPayload?.shipTo?.pincode
     ),
     productCode: toSafeString(
       labelData?.carrier?.blueDart?.productCode ||
-        requestServices?.ProductCode ||
-        process.env.BLUE_DART_PRODUCT_CODE ||
-        "A"
+      requestServices?.ProductCode ||
+      process.env.BLUE_DART_PRODUCT_CODE ||
+      "A"
     ),
     subProductCode: toSafeString(
       labelData?.carrier?.blueDart?.subProductCode ||
-        requestServices?.SubProductCode ||
-        process.env.BLUE_DART_SUB_PRODUCT_CODE ||
-        "P"
+      requestServices?.SubProductCode ||
+      process.env.BLUE_DART_SUB_PRODUCT_CODE ||
+      "P"
     ),
     pickupDate: toBlueDartDateLiteralString(
       requestServices?.PickupDate ||
-        order?.shipping_meta?.pickupRegistrationDate ||
-        labelData?.bookingDate ||
-        order?.createdAt
+      order?.shipping_meta?.pickupRegistrationDate ||
+      labelData?.bookingDate ||
+      order?.createdAt
     ),
     pickupTime: normalizePickupTimeForTransit(
       labelData?.carrier?.blueDart?.pickupTime ||
-        requestServices?.PickupTime ||
-        process.env.BLUE_DART_PICKUP_TIME ||
-        "08:00"
+      requestServices?.PickupTime ||
+      process.env.BLUE_DART_PICKUP_TIME ||
+      "08:00"
     ),
   };
 };
@@ -713,23 +713,23 @@ const getShipmentReceiverDetails = (shipmentResponse = {}) => {
   return {
     name: toSafeString(
       receiver?.contactInformation?.fullName ||
-        receiver?.ConsigneeName ||
-        receiver?.name
+      receiver?.ConsigneeName ||
+      receiver?.name
     ),
     phone: toSafeString(
       receiver?.contactInformation?.phone ||
-        receiver?.ConsigneeMobile ||
-        receiver?.phone
+      receiver?.ConsigneeMobile ||
+      receiver?.phone
     ),
     addressLine1: toSafeString(
       postalAddress?.addressLine1 ||
-        receiver?.ConsigneeAddress1 ||
-        receiver?.addressLine1
+      receiver?.ConsigneeAddress1 ||
+      receiver?.addressLine1
     ),
     addressLine2: toSafeString(
       postalAddress?.addressLine2 ||
-        receiver?.ConsigneeAddress2 ||
-        receiver?.addressLine2
+      receiver?.ConsigneeAddress2 ||
+      receiver?.addressLine2
     ),
     city: toSafeString(postalAddress?.cityName || receiver?.city),
     state: toSafeString(postalAddress?.provinceName || receiver?.state),
@@ -1094,11 +1094,11 @@ const appendOrderTimelineEvents = (order, events = []) => {
 const buildTrackingTimelineEvents = (tracking = null, source = "courier") =>
   Array.isArray(tracking?.events)
     ? tracking.events.map((event) =>
-        buildTimelineEvent({
-          ...event,
-          source,
-        })
-      )
+      buildTimelineEvent({
+        ...event,
+        source,
+      })
+    )
     : [];
 
 const persistShipmentMeta = ({
@@ -1126,10 +1126,10 @@ const persistShipmentMeta = ({
     trackingError: trackingError || null,
     ...(transitEstimate
       ? {
-          estimatedDelivery:
-            transitEstimate.estimatedDelivery || transitEstimate.estimatedDeliveryDate || null,
-          transitEstimate,
-        }
+        estimatedDelivery:
+          transitEstimate.estimatedDelivery || transitEstimate.estimatedDeliveryDate || null,
+        transitEstimate,
+      }
       : {}),
     ...(serviceability ? { serviceability } : {}),
     ...(transitRequestPayload ? { transitRequestPayload } : {}),
@@ -1387,17 +1387,17 @@ exports.CreateOrderShipment = catchAsync(async (req, res) => {
 
   const synced = shipment.success
     ? await hydrateOrderShipmentDetails(order, {
-        userId: req.user.id,
-        persist: false,
-      })
+      userId: req.user.id,
+      persist: false,
+    })
     : {
-        addressRecord,
-        liveTracking: null,
-        trackingError: null,
-        transitEstimate: null,
-        serviceability: null,
-        trackingPending: false,
-      };
+      addressRecord,
+      liveTracking: null,
+      trackingError: null,
+      transitEstimate: null,
+      serviceability: null,
+      trackingPending: false,
+    };
 
   await order.save();
 

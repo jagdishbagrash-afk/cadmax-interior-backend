@@ -34,14 +34,7 @@ const {
   buildLegacyAddressString,
   buildShippingAddressSnapshot,
   resolveOwnedAddress,
-  ensureOrderShippingAddress,
-  toCourierAddress,
 } = require("../Utill/orderAddress");
-const { createDhlShipment } = require("../Utill/createDhlShipment");
-const {
-  createBlueDartWaybill,
-  resolveBlueDartShipFrom,
-} = require("../Utill/blueDartService");
 
 // const twilio = require("twilio");
 
@@ -49,442 +42,6 @@ const {
 //   process.env.TWILIO_ACCOUNT_SID,
 //   process.env.TWILIO_AUTH_TOKEN
 // );
-
-const toSafeString = (value) => {
-  if (value === undefined || value === null) {
-    return "";
-  }
-  return String(value).trim();
-};
-
-const toSafeNumber = (value) => {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : 0;
-};
-
-const pickFirstValue = (...values) => {
-  for (const value of values) {
-    if (Array.isArray(value) && value.length > 0) {
-      return value;
-    }
-    if (typeof value === "number" && Number.isFinite(value)) {
-      return value;
-    }
-    if (typeof value === "string" && value.trim() !== "") {
-      return value;
-    }
-  }
-  return values[values.length - 1];
-};
-
-const findNestedValueByKeys = (input, candidateKeys = []) => {
-  const queue = [input];
-  const normalizedKeys = candidateKeys.map((key) => String(key).toLowerCase());
-
-  while (queue.length > 0) {
-    const current = queue.shift();
-
-    if (current === null || current === undefined) {
-      continue;
-    }
-
-    if (typeof current === "object") {
-      for (const [key, value] of Object.entries(current)) {
-        if (normalizedKeys.includes(String(key).toLowerCase())) {
-          return value;
-        }
-        queue.push(value);
-      }
-    }
-  }
-
-  return null;
-};
-
-const normalizeCourier = (value) => {
-  if (!value) {
-    return "DHL";
-  }
-  const normalized = String(value).trim().toUpperCase().replace(/[\s-]+/g, "_");
-  if (normalized === "BLUEDART" || normalized === "BLUE_DART") {
-    return "BLUE_DART";
-  }
-  if (normalized === "DHL") {
-    return "DHL";
-  }
-  return "DHL";
-};
-
-const getShipmentTrackingNumber = (shipmentResponse = {}) =>
-  shipmentResponse?.shipmentTrackingNumber ||
-  shipmentResponse?.trackingNumber ||
-  shipmentResponse?.awbNumber ||
-  shipmentResponse?.AWBNo ||
-  shipmentResponse?.awbNo ||
-  shipmentResponse?.packages?.[0]?.trackingNumber ||
-  shipmentResponse?.pieces?.[0]?.trackingNumber ||
-  null;
-
-const normalizeShippingProvider = (value) => {
-  if (!value) {
-    return null;
-  }
-  const normalized = String(value).trim().toUpperCase().replace(/[\s-]+/g, "_");
-  if (normalized === "BLUEDART" || normalized === "BLUE_DART") {
-    return "BLUE_DART";
-  }
-  if (normalized === "DHL") {
-    return "DHL";
-  }
-  return null;
-};
-
-const resolveDefaultShippingProvider = (value) =>
-  normalizeShippingProvider(value) ||
-  normalizeShippingProvider(process.env.DEFAULT_SHIPPING_PROVIDER) ||
-  "DHL";
-
-const ensureOrderShipFrom = (order) => {
-  const shouldReuseSavedShipFrom =
-    order?.shipping_status === "shipment_created" && String(order?.tracking_number || "").trim() !== "";
-  const shipFrom = resolveBlueDartShipFrom(
-    shouldReuseSavedShipFrom ? order?.labelData?.shipFrom : null
-  );
-  order.labelData = {
-    ...(order.labelData || {}),
-    shipFrom,
-  };
-  return shipFrom;
-};
-
-const buildTimelineEvent = ({
-  timestamp,
-  status,
-  location = "",
-  remarks = "",
-  source = "system",
-}) => ({
-  timestamp: toSafeString(timestamp || new Date().toISOString()),
-  status: toSafeString(status),
-  location: toSafeString(location),
-  remarks: toSafeString(remarks),
-  source: toSafeString(source),
-});
-
-const appendOrderTimelineEvents = (order, events = []) => {
-  const currentTimeline = Array.isArray(order.shipping_timeline)
-    ? order.shipping_timeline
-    : [];
-  const normalizedEvents = events.map((event) => ({
-    timestamp: event.timestamp || new Date().toISOString(),
-    status: String(event.status || "").trim(),
-    location: String(event.location || "").trim(),
-    remarks: String(event.remarks || "").trim(),
-    source: String(event.source || "system").trim(),
-  }));
-  const mergedTimeline = [...normalizedEvents, ...currentTimeline];
-  const uniqueTimeline = mergedTimeline.filter(
-    (item, index, list) =>
-      list.findIndex((candidate) => JSON.stringify(candidate) === JSON.stringify(item)) ===
-      index
-  );
-  order.shipping_timeline = uniqueTimeline;
-};
-
-const persistShipmentMeta = ({ order, shipment, provider }) => {
-  order.shipping_meta = {
-    ...(order.shipping_meta || {}),
-    provider,
-    ...(shipment?.tokenNumber ? { tokenNumber: shipment.tokenNumber } : {}),
-    ...(shipment?.pickupRegistrationDate
-      ? { pickupRegistrationDate: shipment.pickupRegistrationDate }
-      : {}),
-    ...(shipment?.requestPayload ? { requestPayload: shipment.requestPayload } : {}),
-    lastSyncedAt: new Date().toISOString(),
-  };
-};
-
-const buildLabelData = ({ order, savedAddress, shipmentResponse, packageDetails }) => {
-  const fallbackAddress = (() => {
-    const normalized = toSafeString(order?.address);
-    if (!normalized) {
-      return { street_address: "", city: "", state: "", country: "India", pincode: "" };
-    }
-    const parts = normalized.split(",").map((item) => item.trim()).filter(Boolean);
-    const pincodeMatch = normalized.match(/\b\d{4,10}\b/);
-    return {
-      street_address: parts[0] || normalized,
-      city: parts.length >= 3 ? parts[parts.length - 3] : "",
-      state: parts.length >= 2 ? parts[parts.length - 2] : "",
-      country: parts.length >= 1 ? parts[parts.length - 1].replace(/-\s*\d{4,10}.*$/, "").trim() : "India",
-      pincode: pincodeMatch ? pincodeMatch[0] : "",
-    };
-  })();
-
-  const savedAddressDetails = savedAddress || {};
-  const shippingAddress = (() => {
-    if (order?.shippingAddress?.street_address) {
-      return {
-        name: toSafeString(order.shippingAddress.name || order.name),
-        mobile: toSafeString(order.shippingAddress.mobile || order.mobile),
-        street_address: toSafeString(order.shippingAddress.street_address),
-        city: toSafeString(order.shippingAddress.city),
-        state: toSafeString(order.shippingAddress.state),
-        country: toSafeString(order.shippingAddress.country || "India"),
-        pincode: toSafeString(order.shippingAddress.pincode),
-      };
-    }
-    if (savedAddress) {
-      return {
-        name: toSafeString(order.name),
-        mobile: toSafeString(order.mobile),
-        street_address: toSafeString(savedAddress.street_address || savedAddress.addressLine1 || savedAddress.address),
-        city: toSafeString(savedAddress.city || savedAddress.cityName),
-        state: toSafeString(savedAddress.state || savedAddress.provinceName),
-        country: toSafeString(savedAddress.country || "India"),
-        pincode: toSafeString(savedAddress.pincode || savedAddress.postalCode || savedAddress.zip),
-      };
-    }
-    return {
-      name: toSafeString(order.name),
-      mobile: toSafeString(order.mobile),
-      ...fallbackAddress,
-    };
-  })();
-
-  const shipmentReceiver = {
-    name: toSafeString(pickFirstValue(shipmentResponse?.receiverName, shipmentResponse?.name, shippingAddress.name)),
-    phone: toSafeString(pickFirstValue(shipmentResponse?.receiverMobile, shipmentResponse?.mobile, shippingAddress.mobile)),
-    addressLine1: toSafeString(pickFirstValue(shipmentResponse?.addressLine1, shipmentResponse?.street_address, savedAddressDetails.street_address, fallbackAddress.street_address)),
-    addressLine2: toSafeString(pickFirstValue(shipmentResponse?.addressLine2, savedAddressDetails.addressLine2, "")),
-    city: toSafeString(pickFirstValue(shipmentResponse?.city, shippingAddress.city, savedAddressDetails.city, fallbackAddress.city)),
-    state: toSafeString(pickFirstValue(shipmentResponse?.state, shippingAddress.state, savedAddressDetails.state, fallbackAddress.state)),
-    country: toSafeString(pickFirstValue(shipmentResponse?.country, shippingAddress.country, savedAddressDetails.country, "India")),
-    pincode: toSafeString(pickFirstValue(shipmentResponse?.pincode, shipmentResponse?.postalCode, shippingAddress.pincode, savedAddressDetails.pincode, fallbackAddress.pincode)),
-  };
-
-  const shipFrom = resolveBlueDartShipFrom(order?.labelData?.shipFrom);
-
-  const dynamicPackage = packageDetails || order?.labelData?.package;
-  const packageData = {
-    weight: toSafeNumber(pickFirstValue(dynamicPackage?.weight, shipmentResponse?.weight, shipmentResponse?.packageWeight, 0.5)),
-    dimensionsCm: {
-      length: toSafeNumber(pickFirstValue(dynamicPackage?.dimensionsCm?.length, shipmentResponse?.length, 30)),
-      width: toSafeNumber(pickFirstValue(dynamicPackage?.dimensionsCm?.width, shipmentResponse?.width, 20)),
-      height: toSafeNumber(pickFirstValue(dynamicPackage?.dimensionsCm?.height, shipmentResponse?.height, 10)),
-    },
-  };
-
-  const items = (order?.product || []).map((item) => ({
-    name: toSafeString(item.title),
-    quantity: toSafeNumber(item.quantity || 1),
-    price: toSafeNumber(item.price || item.total),
-    total: toSafeNumber(item.total || item.price * (item.quantity || 1)),
-  }));
-
-  const blueDartMeta = normalizeCourier(order?.courier_name) === "BLUE_DART" ? {
-    area: toSafeString(pickFirstValue(shipmentResponse?.Area, shipmentResponse?.area, shipFrom.area)),
-    clusterCode: toSafeString(pickFirstValue(shipmentResponse?.ClusterCode, shipmentResponse?.clusterCode, process.env.BLUE_DART_CLUSTER_CODE)),
-    productCode: toSafeString(pickFirstValue(shipmentResponse?.ProductCode, shipmentResponse?.productCode, process.env.BLUE_DART_PRODUCT_CODE)),
-    subProductCode: toSafeString(pickFirstValue(shipmentResponse?.SubProductCode, shipmentResponse?.subProductCode, process.env.BLUE_DART_SUB_PRODUCT_CODE)),
-    productType: toSafeNumber(pickFirstValue(shipmentResponse?.ProductType, shipmentResponse?.productType, process.env.BLUE_DART_PRODUCT_TYPE, 0)),
-    packType: toSafeString(pickFirstValue(shipmentResponse?.PackType, shipmentResponse?.packType, process.env.BLUE_DART_PACK_TYPE)),
-    pickupTime: toSafeString(pickFirstValue(shipmentResponse?.PickupTime, shipmentResponse?.pickupTime, process.env.BLUE_DART_PICKUP_TIME)),
-    apiType: toSafeString(pickFirstValue(shipmentResponse?.Profile?.Api_type, shipmentResponse?.apiType, process.env.BLUE_DART_API_TYPE)),
-    sender: toSafeString(pickFirstValue(shipFrom.sender, shipmentResponse?.sender, process.env.BLUE_DART_SENDER)),
-    vendorCode: toSafeString(pickFirstValue(shipFrom.vendorCode, shipmentResponse?.vendorCode, process.env.BLUE_DART_VENDOR_CODE)),
-    customerCode: toSafeString(pickFirstValue(shipFrom.customerCode, shipmentResponse?.customerCode, process.env.BLUE_DART_CUSTOMER_CODE)),
-    registerPickup: String(pickFirstValue(shipmentResponse?.RegisterPickup, shipmentResponse?.registerPickup, process.env.BLUE_DART_REGISTER_PICKUP, "true")).toLowerCase() === "true",
-    areaLocation: toSafeString(pickFirstValue(shipmentResponse?.areaLocation, shipmentReceiver.city && shipmentReceiver.state ? `${shipmentReceiver.city}, ${shipmentReceiver.state}` : shipmentReceiver.city)),
-  } : {};
-
-  const payment = {
-    method: toSafeString(order?.paymentMethod || "ONLINE"),
-    isCod: String(order?.paymentMethod || "").toUpperCase() === "COD",
-    codAmount: toSafeNumber(order?.cod_amount || order?.collectable_amount || (String(order?.paymentMethod || "").toUpperCase() === "COD" ? order?.amount : 0)),
-    collectableAmount: toSafeNumber(order?.collectable_amount || order?.cod_amount || (String(order?.paymentMethod || "").toUpperCase() === "COD" ? order?.amount : 0)),
-    declaredValue: toSafeNumber(order?.amount || 0),
-  };
-
-  return {
-    bookingDate: toSafeString(pickFirstValue(shipmentResponse?.bookingDate, shipmentResponse?.BkgDate, shipmentResponse?.BKGDate, order?.createdAt)),
-    origin: toSafeString(pickFirstValue(shipmentResponse?.origin, shipmentResponse?.Origin, shipmentResponse?.OriginArea, shipFrom.city)),
-    destination: toSafeString(pickFirstValue(shipmentResponse?.destination, shipmentResponse?.Destination, shipmentResponse?.destinationArea, shipmentReceiver.city)),
-    serviceType: toSafeString(pickFirstValue(shipmentResponse?.serviceType, shipmentResponse?.productName, normalizeCourier(order?.courier_name) === "BLUE_DART" ? "Standard Shipping" : "Express Shipping")),
-    carrier: {
-      provider: normalizeCourier(order?.courier_name),
-      blueDart: blueDartMeta,
-    },
-    shipTo: shipmentReceiver,
-    shipFrom,
-    payment,
-    package: packageData,
-    items,
-  };
-};
-
-const mergeLabelData = (computedLabelData = {}, savedLabelData = {}) => ({
-  ...computedLabelData,
-  ...savedLabelData,
-  carrier: {
-    ...(computedLabelData.carrier || {}),
-    ...(savedLabelData?.carrier || {}),
-    blueDart: {
-      ...(computedLabelData?.carrier?.blueDart || {}),
-      ...(savedLabelData?.carrier?.blueDart || {}),
-    },
-  },
-  shipTo: {
-    ...(computedLabelData.shipTo || {}),
-    ...(savedLabelData?.shipTo || {}),
-  },
-  shipFrom: {
-    ...(computedLabelData.shipFrom || {}),
-    ...(savedLabelData?.shipFrom || {}),
-  },
-  payment: {
-    ...(computedLabelData.payment || {}),
-    ...(savedLabelData?.payment || {}),
-  },
-  package: {
-    ...(computedLabelData.package || {}),
-    ...(savedLabelData?.package || {}),
-    dimensionsCm: {
-      ...(computedLabelData?.package?.dimensionsCm || {}),
-      ...(savedLabelData?.package?.dimensionsCm || {}),
-    },
-  },
-  items: savedLabelData?.items || computedLabelData.items || [],
-});
-
-const getOrderLabelData = ({ order, savedAddress, packageDetails }) =>
-  mergeLabelData(
-    buildLabelData({
-      order,
-      savedAddress,
-      shipmentResponse: order.shipping_response || {},
-      packageDetails: packageDetails || order?.labelData?.package
-    }),
-    order.labelData || {}
-  );
-
-const buildShipmentResponseData = ({
-  order,
-  savedAddress,
-  liveTracking = null,
-  trackingError = null,
-  transitEstimate = null,
-  serviceability = null,
-  trackingPending = false,
-}) => {
-  const labelData = getOrderLabelData({ order, savedAddress });
-  const resolvedLiveTracking = liveTracking || order?.shipping_meta?.liveTracking || null;
-  const resolvedTrackingError = trackingError || order?.shipping_meta?.trackingError || null;
-  const resolvedTransitEstimate =
-    transitEstimate || order?.shipping_meta?.transitEstimate || null;
-  const resolvedServiceability =
-    serviceability || order?.shipping_meta?.serviceability || null;
-  const resolvedTrackingPending =
-    typeof trackingPending === "boolean"
-      ? trackingPending
-      : Boolean(order?.shipping_meta?.trackingPending);
-
-  return {
-    orderId: order._id,
-    orderNumber: order.orderId,
-    addressId: order.addressId || null,
-    address: toSafeString(order.address),
-    shippingAddress: (() => {
-      if (order?.shippingAddress?.street_address) {
-        return order.shippingAddress;
-      }
-      if (savedAddress) {
-        return buildShippingAddressSnapshot({
-          name: order.name,
-          mobile: order.mobile,
-          addressRecord: savedAddress,
-        });
-      }
-      return null;
-    })(),
-    paymentId: order.PaymentId || "",
-    shippingStatus: toSafeString(order.shipping_status),
-    courierName: toSafeString(order.courier_name),
-    trackingNumber: toSafeString(order.tracking_number),
-    labelData,
-    labelReprint: {
-      available: Boolean(labelData),
-      labelData,
-    },
-    liveTracking: resolvedLiveTracking,
-    trackingError: resolvedTrackingError,
-    transitEstimate: resolvedTransitEstimate,
-    serviceability: resolvedServiceability,
-    trackingPending: resolvedTrackingPending,
-  };
-};
-
-const createShipmentForOrder = async ({
-  order,
-  receiverAddress,
-  shippingProvider,
-  paymentMethod,
-  isCOD = false,
-  codAmount = 0,
-  collectableAmount = 0,
-  packageDetails = {}
-}) => {
-  const provider = resolveDefaultShippingProvider(shippingProvider);
-  const receiverName = receiverAddress?.name || order?.shippingAddress?.name || order?.name;
-  const receiverMobile = receiverAddress?.mobile || order?.shippingAddress?.mobile || order?.mobile;
-
-  if (provider === "BLUE_DART") {
-    const shipFrom = ensureOrderShipFrom(order);
-    const shipment = await createBlueDartWaybill({
-      orderId: order.orderId,
-      name: receiverName,
-      mobile: receiverMobile,
-      receiverAddress,
-      shipFrom,
-      products: order.product,
-      declaredValue: order.amount,
-      paymentMethod,
-      isCod: isCOD,
-      codAmount,
-      collectableAmount,
-      weight: packageDetails?.weight,
-      length: packageDetails?.dimensionsCm?.length,
-      width: packageDetails?.dimensionsCm?.width,
-      height: packageDetails?.dimensionsCm?.height
-    });
-    return {
-      provider,
-      shipment,
-      trackingNumber: shipment.success
-        ? shipment.awbNumber || getShipmentTrackingNumber(shipment.data)
-        : null,
-    };
-  }
-
-  const shipment = await createDhlShipment({
-    name: receiverName,
-    mobile: receiverMobile,
-    address: receiverAddress,
-    products: order.product,
-    totalAmount: order.amount,
-    orderId: order.orderId,
-    weight: packageDetails?.weight,
-    length: packageDetails?.dimensionsCm?.length,
-    width: packageDetails?.dimensionsCm?.width,
-    height: packageDetails?.dimensionsCm?.height
-  });
-
-  return {
-    provider: "DHL",
-    shipment,
-    trackingNumber: shipment.success ? getShipmentTrackingNumber(shipment.data) : null,
-  };
-};
 
 async function recalculateProductRating(productId) {
   const result = await Review.aggregate([
@@ -1329,18 +886,7 @@ exports.OTPVerify = async (req, res) => {
 
 exports.AppOrder = catchAsync(async (req, res) => {
   try {
-    const { 
-      name, 
-      mobile, 
-      address, 
-      product, 
-      amount, 
-      addressId, 
-      PaymentId, 
-      paymentMethod = "ONLINE", 
-      shippingProvider,
-      package: packageDetails
-    } = req.body;
+    const { name, mobile, address, product, amount, addressId, PaymentId } = req.body;
     const userId = req.user?.id || "692dcfbd4816433146e11abd";
 
     const orderId = `ORD-${uuidv4().slice(0, 8).toUpperCase()}`;
@@ -1364,19 +910,12 @@ exports.AppOrder = catchAsync(async (req, res) => {
       }
     }
 
-    const shippingAddressSnapshot = buildShippingAddressSnapshot({
+    const shippingAddress = buildShippingAddressSnapshot({
       name,
       mobile,
       addressRecord: addressResult.address,
     });
-    const legacyAddress = buildLegacyAddressString(shippingAddressSnapshot) || address;
-
-    // Normalize payment method
-    const normalizedPaymentMethod = String(paymentMethod || "ONLINE").toUpperCase();
-    const isCOD = normalizedPaymentMethod === "COD";
-
-    // ✅ Prepare initial label data with package details
-    const initialLabelData = packageDetails ? { package: packageDetails } : {};
+    const legacyAddress = buildLegacyAddressString(shippingAddress) || address;
 
     // ✅ Save Order
     const newOrder = new Order({
@@ -1385,113 +924,14 @@ exports.AppOrder = catchAsync(async (req, res) => {
       address: legacyAddress,
       product,
       addressId,
-      shippingAddress: shippingAddressSnapshot,
+      shippingAddress,
       amount,
       userId,
       orderId,
-      PaymentId,
-      paymentMethod: normalizedPaymentMethod,
-      cod_amount: isCOD ? amount : 0,
-      collectable_amount: isCOD ? amount : 0,
-      status: "pending",
-      shipping_status: "pending",
-      labelData: initialLabelData
+      PaymentId
     });
 
     const record = await newOrder.save();
-
-    // ✅ Create Shipment
-    let shipment = null;
-    let shipmentResponseData = null;
-
-    try {
-      const { shippingAddress: ensuredShippingAddress, addressRecord } = await ensureOrderShippingAddress(record, {
-        userId,
-        persist: true
-      });
-      const shipFrom = ensureOrderShipFrom(record);
-
-      if (!ensuredShippingAddress) {
-        throw new Error("Order shipping address is missing");
-      }
-
-      const created = await createShipmentForOrder({
-        order: record,
-        receiverAddress: toCourierAddress(ensuredShippingAddress),
-        shippingProvider,
-        paymentMethod: normalizedPaymentMethod,
-        isCOD,
-        codAmount: isCOD ? amount : 0,
-        collectableAmount: isCOD ? amount : 0,
-        packageDetails: record.labelData?.package || packageDetails
-      });
-
-      shipment = created.shipment;
-      record.courier_name = created.provider;
-
-      if (shipment.success) {
-        record.tracking_number = created.trackingNumber;
-        record.shipping_status = "shipment_created";
-        record.shipping_response = shipment.data;
-        record.status = "confirmed";
-        appendOrderTimelineEvents(record, [
-          buildTimelineEvent({
-            status: "Shipment created",
-            location: shipFrom.city,
-            remarks: `Shipment created with ${created.provider}`,
-            source: "system",
-          }),
-        ]);
-      } else {
-        record.shipping_status = "shipment_failed";
-        record.shipping_response = shipment.error;
-        appendOrderTimelineEvents(record, [
-          buildTimelineEvent({
-            status: "Shipment failed",
-            location: shipFrom.city,
-            remarks: toSafeString(shipment?.error?.title || shipment?.error?.message || shipment?.error),
-            source: "system",
-          }),
-        ]);
-      }
-
-      persistShipmentMeta({
-        order: record,
-        shipment,
-        provider: created.provider
-      });
-
-      record.labelData = mergeLabelData(
-        buildLabelData({
-          order: {
-            ...record.toObject(),
-            labelData: {
-              ...(record.labelData || {}),
-              shipFrom,
-            },
-            shipping_response: record.shipping_response || {},
-          },
-          savedAddress: addressRecord,
-          shipmentResponse: record.shipping_response || {},
-          packageDetails: record.labelData?.package || packageDetails
-        }),
-        record.labelData || {}
-      );
-
-      await record.save();
-
-      shipmentResponseData = buildShipmentResponseData({
-        order: record,
-        savedAddress: addressRecord,
-        liveTracking: null,
-        trackingError: null,
-        transitEstimate: null,
-        serviceability: null,
-        trackingPending: false,
-      });
-    } catch (shipmentError) {
-      console.error("Shipment creation error:", shipmentError);
-    }
 
 
     const productIds = product.map(p => p.id); // req.body.product se ids nikalo
@@ -1509,11 +949,7 @@ exports.AppOrder = catchAsync(async (req, res) => {
     //   const record = await cart.save();
     // }
 
-    return successResponse(res, "Order added successfully", 201, {
-      order: record,
-      shipment: shipmentResponseData,
-      shipmentRaw: shipment
-    });
+    return successResponse(res, "Order added successfully", 201, record);
 
   } catch (error) {
     console.error(error);
@@ -1537,45 +973,41 @@ exports.OrderList = catchAsync(async (req, res) => {
 
   const formattedOrders = orders.map(order => ({
     _id: order._id,
+    orderId: order.orderId,
+
     name: order.name,
     mobile: order.mobile,
-    addressId: order.addressId || null,
+
     address: order.address,
-    shippingAddress: order.shippingAddress || null,
+    shippingAddress: order.shippingAddress,
+
     status: order.status,
     amount: order.amount,
+
+    paymentMethod: order.paymentMethod,
+
+    // Shipment Details
+    courier_name: order.courier_name,
+    tracking_number: order.tracking_number,
+    shipping_status: order.shipping_status,
+    shipping_response: order.shipping_response,
+    labelData: order.labelData,
+
     createdAt: order.createdAt,
     updatedAt: order.updatedAt,
 
-    product: order.product.map(p => {
-      const product = p.id;
+    product: order.product.map(p => ({
+      _id: p.id?._id,
+      title: p.id?.title,
+      amount: p.price,
+      quantity: p.quantity,
+      total: p.total,
+      variant: p.variant,
 
-      return {
-        _id: product._id,
-        title: product.title,
-        description: product.description,
-        amount: product.amount,
-        variants: product.variants,
-
-        category: product.category,
-        subcategory: product.subcategory,
-
-        dimensions: product.dimensions,
-        material: product.material,
-        type: product.type,
-        terms: product.terms,
-        deletedAt: product.deletedAt,
-        createdAt: product.createdAt,
-        updatedAt: product.updatedAt,
-        slug: product.slug,
-
-        // order-product fields
-        price: p.price,
-        quantity: p.quantity,
-        total: p.total,
-        variant: p.variant
-      };
-    })
+      category: p.id?.category,
+      subcategory: p.id?.subcategory,
+      variants: p.id?.variants,
+    }))
   }));
   return successResponse(
     res,
