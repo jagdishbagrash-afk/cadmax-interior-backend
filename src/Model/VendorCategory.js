@@ -20,6 +20,18 @@ const VendorCategorySchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
+    meta_title :{
+        type: String,
+        default: null
+    },
+    meta_description:{
+        type: String,
+        default: null
+    },
+    meta_keywords:{
+        type: String,
+        default: null
+    }
 }, { timestamps: true });
 
 module.exports = mongoose.model("VendorCategory", VendorCategorySchema);

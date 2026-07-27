@@ -93,6 +93,10 @@ exports.updateCategory = CatchAsync(async (req, res) => {
 
         }
 
+            if (req.body.meta_title) data.meta_title = req.body.meta_title;
+    if (req.body.meta_description) data.meta_description = req.body.meta_description;
+    if (req.body.meta_keywords) data.meta_keywords = req.body.meta_keywords;
+
         /* -------- Image Update -------- */
 
         if (req.file && req.file.location) {
@@ -205,6 +209,9 @@ exports.updatevendor = CatchAsync(
             if (specialization) data.specialization = specialization;
             if (experience) data.experience = experience;
             if (content) data.content = content;
+                if (req.body.meta_title) data.meta_title = req.body.meta_title;
+    if (req.body.meta_description) data.meta_description = req.body.meta_description;
+    if (req.body.meta_keywords) data.meta_keywords = req.body.meta_keywords;
            if (Image) {
     if (data.Image) {
         try {
