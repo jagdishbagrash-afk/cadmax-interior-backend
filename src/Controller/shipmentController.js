@@ -362,6 +362,64 @@ const normalizePickupTimeForTransit = (value) => {
   return "08:00";
 };
 
+const CUTOFF_HOUR = 16;
+const CUTOFF_MINUTE = 0;
+
+const resolveTransitPickupDateTime = (baseDateOrOrder, { preferOrderDates = true } = {}) => {
+  let baseDate = null;
+
+  if (baseDateOrOrder instanceof Date && !Number.isNaN(baseDateOrOrder.getTime())) {
+    baseDate = baseDateOrOrder;
+  } else if (typeof baseDateOrOrder === "string") {
+    const parsed = new Date(baseDateOrOrder);
+    baseDate = Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+  } else if (baseDateOrOrder && typeof baseDateOrOrder === "object") {
+    const order = baseDateOrOrder;
+    if (preferOrderDates) {
+      const candidates = [
+        order?.shipping_meta?.pickupRegistrationDate,
+        order?.labelData?.bookingDate,
+        order?.createdAt,
+      ];
+      for (const candidate of candidates) {
+        if (!candidate) continue;
+        const parsed = candidate instanceof Date
+          ? candidate
+          : new Date(candidate);
+        if (!Number.isNaN(parsed.getTime())) {
+          baseDate = parsed;
+          break;
+        }
+      }
+    }
+    if (!baseDate) baseDate = new Date();
+  } else {
+    baseDate = new Date();
+  }
+
+  const pickupHour = baseDate.getHours();
+  const pickupMinute = baseDate.getMinutes();
+  const isAfterCutoff =
+    pickupHour > CUTOFF_HOUR ||
+    (pickupHour === CUTOFF_HOUR && pickupMinute >= CUTOFF_MINUTE);
+
+  const pickupDateObj = new Date(baseDate);
+  if (isAfterCutoff) {
+    pickupDateObj.setDate(pickupDateObj.getDate() + 1);
+    pickupDateObj.setHours(9, 0, 0, 0);
+  }
+
+  const pickupTime = `${String(pickupHour).padStart(2, "0")}:${String(pickupMinute).padStart(2, "0")}`;
+
+  return {
+    pickupDate: `/Date(${pickupDateObj.getTime()})/`,
+    pickupTime: normalizePickupTimeForTransit(pickupTime),
+    isAfterCutoff,
+    baseDateIso: baseDate.toISOString(),
+    resolvedPickupDateIso: pickupDateObj.toISOString(),
+  };
+};
+
 const toBlueDartDateLiteralString = (value) => {
   const normalized = toSafeString(value);
   if (/^\/Date\(\d+\)\/$/.test(normalized)) {
@@ -1742,5 +1800,229 @@ exports.UpdateOrderDeliveryStatus = catchAsync(async (req, res) => {
       serviceability: synced.serviceability,
       trackingPending: synced.trackingPending,
     }),
+  });
+});
+
+exports.GetOrderTransitTime = catchAsync(async (req, res) => {
+  const order = await Order.findOne({
+    _id: req.params.id,
+    userId: req.user.id,
+  });
+
+  if (!order) {
+    return res.status(404).json({
+      status: false,
+      message: "Order not found",
+    });
+  }
+
+  const shipperPincode = toSafeString(
+    process.env.DHL_SHIPPER_POSTAL_CODE ||
+      process.env.BLUE_DART_SHIPPER_PINCODE ||
+      process.env.BLUE_DART_SHIPPER_POSTAL_CODE ||
+      ""
+  );
+
+  const consigneePincode = toSafeString(
+    order?.shippingAddress?.pincode ||
+      order?.labelData?.shipTo?.pincode ||
+      order?.shipping_meta?.requestPayload?.Request?.Consignee?.ConsigneePincode ||
+      ""
+  );
+
+  if (!shipperPincode || !consigneePincode) {
+    return res.status(400).json({
+      status: false,
+      message: "Pincode information is incomplete",
+      meta: {
+        shipperPincode: shipperPincode ? "[OK]" : "[MISSING]",
+        consigneePincode: consigneePincode ? "[OK]" : "[MISSING]",
+      },
+    });
+  }
+
+  const { pickupDate, pickupTime, isAfterCutoff, baseDateIso, resolvedPickupDateIso } =
+    resolveTransitPickupDateTime(order, { preferOrderDates: true });
+
+  const productCode = toSafeString(
+    order?.labelData?.carrier?.blueDart?.productCode ||
+      order?.shipping_meta?.requestPayload?.Request?.Services?.ProductCode ||
+      process.env.BLUE_DART_PRODUCT_CODE ||
+      "A"
+  );
+
+  const isCod = toSafeString(order?.paymentMethod).toUpperCase() === "COD";
+  const subProductCode = toSafeString(
+    order?.labelData?.carrier?.blueDart?.subProductCode ||
+      order?.shipping_meta?.requestPayload?.Request?.Services?.SubProductCode ||
+      (isCod
+        ? process.env.BLUE_DART_COD_SUB_PRODUCT_CODE || "C"
+        : process.env.BLUE_DART_SUB_PRODUCT_CODE || "P")
+  );
+
+  const transitResult = await getBlueDartTransitTime({
+    fromPincode: shipperPincode,
+    toPincode: consigneePincode,
+    pickupTime,
+    pickupDate,
+    productCode,
+    subProductCode,
+  });
+
+  if (!transitResult.success) {
+    return res.status(502).json({
+      status: false,
+      message: "Failed to fetch transit time from Blue Dart",
+      error: transitResult.error,
+      request: {
+        fromPincode: shipperPincode,
+        toPincode: consigneePincode,
+        pPudate: pickupDate,
+        pPickupTime: pickupTime,
+        isAfterCutoff,
+        baseDateIso,
+        resolvedPickupDateIso,
+        productCode,
+        subProductCode,
+      },
+    });
+  }
+
+  const rawResult = transitResult.data?.GetDomesticTransitTimeForPinCodeandProductResult ||
+    transitResult.data?.getDomesticTransitTimeForPinCodeandProductResult ||
+    transitResult.data || {};
+
+  const expectedDateDelivery = toSafeString(rawResult.ExpectedDateDelivery);
+  const expectedDatePOD = toSafeString(rawResult.ExpectedDatePOD);
+
+  return res.status(200).json({
+    status: true,
+    message: "Transit time fetched successfully",
+    data: {
+      orderId: order._id,
+      orderNumber: order.orderId,
+      expectedDateDelivery,
+      expectedDatePOD,
+      GetDomesticTransitTimeForPinCodeandProductResult: rawResult,
+      transitEstimate: extractTransitEstimate(transitResult.data),
+    },
+    meta: {
+      request: {
+        fromPincode: shipperPincode,
+        toPincode: consigneePincode,
+        pPudate: pickupDate,
+        pPickupTime: pickupTime,
+        productCode,
+        subProductCode,
+      },
+      cutoff: {
+        rule: "Orders at or after 16:00 roll to next business day",
+        isAfterCutoff,
+        baseDateIso,
+        resolvedPickupDateIso,
+      },
+    },
+  });
+});
+
+exports.GetPincodeTransitTime = catchAsync(async (req, res) => {
+  const toPincode = toSafeString(req.query.toPincode || req.query.to || req.body?.toPincode);
+  const fromPincode = toSafeString(
+    req.query.fromPincode ||
+      req.query.from ||
+      req.body?.fromPincode ||
+      process.env.DHL_SHIPPER_POSTAL_CODE ||
+      process.env.BLUE_DART_SHIPPER_PINCODE ||
+      process.env.BLUE_DART_SHIPPER_POSTAL_CODE ||
+      ""
+  );
+  const isCod = toSafeString(req.query.isCod || req.body?.isCod).toUpperCase() === "TRUE";
+  const productCode = toSafeString(
+    req.query.productCode ||
+      req.body?.productCode ||
+      process.env.BLUE_DART_PRODUCT_CODE ||
+      "A"
+  );
+  const subProductCode = toSafeString(
+    req.query.subProductCode ||
+      req.body?.subProductCode ||
+      (isCod
+        ? process.env.BLUE_DART_COD_SUB_PRODUCT_CODE || "C"
+        : process.env.BLUE_DART_SUB_PRODUCT_CODE || "P")
+  );
+
+  if (!/^\d{4,10}$/.test(toPincode)) {
+    return res.status(400).json({
+      status: false,
+      message: "Valid toPincode is required (4-10 digits)",
+    });
+  }
+  if (!/^\d{4,10}$/.test(fromPincode)) {
+    return res.status(400).json({
+      status: false,
+      message: "Valid fromPincode is required (4-10 digits)",
+    });
+  }
+
+  const { pickupDate, pickupTime, isAfterCutoff, baseDateIso, resolvedPickupDateIso } =
+    resolveTransitPickupDateTime(new Date(), { preferOrderDates: false });
+
+  const transitResult = await getBlueDartTransitTime({
+    fromPincode,
+    toPincode,
+    pickupTime,
+    pickupDate,
+    productCode,
+    subProductCode,
+  });
+
+  if (!transitResult.success) {
+    return res.status(502).json({
+      status: false,
+      message: "Failed to fetch transit time from Blue Dart",
+      error: transitResult.error,
+      request: {
+        fromPincode,
+        toPincode,
+        pPudate: pickupDate,
+        pPickupTime: pickupTime,
+        isAfterCutoff,
+        baseDateIso,
+        resolvedPickupDateIso,
+        productCode,
+        subProductCode,
+      },
+    });
+  }
+
+  const rawResult = transitResult.data?.GetDomesticTransitTimeForPinCodeandProductResult ||
+    transitResult.data?.getDomesticTransitTimeForPinCodeandProductResult ||
+    transitResult.data || {};
+
+  return res.status(200).json({
+    status: true,
+    message: "Transit time fetched successfully",
+    data: {
+      expectedDateDelivery: toSafeString(rawResult.ExpectedDateDelivery),
+      expectedDatePOD: toSafeString(rawResult.ExpectedDatePOD),
+      GetDomesticTransitTimeForPinCodeandProductResult: rawResult,
+      transitEstimate: extractTransitEstimate(transitResult.data),
+    },
+    meta: {
+      request: {
+        fromPincode,
+        toPincode,
+        pPudate: pickupDate,
+        pPickupTime: pickupTime,
+        productCode,
+        subProductCode,
+      },
+      cutoff: {
+        rule: "Requests at or after 16:00 roll to next business day",
+        isAfterCutoff,
+        baseDateIso,
+        resolvedPickupDateIso,
+      },
+    },
   });
 });
