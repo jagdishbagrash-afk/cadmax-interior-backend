@@ -438,6 +438,11 @@ const resolveBlueDartTransitContext = (order = {}) => {
   const requestShipper = requestPayload?.Request?.Shipper || requestPayload?.request?.Shipper || {};
   const requestConsignee =
     requestPayload?.Request?.Consignee || requestPayload?.request?.Consignee || {};
+  const isCod = toSafeString(order?.paymentMethod).toUpperCase() === "COD";
+
+  const fallbackSubProductCode = isCod
+    ? process.env.BLUE_DART_COD_SUB_PRODUCT_CODE || "C"
+    : process.env.BLUE_DART_SUB_PRODUCT_CODE || "P";
 
   return {
     fromPincode: toSafeString(
@@ -461,8 +466,7 @@ const resolveBlueDartTransitContext = (order = {}) => {
     subProductCode: toSafeString(
       labelData?.carrier?.blueDart?.subProductCode ||
       requestServices?.SubProductCode ||
-      process.env.BLUE_DART_SUB_PRODUCT_CODE ||
-      "P"
+      fallbackSubProductCode
     ),
     pickupDate: toBlueDartDateLiteralString(
       requestServices?.PickupDate ||
@@ -596,6 +600,10 @@ const createShipmentForOrder = async ({ order, receiverAddress, shippingProvider
   const provider = resolveDefaultShippingProvider(shippingProvider);
   const receiverName = receiverAddress?.name || order?.shippingAddress?.name || order?.name;
   const receiverMobile = receiverAddress?.mobile || order?.shippingAddress?.mobile || order?.mobile;
+  const isCod = toSafeString(order?.paymentMethod).toUpperCase() === "COD";
+  const collectableAmount = order?.amount;
+  const productCode = order?.shipping_meta?.productCode || order?.labelData?.carrier?.blueDart?.productCode;
+  const subProductCode = order?.shipping_meta?.subProductCode || order?.labelData?.carrier?.blueDart?.subProductCode;
 
   if (provider === "BLUE_DART") {
     const shipFrom = resolveBlueDartShipFrom(order?.labelData?.shipFrom);
@@ -608,7 +616,10 @@ const createShipmentForOrder = async ({ order, receiverAddress, shippingProvider
       shipFrom,
       products: order.product,
       declaredValue: order.amount,
-      isCod: false,
+      isCod,
+      collectableAmount,
+      productCode,
+      subProductCode,
     });
 
     return {
@@ -870,6 +881,10 @@ const buildLabelData = ({ order, savedAddress, shipmentResponse }) => {
   const items = getShipmentItemDetails(shipmentResponse, order);
   const serviceDetails = shipmentResponse?.Request?.Services || shipmentResponse?.Services || {};
   const shipperDetails = shipmentResponse?.Request?.Shipper || shipmentResponse?.Shipper || {};
+  const isCod = toSafeString(order?.paymentMethod).toUpperCase() === "COD";
+  const fallbackSubProductCode = isCod
+    ? process.env.BLUE_DART_COD_SUB_PRODUCT_CODE || "C"
+    : process.env.BLUE_DART_SUB_PRODUCT_CODE || "P";
   const bookingDate = toSafeString(
     pickFirstValue(
       shipmentResponse?.bookingDate,
@@ -962,7 +977,7 @@ const buildLabelData = ({ order, savedAddress, shipmentResponse }) => {
       pickFirstValue(
         serviceDetails?.SubProductCode,
         shipmentResponse?.subProductCode,
-        process.env.BLUE_DART_SUB_PRODUCT_CODE
+        fallbackSubProductCode
       )
     ),
     productType: toSafeNumber(

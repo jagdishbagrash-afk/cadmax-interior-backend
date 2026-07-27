@@ -636,6 +636,8 @@ const buildGenerateWaybillPayload = ({
   declaredValue,
   isCod,
   collectableAmount,
+  productCode,
+  subProductCode,
   overrides = {},
 }) => {
   const pieceCount = getTotalPieces(products);
@@ -657,9 +659,15 @@ const buildGenerateWaybillPayload = ({
   }
 
   const resolvedShipFrom = resolveBlueDartShipFrom(shipFrom);
-  const resolvedSubProductCode = isCod
-    ? process.env.BLUE_DART_COD_SUB_PRODUCT_CODE || "C"
-    : process.env.BLUE_DART_SUB_PRODUCT_CODE || "P";
+  const resolvedProductCode = String(
+    productCode || process.env.BLUE_DART_PRODUCT_CODE || "A"
+  );
+  const resolvedSubProductCode = String(
+    subProductCode ||
+      (isCod
+        ? process.env.BLUE_DART_COD_SUB_PRODUCT_CODE || "C"
+        : process.env.BLUE_DART_SUB_PRODUCT_CODE || "P")
+  );
 
   const payload = {
     Request: {
@@ -734,7 +742,7 @@ const buildGenerateWaybillPayload = ({
         PickupType: "",
         PieceCount: String(pieceCount),
         PreferredPickupTimeSlot: "",
-        ProductCode: process.env.BLUE_DART_PRODUCT_CODE || "A",
+        ProductCode: resolvedProductCode,
         ProductFeature: "",
         ProductType: coerceNumber(process.env.BLUE_DART_PRODUCT_TYPE) ?? 1,
         RegisterPickup:
@@ -890,6 +898,8 @@ const createBlueDartWaybill = async ({
   declaredValue,
   isCod = false,
   collectableAmount,
+  productCode,
+  subProductCode,
   overrides,
 }) => {
   try {
@@ -903,6 +913,8 @@ const createBlueDartWaybill = async ({
       declaredValue,
       isCod,
       collectableAmount,
+      productCode,
+      subProductCode,
       overrides,
     });
 
@@ -1025,6 +1037,7 @@ const getBlueDartTransitTime = async ({
   pickupDate,
   productCode,
   subProductCode,
+  isCod,
   apiType,
   licenceKey,
   loginId,
@@ -1034,13 +1047,18 @@ const getBlueDartTransitTime = async ({
       throw new Error("fromPincode and toPincode are required");
     }
 
+    const resolvedSubProductCode = String(
+      subProductCode ||
+        (isCod
+          ? process.env.BLUE_DART_COD_SUB_PRODUCT_CODE || "C"
+          : process.env.BLUE_DART_SUB_PRODUCT_CODE || "P")
+    );
+
     const payload = {
       pPinCodeFrom: String(fromPincode),
       pPinCodeTo: String(toPincode),
       pProductCode: String(productCode || process.env.BLUE_DART_PRODUCT_CODE || "A"),
-      pSubProductCode: String(
-        subProductCode || process.env.BLUE_DART_SUB_PRODUCT_CODE || "P"
-      ),
+      pSubProductCode: resolvedSubProductCode,
       pPudate: normalizeBlueDartDateLiteral(pickupDate),
       pPickupTime: normalizeBlueDartPickupTime(pickupTime),
       profile: buildBlueDartProfile({
