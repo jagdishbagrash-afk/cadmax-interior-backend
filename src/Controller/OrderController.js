@@ -408,13 +408,30 @@ exports.addOrder = catchAsync(async (req, res) => {
       orderId: savedOrder.orderId,
     };
 
+    const resolvedIsCod = (savedOrder.paymentMethod || paymentMethod || "ONLINE").toUpperCase() === "COD";
+
     // Create shipment based on courier preference
     const courierName = process.env.DEFAULT_COURIER || "DHL";
     let shipmentResponse = null;
 
     if (courierName === "BLUE_DART" || courierName === "BlueDart") {
-      // Use Blue Dart
-      shipmentResponse = await createBlueDartWaybill(shipmentPayload);
+      // Use Blue Dart - map to correct param names for createBlueDartWaybill
+      shipmentResponse = await createBlueDartWaybill({
+        orderId: savedOrder.orderId,
+        name: shippingAddress.name,
+        mobile: shippingAddress.mobile,
+        receiverAddress: {
+          ...shippingAddress,
+          street_address: shippingAddress.street_address || legacyAddress,
+          address: shippingAddress.address || legacyAddress,
+          addressLine1: shippingAddress.addressLine1 || legacyAddress,
+          pincode: shippingAddress.pincode,
+        },
+        products: orderProducts,
+        declaredValue: numericAmount,
+        isCod: resolvedIsCod,
+        collectableAmount: resolvedIsCod ? numericAmount : 0,
+      });
       
       if (shipmentResponse?.success || shipmentResponse?.awbNumber) {
         shipmentData = {
