@@ -190,10 +190,10 @@ exports.GetSubCategoryByNameCategory = CatchAsync(async (req, res) => {
         if (!category) {
             return validationErrorResponse(res, "Category not found.", 404);
         }
-        const subCategories = await SubCategory.find({
-            category: category._id,
-            status: true
-        });
+   const subCategories = await SubCategory.find({
+  category: category._id,
+  status: true,
+}).populate("category");
 
         if (!subCategories || subCategories.length === 0) {
             return validationErrorResponse(

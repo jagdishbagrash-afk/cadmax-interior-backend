@@ -15,6 +15,7 @@ const {
 } = require("../Utill/orderAddress");
 const { createDhlShipment } = require("../Utill/createDhlShipment");
 const { createBlueDartWaybill } = require("../Utill/blueDartService");
+const { default: mongoose } = require("mongoose");
 
 // exports.addOrder = catchAsync(async (req, res) => {
 //   try {
@@ -723,3 +724,43 @@ exports.updateStatus = catchAsync(async (req, res) => {
     );
   }
 });
+
+
+exports.getOrderById = catchAsync(async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid Order ID",
+      });
+    }
+
+    const order = await Order.findById(id)
+      .populate("userId", "name email mobile")
+      .populate("addressId");
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Order fetched successfully",
+      data: order,
+    });
+  } catch (error) {
+    console.error("Get Order Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+});
+
