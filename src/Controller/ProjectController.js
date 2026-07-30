@@ -127,7 +127,9 @@ exports.UpdateProject = CatchAsync(async (req, res) => {
         if (brief) data.brief = brief;
         if (solution) data.solution = solution;
         if (content) data.content = content;
-
+    if (req.body.meta_title) data.meta_title = req.body.meta_title;
+    if (req.body.meta_description) data.meta_description = req.body.meta_description;
+    if (req.body.meta_keywords) data.meta_keywords = req.body.meta_keywords;
         // Get files (if any new ones uploaded)
         const Image = req.files?.["image"]?.[0]?.location;
 

@@ -120,6 +120,9 @@ exports.UpdateSubCategory = CatchAsync(async (req, res) => {
         }
 
         if (category) data.category = category;
+            if (req.body.meta_title) data.meta_title = req.body.meta_title;
+    if (req.body.meta_description) data.meta_description = req.body.meta_description;
+    if (req.body.meta_keywords) data.meta_keywords = req.body.meta_keywords;
 
         // ✅ Image update
         if (req.file && req.file.location) {
@@ -187,10 +190,10 @@ exports.GetSubCategoryByNameCategory = CatchAsync(async (req, res) => {
         if (!category) {
             return validationErrorResponse(res, "Category not found.", 404);
         }
-        const subCategories = await SubCategory.find({
-            category: category._id,
-            status: true
-        });
+   const subCategories = await SubCategory.find({
+  category: category._id,
+  status: true,
+}).populate("category");
 
         if (!subCategories || subCategories.length === 0) {
             return validationErrorResponse(

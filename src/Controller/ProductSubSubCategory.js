@@ -103,7 +103,9 @@ exports.UpdateProductSubSubCategory = CatchAsync(async (req, res) => {
         if (subcategory) {
             productSubSubCategory.subcategory = subcategory;
         }
-
+    if (req.body.meta_title) productSubSubCategory.meta_title = req.body.meta_title;
+    if (req.body.meta_description) productSubSubCategory.meta_description = req.body.meta_description;
+    if (req.body.meta_keywords) productSubSubCategory.meta_keywords = req.body.meta_keywords;
         // Update Image
         if (req.file?.location) {
             if (productSubSubCategory.Image) {

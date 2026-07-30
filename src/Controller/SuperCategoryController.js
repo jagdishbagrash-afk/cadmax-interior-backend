@@ -68,6 +68,9 @@ exports.updateSuperCategory = async (req, res) => {
         }
 
         if (name) data.name = name;
+            if (req.body.meta_title) data.meta_title = req.body.meta_title;
+    if (req.body.meta_description) data.meta_description = req.body.meta_description;
+    if (req.body.meta_keywords) data.meta_keywords = req.body.meta_keywords;
 
         if (req.file && req.file.filename) {
 

@@ -152,7 +152,9 @@ exports.UpdateServicesSubCategory = CatchAsync(
       if (name && name !== data.name) {
         data.name = name;
       }
-
+    if (req.body.meta_title) data.meta_title = req.body.meta_title;
+    if (req.body.meta_description) data.meta_description = req.body.meta_description;
+    if (req.body.meta_keywords) data.meta_keywords = req.body.meta_keywords;
       if (category) data.category = category;
 
       // ✅ Image update
