@@ -1314,6 +1314,9 @@ const hydrateOrderShipmentDetails = async (
   };
 };
 
+exports.hydrateOrderShipmentDetails = hydrateOrderShipmentDetails;
+
+
 exports.TrackShipment = async (req, res) => {
   try {
     const { trackingNumber } = req.params;
