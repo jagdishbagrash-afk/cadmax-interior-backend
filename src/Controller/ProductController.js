@@ -149,6 +149,9 @@ exports.addProduct = CatchAsync(async (req, res) => {
       type: req.body.type || "",
       terms: req.body.terms || "",
       variants: finalVariants,
+      meta_title: req.body.meta_title || "",
+      meta_description: req.body.meta_description || "",
+      meta_keywords: req.body.meta_keywords || "",
       product_price_section: productPriceSection.length > 0 ? productPriceSection : []
     });
 
