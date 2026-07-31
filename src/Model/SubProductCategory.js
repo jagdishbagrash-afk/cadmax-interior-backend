@@ -29,6 +29,18 @@ const categorySchema = mongoose.Schema({
         type: String,
         required: true
     },
+      meta_title :{
+        type: String,
+        default: null
+    },
+    meta_description:{
+        type: String,
+        default: null
+    },
+    meta_keywords:{
+        type: String,
+        default: null
+    }
 
 });
 

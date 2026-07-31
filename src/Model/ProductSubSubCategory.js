@@ -27,6 +27,18 @@ const productsubsubcategorySchema = mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "subCategory",
     },
+      meta_title :{
+        type: String,
+        default: null
+    },
+    meta_description:{
+        type: String,
+        default: null
+    },
+    meta_keywords:{
+        type: String,
+        default: null
+    }
 
 },
     { timestamps: true }

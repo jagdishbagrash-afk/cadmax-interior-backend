@@ -194,6 +194,18 @@ const ProductSchema = mongoose.Schema(
       star5: { type: Number, default: 0 },
     },
 
+      meta_title :{
+        type: String,
+        default: null
+    },
+    meta_description:{
+        type: String,
+        default: null
+    },
+    meta_keywords:{
+        type: String,
+        default: null
+    }
   },
   { timestamps: true }
 );
