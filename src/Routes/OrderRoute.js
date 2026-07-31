@@ -1,5 +1,5 @@
 const router = require("express").Router();
-const { addOrder, getAllOrders, getOrdersByUser, updateStatus, getOrderDetailsWeb, getOrderDetailsApp } = require("../Controller/OrderController");
+const { addOrder, getAllOrders, getOrdersByUser, updateStatus, getOrderDetailsWeb, getOrderDetailsApp, getOrderById } = require("../Controller/OrderController");
 const { verifyToken } = require("../Utill/tokenVerify");
 router.post("/order/add", verifyToken,  addOrder);
 router.get("/order/getAll", getAllOrders);  
