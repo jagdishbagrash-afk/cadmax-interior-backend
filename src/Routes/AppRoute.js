@@ -22,10 +22,12 @@ AppRoute.get("/app/product/:id", getProductById);
 AppRoute.post("/app/cart/add", verifyToken, AddToCart);
 AppRoute.post("/app/cart/update", verifyToken, updateCart);
 AppRoute.get("/app/cart/get", verifyToken, getCart);
-AppRoute.get("/app/cart/clear", verifyToken, clearCart);
-AppRoute.get("/app/cart/remove/:productId/:variant", verifyToken, removeProductVariantFromCart)
+const { getOrderDetailsApp } = require("../Controller/OrderController");
+
+AppRoute.get("/app/order/details/:orderId", getOrderDetailsApp);
 AppRoute.post("/app/order/add", verifyToken, AppOrder);
 AppRoute.get("/app/order/list", verifyToken, OrderList);
+
 AppRoute.post("/app/concept/user", verifyToken, ConceptUserPost);
 AppRoute.post("/app/booking/add", verifyToken, BookingAppAdd);
 AppRoute.post("/app/booking/get", verifyToken, getAllBookings);
