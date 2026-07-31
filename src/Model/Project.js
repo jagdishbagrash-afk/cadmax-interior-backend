@@ -37,6 +37,18 @@ const ProjectSchema = mongoose.Schema(
     multiple_images :{
         type :Array
     },
+    meta_title :{
+        type: String,
+        default: null
+    },
+    meta_description:{
+        type: String,
+        default: null
+    },
+    meta_keywords:{
+        type: String,
+        default: null
+    }
   },
   { timestamps: true }
 );

@@ -22,10 +22,12 @@ AppRoute.get("/app/product/:id", getProductById);
 AppRoute.post("/app/cart/add", verifyToken, AddToCart);
 AppRoute.post("/app/cart/update", verifyToken, updateCart);
 AppRoute.get("/app/cart/get", verifyToken, getCart);
-AppRoute.get("/app/cart/clear", verifyToken, clearCart);
-AppRoute.get("/app/cart/remove/:productId/:variant", verifyToken, removeProductVariantFromCart)
+const { getOrderDetailsApp } = require("../Controller/OrderController");
+
+AppRoute.get("/app/order/details/:orderId", getOrderDetailsApp);
 AppRoute.post("/app/order/add", verifyToken, AppOrder);
 AppRoute.get("/app/order/list", verifyToken, OrderList);
+
 AppRoute.post("/app/concept/user", verifyToken, ConceptUserPost);
 AppRoute.post("/app/booking/add", verifyToken, BookingAppAdd);
 AppRoute.post("/app/booking/get", verifyToken, getAllBookings);
@@ -70,13 +72,13 @@ AppRoute.post("/app/wishlist/add", verifyToken, addToWishlist);
 
 
 // Authenticated
-AppRoute.post("/app/review/add", verifyToken, upload.array("reviewImages", 15),  addReview);
-AppRoute.post("/app/review/update/:reviewId", upload.array("reviewImages", 15),   verifyToken, updateReview);
+AppRoute.post("/app/review/add", verifyToken, upload.array("reviewImages", 15), addReview);
+AppRoute.post("/app/review/update/:reviewId", upload.array("reviewImages", 15), verifyToken, updateReview);
 
 AppRoute.get("/app/review/helpful/:reviewId", verifyToken, markHelpful);
 AppRoute.get("/app/review/not-helpful/:reviewId", verifyToken, markNotHelpful);
 
-AppRoute.get("/app/review/product/:productId" , getProductReviews);
+AppRoute.get("/app/review/product/:productId", getProductReviews);
 
 AppRoute.post("/app/review/images/delete/:reviewId/:imageIndex", verifyToken, deleteReviewImage);
 

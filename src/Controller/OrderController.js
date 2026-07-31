@@ -15,6 +15,11 @@ const {
 } = require("../Utill/orderAddress");
 const { createDhlShipment } = require("../Utill/createDhlShipment");
 const { createBlueDartWaybill } = require("../Utill/blueDartService");
+const mongoose = require("mongoose");
+const { hydrateOrderShipmentDetails } = require("./shipmentController");
+const { formatOrderDetailsForWeb, formatOrderDetailsForApp } = require("../Utill/orderDetailsFormatter");
+
+
 
 // exports.addOrder = catchAsync(async (req, res) => {
 //   try {
@@ -723,3 +728,122 @@ exports.updateStatus = catchAsync(async (req, res) => {
     );
   }
 });
+
+/**
+ * WEB Order Details API
+ * Fetches complete order details matching the design screenshot
+ * and hits inner side transit API for live tracking updates.
+ */
+exports.getOrderDetailsWeb = catchAsync(async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    if (!orderId) {
+      return validationErrorResponse(res, "orderId parameter is required");
+    }
+
+    const cleanOrderId = String(orderId).trim().replace(/^#/, "");
+
+    const queryConditions = [
+      { orderId: cleanOrderId },
+      { orderId: `ORD-${cleanOrderId}` },
+      { tracking_number: cleanOrderId },
+    ];
+
+    if (mongoose.Types.ObjectId.isValid(cleanOrderId)) {
+      queryConditions.push({ _id: cleanOrderId });
+    }
+
+    const order = await Order.findOne({ $or: queryConditions }).populate({
+      path: "product.id",
+      model: "Product",
+    });
+
+    if (!order) {
+      return errorResponse(res, `Order not found with ID: ${orderId}`, 404);
+    }
+
+    // Hit inner side transit API to update real-time transit tracking data
+    let syncedTransit = {};
+    try {
+      if (typeof hydrateOrderShipmentDetails === "function") {
+        syncedTransit = await hydrateOrderShipmentDetails(order, {
+          userId: req.user?.id || order.userId,
+          syncCourier: true,
+          persist: true,
+        });
+      }
+    } catch (transitErr) {
+      console.warn("Inner side transit API sync notice:", transitErr.message);
+    }
+
+    const formattedWebData = formatOrderDetailsForWeb(order, syncedTransit);
+
+    return res.status(200).json({
+      status: true,
+      message: "Web order details fetched successfully with inner transit API tracking",
+      data: formattedWebData,
+    });
+  } catch (error) {
+    console.error("getOrderDetailsWeb Error:", error);
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});
+
+/**
+ * MOBILE APP Order Details API
+ * Fetches complete order details matching the design screenshot formatted for Mobile App
+ * and hits inner side transit API for live tracking updates.
+ */
+exports.getOrderDetailsApp = catchAsync(async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    if (!orderId) {
+      return validationErrorResponse(res, "orderId parameter is required");
+    }
+
+    const cleanOrderId = String(orderId).trim().replace(/^#/, "");
+
+    const queryConditions = [
+      { orderId: cleanOrderId },
+      { orderId: `ORD-${cleanOrderId}` },
+      { tracking_number: cleanOrderId },
+    ];
+
+    if (mongoose.Types.ObjectId.isValid(cleanOrderId)) {
+      queryConditions.push({ _id: cleanOrderId });
+    }
+
+    const order = await Order.findOne({ $or: queryConditions }).populate({
+      path: "product.id",
+      model: "Product",
+    });
+
+    if (!order) {
+      return errorResponse(res, `Order not found with ID: ${orderId}`, 404);
+    }
+
+    // Hit inner side transit API to update real-time transit tracking data
+    let syncedTransit = {};
+    try {
+      if (typeof hydrateOrderShipmentDetails === "function") {
+        syncedTransit = await hydrateOrderShipmentDetails(order, {
+          userId: req.user?.id || order.userId,
+          syncCourier: true,
+          persist: true,
+        });
+      }
+    } catch (transitErr) {
+      console.warn("Inner side transit API sync notice:", transitErr.message);
+    }
+
+    const formattedAppData = formatOrderDetailsForApp(order, syncedTransit);
+
+    return res.status(200).json(formattedAppData);
+  } catch (error) {
+    console.error("getOrderDetailsApp Error:", error);
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});
+

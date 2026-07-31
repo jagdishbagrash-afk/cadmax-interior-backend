@@ -97,6 +97,9 @@ exports.UpdateServicesType = CatchAsync(
       // ✅ Update name if provided
       if (title) data.title = title;
       if (TypeServices) data.TypeServices = TypeServices;
+       if (req.body.meta_title) data.meta_title = req.body.meta_title;
+    if (req.body.meta_description) data.meta_description = req.body.meta_description;
+    if (req.body.meta_keywords) data.meta_keywords = req.body.meta_keywords;
 
       // ✅ If new image uploaded → delete old image first
       if (req.file && req.file.location) {
@@ -260,7 +263,9 @@ exports.UpdateServices = CatchAsync(
       if (timeline) data.timeline = timeline;
       if (cost) data.cost = cost;
 
-
+    if (req.body.meta_title) data.meta_title = req.body.meta_title;
+    if (req.body.meta_description) data.meta_description = req.body.meta_description;
+    if (req.body.meta_keywords) data.meta_keywords = req.body.meta_keywords;
       if (Image) data.Image = Image;
       if (imageUrls.length > 0) {
         data.multiple_images = [...data.multiple_images, ...imageUrls];

@@ -260,6 +260,9 @@ exports.updateProduct = CatchAsync(async (req, res) => {
     if (req.body.material) product.material = req.body.material;
     if (req.body.type) product.type = req.body.type;
     if (req.body.terms) product.terms = req.body.terms;
+    if (req.body.meta_title) product.meta_title = req.body.meta_title;
+    if (req.body.meta_description) product.meta_description = req.body.meta_description;
+    if (req.body.meta_keywords) product.meta_keywords = req.body.meta_keywords;
 
 
     // Handle variant images

@@ -81,6 +81,9 @@ exports.updateCategory = CatchAsync(async (req, res) => {
             category.name = name;
             category.slug = await generateUniqueSlug(Category, name, id);
         }
+            if (req.body.meta_title) category.meta_title = req.body.meta_title;
+    if (req.body.meta_description) category.meta_description = req.body.meta_description;
+    if (req.body.meta_keywords) category.meta_keywords = req.body.meta_keywords;
 
         // Update image if new file uploaded
         if (req.file && req.file.location) {
