@@ -85,9 +85,10 @@ const OrderSchema = new mongoose.Schema(
     product: { type: [OrderProductSchema], required: true },
     status: {
       type: String,
-      enum: ["pending", "confirmed", "shipped", "delivered", "cancelled"],
+      enum: ["pending", "confirmed", "shipped", "delivered", "cancelled" , "returned", "failed", "on-hold", 'processing'],
       default: "pending",
     },
+    note: { type: String },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     addressId: { type: mongoose.Schema.Types.ObjectId, ref: "Address" },
     shippingAddress: { type: OrderShippingAddressSchema, default: null },

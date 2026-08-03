@@ -609,10 +609,95 @@ exports.getAllOrders = catchAsync(async (req, res) => {
 
 
 
+// exports.updateStatus = catchAsync(async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const { status ,note} = req.body;
+
+//     if (!id) {
+//       return validationErrorResponse(res, "Order ID is required");
+//     }
+
+//     if (!status) {
+//       return validationErrorResponse(res, "Status is required");
+//     }
+
+//     // ✅ Update order
+//     const order = await Order.findByIdAndUpdate(
+//       id,
+//       { status },
+//       { new: true }
+//     );
+
+//     if (!order) {
+//       return errorResponse(res, "Order not found", 404);
+//     }
+
+//     // 🔥 User ka FCM token lao
+//     const user = await User.findById(order.userId).select("fcmToken name");
+
+//     if (user?.fcmToken) {
+
+//       // 🎯 Status-wise message
+//       let title = "Order Update 📦";
+//       let body = "";
+
+//       switch (status) {
+//         case "pending":
+//           body = `Hi ${user.name}, your order is pending.`;
+//           break;
+
+//         case "confirmed":
+//           body = `Hi ${user.name}, your order has been confirmed ✅`;
+//           break;
+
+//         case "shipped":
+//           body = `Hi ${user.name}, your order has been shipped 🚚`;
+//           break;
+
+//         case "delivered":
+//           body = `Hi ${user.name}, your order has been delivered 🎉`;
+//           break;
+
+//         case "cancelled":
+//           body = `Hi ${user.name}, your order has been cancelled ❌`;
+//           break;
+
+//         default:
+//           body = `Hi ${user.name}, your order status is updated to ${status}`;
+//       }
+
+//       // 🚀 Send Notification
+//       await sendPushNotification({
+//         tokens: [user.fcmToken], // single user
+//         title,
+//         body,
+//         data: {
+//           type: "ORDER_STATUS",
+//           orderId: order._id.toString(),
+//           status: status,
+//         },
+//       });
+//     }
+
+//     return successResponse(
+//       res,
+//       "Order status updated successfully & notification sent 🚀",
+//       200,
+//       order
+//     );
+
+//   } catch (error) {
+//     console.error(error);
+//     return errorResponse(res, error.message || "Internal Server Error", 500);
+//   }
+// });
+
+
 exports.updateStatus = catchAsync(async (req, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, note } = req.body;
 
     if (!id) {
       return validationErrorResponse(res, "Order ID is required");
@@ -622,10 +707,13 @@ exports.updateStatus = catchAsync(async (req, res) => {
       return validationErrorResponse(res, "Status is required");
     }
 
-    // ✅ Update order
+    // Update Order
     const order = await Order.findByIdAndUpdate(
       id,
-      { status },
+      {
+        status,
+        ...(note && { note }),
+      },
       { new: true }
     );
 
@@ -633,12 +721,29 @@ exports.updateStatus = catchAsync(async (req, res) => {
       return errorResponse(res, "Order not found", 404);
     }
 
-    // 🔥 User ka FCM token lao
-    const user = await User.findById(order.userId).select("fcmToken name");
+    // ======================================================
+    // Auto Fetch Tracking After Order Confirmation
+    // ======================================================
+    if (status === "confirmed") {
+      try {
+        await hydrateOrderShipmentDetails(order, {
+          userId: order.userId,
+        });
+
+        console.log(
+          `Tracking synced successfully for Order ${order._id}`
+        );
+      } catch (err) {
+        console.error("Tracking Sync Error:", err.message);
+      }
+    }
+
+    // Get User
+    const user = await User.findById(order.userId).select(
+      "fcmToken name"
+    );
 
     if (user?.fcmToken) {
-
-      // 🎯 Status-wise message
       let title = "Order Update 📦";
       let body = "";
 
@@ -667,32 +772,33 @@ exports.updateStatus = catchAsync(async (req, res) => {
           body = `Hi ${user.name}, your order status is updated to ${status}`;
       }
 
-      // 🚀 Send Notification
       await sendPushNotification({
-        tokens: [user.fcmToken], // single user
+        tokens: [user.fcmToken],
         title,
         body,
         data: {
           type: "ORDER_STATUS",
           orderId: order._id.toString(),
-          status: status,
+          status,
         },
       });
     }
 
     return successResponse(
       res,
-      "Order status updated successfully & notification sent 🚀",
+      "Order status updated successfully",
       200,
       order
     );
-
   } catch (error) {
     console.error(error);
-    return errorResponse(res, error.message || "Internal Server Error", 500);
+    return errorResponse(
+      res,
+      error.message || "Internal Server Error",
+      500
+    );
   }
 });
-
 
   exports.getOrdersByUser = catchAsync(async (req, res) => {
   try {
@@ -847,3 +953,40 @@ exports.getOrderDetailsApp = catchAsync(async (req, res) => {
   }
 });
 
+exports.getOrderById = catchAsync(async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid Order ID",
+      });
+    }
+
+    const order = await Order.findById(id)
+      .populate("userId", "name email mobile")
+      .populate("addressId");
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Order fetched successfully",
+      data: order,
+    });
+  } catch (error) {
+    console.error("Get Order Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+});
