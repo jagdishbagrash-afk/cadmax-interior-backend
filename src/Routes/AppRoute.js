@@ -39,6 +39,7 @@ AppRoute.post("/app/address/update/:id", verifyToken, MultipleAddressController.
 AppRoute.get("/app/address/default/:id", verifyToken, MultipleAddressController.setDefaultAddress);
 AppRoute.get("/app/address/delete/:id", MultipleAddressController.DeleteAddress);
 AppRoute.post("/app/user/delete", verifyToken, AppDeleteUser)
+AppRoute.post("/app/reverse-geocode", MultipleAddressController.reverseGeocode);
 
 // Witout Auth 
 
