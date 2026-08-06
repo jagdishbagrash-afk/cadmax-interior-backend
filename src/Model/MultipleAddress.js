@@ -2,9 +2,9 @@ const mongoose = require("mongoose");
 
 const addressSchema = new mongoose.Schema({
   userId: {
-  type: mongoose.Schema.Types.ObjectId,
-  ref: "User"
-},
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User"
+  },
   pincode: {
     type: String,
   },
@@ -27,7 +27,7 @@ const addressSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  flatNo : {
+  flatNo: {
     type: String,
   },
   deletedAt: {
