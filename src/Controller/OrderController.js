@@ -1,4 +1,5 @@
 const Order = require("../Model/Order");
+const Payment = require("../Model/Payment");
 const catchAsync = require("../Utill/catchAsync");
 const { v4: uuidv4 } = require("uuid");
 const { successResponse, errorResponse, validationErrorResponse } = require("../Utill/ErrorHandling");
@@ -12,9 +13,11 @@ const {
   buildLegacyAddressString,
   buildShippingAddressSnapshot,
   resolveOwnedAddress,
+  ensureOrderShippingAddress,
+  toCourierAddress,
 } = require("../Utill/orderAddress");
 const { createDhlShipment } = require("../Utill/createDhlShipment");
-const { createBlueDartWaybill } = require("../Utill/blueDartService");
+const { createBlueDartWaybill, resolveBlueDartShipFrom } = require("../Utill/blueDartService");
 const mongoose = require("mongoose");
 const { hydrateOrderShipmentDetails } = require("./shipmentController");
 const { formatOrderDetailsForWeb, formatOrderDetailsForApp } = require("../Utill/orderDetailsFormatter");
@@ -284,7 +287,7 @@ exports.addOrder = catchAsync(async (req, res) => {
   }
 
   // ==========================
-  // Create Order
+  // Create Order — NO shipment yet; awaiting admin approval
   // ==========================
   const newOrder = new Order({
     name,
@@ -295,12 +298,13 @@ exports.addOrder = catchAsync(async (req, res) => {
     product: orderProducts,
     amount: numericAmount,
     userId,
-    PaymentId,
+    PaymentId: PaymentId || null,
     paymentMethod: paymentMethod || "ONLINE",
     orderId,
     status: "pending",
+    admin_approval_status: "pending_approval",
     shipping_status: "pending",
-    courier_name: "DHL",
+    courier_name: process.env.DEFAULT_COURIER || "DHL",
   });
 
   const savedOrder = await newOrder.save();
@@ -324,186 +328,40 @@ exports.addOrder = catchAsync(async (req, res) => {
   );
 
   // ==========================
-  // Reduce Stock
+  // Reduce Stock (hold stock on order placement; restored if rejected)
   // ==========================
   for (const item of product) {
-    // Find the product first to get variant info
     const productData = await Product.findById(item.id);
-    
-    if (!productData) {
-      continue;
-    }
+    if (!productData) continue;
 
-    // Find the specific variant by color (item.variant contains the color)
     const variantColor = item.variant?.toLowerCase();
     const variantIndex = productData.variants.findIndex(
       v => v.color.toLowerCase() === variantColor
     );
+    if (variantIndex === -1) continue;
 
-    if (variantIndex === -1) {
-      // Fallback to first variant if color not found
-      continue;
-    }
-
-    // Update the specific variant's stock
     const updatedProduct = await Product.findOneAndUpdate(
       {
         _id: item.id,
-        [`variants.${variantIndex}.stock`]: {
-          $gte: item.quantity,
-        },
+        [`variants.${variantIndex}.stock`]: { $gte: item.quantity },
       },
       {
-        $inc: {
-          [`variants.${variantIndex}.stock`]: -item.quantity,
-        },
+        $inc: { [`variants.${variantIndex}.stock`]: -item.quantity },
       },
+      { new: true, runValidators: false }
+    );
+
+    if (!updatedProduct) continue;
+
+    const anyVariantInStock = updatedProduct.variants.some(v => v.stock > 0);
+    await Product.updateOne(
+      { _id: item.id },
       {
-        new: true,
-        runValidators: false,
-      }
-    );
-
-    if (!updatedProduct) {
-      continue;
-    }
-
-    // Check if any variant still has stock
-    const anyVariantInStock = updatedProduct.variants.some(
-      v => v.stock > 0
-    );
-
-    // Update stock_status based on whether any variant is in stock
-    if (!anyVariantInStock) {
-      await Product.updateOne(
-        { _id: item.id },
-        {
-          $set: {
-            stock_status: "out_of_stock",
-          },
-        }
-      );
-    } else {
-      // Ensure product is marked as in_stock if at least one variant has stock
-      await Product.updateOne(
-        { _id: item.id },
-        {
-          $set: {
-            stock_status: "in_stock",
-          },
-        }
-      );
-    }
-  }
-
-  // ==========================
-  // Create Shipment
-  // ==========================
-  let shipmentData = null;
-  let shipmentError = null;
-
-  try {
-    // Build shipment payload
-    const shipmentPayload = {
-      name: shippingAddress.name,
-      mobile: shippingAddress.mobile,
-      address: legacyAddress,
-      products: orderProducts,
-      totalAmount: numericAmount,
-      orderId: savedOrder.orderId,
-    };
-
-    const resolvedIsCod = (savedOrder.paymentMethod || paymentMethod || "ONLINE").toUpperCase() === "COD";
-
-    // Create shipment based on courier preference
-    const courierName = process.env.DEFAULT_COURIER || "DHL";
-    let shipmentResponse = null;
-
-    if (courierName === "BLUE_DART" || courierName === "BlueDart") {
-      // Use Blue Dart - map to correct param names for createBlueDartWaybill
-      shipmentResponse = await createBlueDartWaybill({
-        orderId: savedOrder.orderId,
-        name: shippingAddress.name,
-        mobile: shippingAddress.mobile,
-        receiverAddress: {
-          ...shippingAddress,
-          street_address: shippingAddress.street_address || legacyAddress,
-          address: shippingAddress.address || legacyAddress,
-          addressLine1: shippingAddress.addressLine1 || legacyAddress,
-          pincode: shippingAddress.pincode,
+        $set: {
+          stock_status: anyVariantInStock ? "in_stock" : "out_of_stock",
         },
-        products: orderProducts,
-        declaredValue: numericAmount,
-        isCod: resolvedIsCod,
-        collectableAmount: resolvedIsCod ? numericAmount : 0,
-      });
-      
-      if (shipmentResponse?.success || shipmentResponse?.awbNumber) {
-        shipmentData = {
-          courierName: "BLUE_DART",
-          trackingNumber: shipmentResponse.awbNumber,
-          waybillNumber: shipmentResponse.awbNumber,
-          labelData: shipmentResponse.labelData || null,
-          shipmentDetails: {
-            status: "created",
-            timestamp: new Date().toISOString(),
-            ...shipmentResponse,
-          },
-        };
-      } else {
-        shipmentError = shipmentResponse?.error || "Blue Dart shipment creation failed";
       }
-    } else {
-      // Use DHL (default)
-      shipmentResponse = await createDhlShipment(shipmentPayload);
-
-      if (shipmentResponse?.success && shipmentResponse?.data) {
-        const shipmentId = shipmentResponse.data?.shipmentTrackingNumber;
-        shipmentData = {
-          courierName: "DHL",
-          trackingNumber: shipmentId,
-          labelData: shipmentResponse.data?.labelData || null,
-          shipmentDetails: {
-            status: "created",
-            timestamp: new Date().toISOString(),
-            estimatedDeliveryDate: shipmentResponse.data?.estimatedDeliveryDate,
-            warnings: shipmentResponse.data?.warnings || [],
-          },
-          rawResponse: shipmentResponse.data,
-        };
-      } else {
-        shipmentError = shipmentResponse?.error || "DHL shipment creation failed";
-      }
-    }
-
-    // Update order with shipment information
-    if (shipmentData) {
-      savedOrder.tracking_number = shipmentData.trackingNumber;
-      savedOrder.shipping_status = "shipment_created";
-      savedOrder.courier_name = shipmentData.courierName;
-      savedOrder.shipping_response = shipmentData.shipmentDetails;
-      savedOrder.labelData = shipmentData.labelData;
-    } else {
-      savedOrder.shipping_status = "shipment_creation_failed";
-      savedOrder.shipping_response = {
-        status: "failed",
-        error: shipmentError,
-        timestamp: new Date().toISOString(),
-      };
-    }
-
-    await savedOrder.save();
-  } catch (shipmentException) {
-    console.error("Shipment creation exception:", shipmentException);
-    
-    savedOrder.shipping_status = "shipment_creation_failed";
-    savedOrder.shipping_response = {
-      status: "failed",
-      error: shipmentException.message,
-      timestamp: new Date().toISOString(),
-    };
-
-    await savedOrder.save();
+    );
   }
 
   // ==========================
@@ -512,38 +370,36 @@ exports.addOrder = catchAsync(async (req, res) => {
   const responseData = {
     order: savedOrder,
     paymentMethod: newOrder.paymentMethod,
-    shipment: shipmentData || {
-      status: "failed",
-      error: shipmentError,
-      trackingNumber: null,
+    adminApproval: {
+      status: "pending_approval",
+      message: "Order placed successfully. Awaiting admin approval.",
+      nextStep: "Admin will review and approve/reject this order. Shipment & tracking ID will be generated after approval.",
     },
   };
 
-  // Add COD specific details if payment method is COD
   if (newOrder.paymentMethod === "COD") {
     responseData.paymentDetails = {
       paymentMethod: "COD",
       amount: numericAmount,
       status: "pending",
-      message: "Payment will be collected at delivery",
+      message: "Payment will be collected at delivery (after admin approval)",
       instructions: {
         vendor: "Please collect ₹" + numericAmount + " from customer on delivery",
         customer: "You will pay ₹" + numericAmount + " when the product is delivered",
       },
     };
   } else {
-    // ONLINE payment details
     responseData.paymentDetails = {
       paymentMethod: "ONLINE",
       amount: numericAmount,
       transactionId: PaymentId || null,
-      status: "completed",
+      status: PaymentId ? "completed" : "pending_payment",
     };
   }
 
   return successResponse(
     res,
-    `Order added successfully. Shipment ${shipmentData ? 'created with tracking ID: ' + shipmentData.trackingNumber : 'creation pending'}. Payment method: ${newOrder.paymentMethod}`,
+    `Order placed successfully. Awaiting admin approval. Payment method: ${newOrder.paymentMethod}`,
     201,
     responseData
   );
