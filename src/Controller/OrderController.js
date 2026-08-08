@@ -846,3 +846,505 @@ exports.getOrderById = catchAsync(async (req, res) => {
     });
   }
 });
+
+// ==============================================================
+// ADMIN ORDER MANAGEMENT ENDPOINTS
+// ==============================================================
+
+const ensureAdmin = async (userId) => {
+  if (!userId) return false;
+  const user = await User.findById(userId).select("role").lean();
+  return user && user.role === "admin";
+};
+
+/**
+ * ADMIN: Get all orders with filters, search, pagination
+ * Query params:
+ *   admin_approval_status: pending_approval | approved | rejected | all
+ *   status: pending | confirmed | shipped | delivered | cancelled | all
+ *   paymentMethod: ONLINE | COD | all
+ *   search: orderId / name / mobile
+ *   fromDate, toDate: ISO date strings
+ *   page, limit: pagination
+ */
+exports.getAllOrdersAdmin = catchAsync(async (req, res) => {
+  const isAdmin = await ensureAdmin(req.user?.id);
+  if (!isAdmin) {
+    return errorResponse(res, "Forbidden: admin access required", 403);
+  }
+
+  try {
+    const {
+      admin_approval_status = "all",
+      status = "all",
+      paymentMethod = "all",
+      search = "",
+      fromDate,
+      toDate,
+      page = 1,
+      limit = 20,
+    } = req.query;
+
+    const match = {};
+
+    if (admin_approval_status && admin_approval_status !== "all") {
+      match.admin_approval_status = admin_approval_status;
+    }
+    if (status && status !== "all") {
+      match.status = status;
+    }
+    if (paymentMethod && paymentMethod !== "all") {
+      match.paymentMethod = paymentMethod;
+    }
+    if (fromDate || toDate) {
+      match.createdAt = {};
+      if (fromDate) match.createdAt.$gte = new Date(fromDate);
+      if (toDate) {
+        const end = new Date(toDate);
+        end.setHours(23, 59, 59, 999);
+        match.createdAt.$lte = end;
+      }
+    }
+    if (search) {
+      const s = String(search).trim();
+      match.$or = [
+        { orderId: { $regex: s, $options: "i" } },
+        { name: { $regex: s, $options: "i" } },
+        { mobile: { $regex: s, $options: "i" } },
+        { tracking_number: { $regex: s, $options: "i" } },
+      ];
+    }
+
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+    const skip = (pageNum - 1) * limitNum;
+
+    const [orders, total, counts] = await Promise.all([
+      Order.find(match)
+        .populate({ path: "userId", model: "User", select: "name email phone role" })
+        .populate({ path: "product.id", model: "Product" })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .lean(),
+      Order.countDocuments(match),
+      Order.aggregate([
+        {
+          $facet: {
+            byApproval: [
+              { $group: { _id: "$admin_approval_status", count: { $sum: 1 } } },
+            ],
+            byStatus: [
+              { $group: { _id: "$status", count: { $sum: 1 } } },
+            ],
+            byPayment: [
+              { $group: { _id: "$paymentMethod", count: { $sum: 1 } } },
+            ],
+          },
+        },
+      ]).then((r) => r[0] || { byApproval: [], byStatus: [], byPayment: [] }),
+    ]);
+
+    const toMap = (arr) =>
+      arr.reduce((acc, { _id, count }) => {
+        if (_id) acc[_id] = count;
+        return acc;
+      }, {});
+
+    return successResponse(res, "Admin orders fetched successfully", 200, {
+      orders,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
+      },
+      summary: {
+        byApprovalStatus: toMap(counts.byApproval || []),
+        byOrderStatus: toMap(counts.byStatus || []),
+        byPaymentMethod: toMap(counts.byPayment || []),
+      },
+      appliedFilters: {
+        admin_approval_status,
+        status,
+        paymentMethod,
+        search,
+        fromDate: fromDate || null,
+        toDate: toDate || null,
+      },
+    });
+  } catch (error) {
+    console.error("getAllOrdersAdmin Error:", error);
+    return errorResponse(res, error.message || "Internal Server Error", 500);
+  }
+});
+
+/**
+ * ADMIN: Approve an order and create shipment + tracking ID
+ */
+exports.approveOrder = catchAsync(async (req, res) => {
+  const isAdmin = await ensureAdmin(req.user?.id);
+  if (!isAdmin) {
+    return errorResponse(res, "Forbidden: admin access required", 403);
+  }
+
+  const { id } = req.params;
+  const { courier_override } = req.body || {};
+
+  if (!id) {
+    return validationErrorResponse(res, "Order ID is required");
+  }
+
+  const order = await Order.findById(id);
+  if (!order) {
+    return errorResponse(res, "Order not found", 404);
+  }
+
+  if (order.admin_approval_status === "approved") {
+    return successResponse(res, "Order is already approved", 200, {
+      order,
+      alreadyApproved: true,
+    });
+  }
+
+  if (order.admin_approval_status === "rejected") {
+    return errorResponse(res, "Cannot approve a rejected order", 400);
+  }
+
+  const { shippingAddress } = await ensureOrderShippingAddress(order, {
+    userId: order.userId,
+  });
+  if (!shippingAddress) {
+    return errorResponse(res, "Order shipping address is missing", 400);
+  }
+
+  if (!order.labelData) order.labelData = {};
+  order.labelData.shipFrom = resolveBlueDartShipFrom(order.labelData.shipFrom);
+
+  let shipmentData = null;
+  let shipmentError = null;
+  const isCod = (order.paymentMethod || "ONLINE").toUpperCase() === "COD";
+  const courierName = courier_override || process.env.DEFAULT_COURIER || "DHL";
+  const legacyAddress = buildLegacyAddressString(shippingAddress);
+
+  try {
+    if (courierName === "BLUE_DART" || courierName === "BlueDart") {
+      const shipmentResponse = await createBlueDartWaybill({
+        orderId: order.orderId,
+        name: shippingAddress.name,
+        mobile: shippingAddress.mobile,
+        receiverAddress: {
+          ...shippingAddress,
+          street_address: shippingAddress.street_address || legacyAddress,
+          address: legacyAddress,
+          addressLine1: shippingAddress.street_address || legacyAddress,
+          pincode: shippingAddress.pincode,
+        },
+        shipFrom: order.labelData.shipFrom,
+        products: order.product,
+        declaredValue: order.amount,
+        isCod,
+        collectableAmount: isCod ? order.amount : 0,
+      });
+
+      if (shipmentResponse?.success || shipmentResponse?.awbNumber) {
+        shipmentData = {
+          courierName: "BLUE_DART",
+          trackingNumber: shipmentResponse.awbNumber,
+          waybillNumber: shipmentResponse.awbNumber,
+          labelData: shipmentResponse.labelData || null,
+          shipmentDetails: {
+            status: "created",
+            timestamp: new Date().toISOString(),
+            ...shipmentResponse,
+          },
+        };
+      } else {
+        shipmentError = shipmentResponse?.error || "Blue Dart shipment creation failed";
+      }
+    } else {
+      const shipmentResponse = await createDhlShipment({
+        name: shippingAddress.name,
+        mobile: shippingAddress.mobile,
+        address: legacyAddress,
+        products: order.product,
+        totalAmount: order.amount,
+        orderId: order.orderId,
+      });
+
+      if (shipmentResponse?.success && shipmentResponse?.data) {
+        shipmentData = {
+          courierName: "DHL",
+          trackingNumber: shipmentResponse.data.shipmentTrackingNumber,
+          labelData: shipmentResponse.data?.labelData || null,
+          shipmentDetails: {
+            status: "created",
+            timestamp: new Date().toISOString(),
+            estimatedDeliveryDate: shipmentResponse.data?.estimatedDeliveryDate,
+            warnings: shipmentResponse.data?.warnings || [],
+          },
+          rawResponse: shipmentResponse.data,
+        };
+      } else {
+        shipmentError = shipmentResponse?.error || "DHL shipment creation failed";
+      }
+    }
+  } catch (err) {
+    console.error("Admin approve shipment error:", err);
+    shipmentError = err.message || "Shipment creation exception";
+  }
+
+  order.admin_approval_status = "approved";
+  order.status = "confirmed";
+  order.approved_by = req.user.id;
+  order.approved_at = new Date();
+
+  if (shipmentData) {
+    order.tracking_number = shipmentData.trackingNumber;
+    order.shipping_status = "shipment_created";
+    order.courier_name = shipmentData.courierName;
+    order.shipping_response = shipmentData.shipmentDetails;
+    order.labelData = {
+      ...(order.labelData || {}),
+      ...(shipmentData.labelData || {}),
+    };
+  } else {
+    order.shipping_status = "shipment_creation_failed";
+    order.shipping_response = {
+      status: "failed",
+      error: shipmentError,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  await order.save();
+
+  let syncedTransit = {};
+  try {
+    syncedTransit = await hydrateOrderShipmentDetails(order, {
+      userId: order.userId,
+      syncCourier: !!shipmentData,
+      persist: true,
+    });
+  } catch (tErr) {
+    console.warn("Post-approval transit sync notice:", tErr.message);
+  }
+
+  try {
+    const user = await User.findById(order.userId).select("fcmToken name");
+    if (user?.fcmToken) {
+      await sendPushNotification({
+        tokens: [user.fcmToken],
+        title: "Order Approved ✅",
+        body: shipmentData
+          ? `Hi ${user.name}, your order ${order.orderId} is approved & shipped! Track: ${shipmentData.trackingNumber}`
+          : `Hi ${user.name}, your order ${order.orderId} is approved.`,
+        data: {
+          type: "ORDER_APPROVED",
+          orderId: order._id.toString(),
+          orderNo: order.orderId,
+          trackingNumber: order.tracking_number || "",
+        },
+      });
+    }
+  } catch (nErr) {
+    console.warn("Approval notification failed:", nErr.message);
+  }
+
+  return successResponse(
+    res,
+    shipmentData
+      ? `Order approved. Shipment created with tracking: ${shipmentData.trackingNumber}`
+      : `Order approved but shipment creation failed: ${shipmentError}`,
+    200,
+    {
+      order,
+      shipment: shipmentData || { status: "failed", error: shipmentError, trackingNumber: null },
+      syncedTransit,
+    }
+  );
+});
+
+/**
+ * ADMIN: Reject an order, restore stock, set status cancelled
+ */
+exports.rejectOrder = catchAsync(async (req, res) => {
+  const isAdmin = await ensureAdmin(req.user?.id);
+  if (!isAdmin) {
+    return errorResponse(res, "Forbidden: admin access required", 403);
+  }
+
+  const { id } = req.params;
+  const { reason } = req.body || {};
+
+  if (!id) {
+    return validationErrorResponse(res, "Order ID is required");
+  }
+  if (!reason || String(reason).trim().length < 3) {
+    return validationErrorResponse(res, "Rejection reason is required (min 3 chars)");
+  }
+
+  const order = await Order.findById(id);
+  if (!order) {
+    return errorResponse(res, "Order not found", 404);
+  }
+
+  if (order.admin_approval_status === "rejected") {
+    return successResponse(res, "Order is already rejected", 200, {
+      order,
+      alreadyRejected: true,
+    });
+  }
+
+  if (
+    order.admin_approval_status === "approved" &&
+    order.shipping_status === "shipment_created"
+  ) {
+    return errorResponse(
+      res,
+      "Cannot reject: shipment already created. Cancel shipment first.",
+      400
+    );
+  }
+
+  for (const item of order.product || []) {
+    try {
+      const productData = await Product.findById(item.id);
+      if (!productData) continue;
+
+      const variantColor = item.variant?.toLowerCase();
+      const variantIndex = productData.variants.findIndex(
+        (v) => v.color.toLowerCase() === variantColor
+      );
+      if (variantIndex === -1) continue;
+
+      await Product.updateOne(
+        { _id: item.id },
+        { $inc: { [`variants.${variantIndex}.stock`]: item.quantity } }
+      );
+
+      const refreshed = await Product.findById(item.id);
+      const anyInStock = (refreshed?.variants || []).some((v) => v.stock > 0);
+      await Product.updateOne(
+        { _id: item.id },
+        { $set: { stock_status: anyInStock ? "in_stock" : "out_of_stock" } }
+      );
+    } catch (stockErr) {
+      console.warn("Stock restore failed for product", item.id, stockErr.message);
+    }
+  }
+
+  order.admin_approval_status = "rejected";
+  order.status = "cancelled";
+  order.rejection_reason = String(reason).trim();
+  order.rejected_by = req.user.id;
+  order.rejected_at = new Date();
+
+  await order.save();
+
+  try {
+    const user = await User.findById(order.userId).select("fcmToken name");
+    if (user?.fcmToken) {
+      await sendPushNotification({
+        tokens: [user.fcmToken],
+        title: "Order Rejected ❌",
+        body: `Hi ${user.name}, your order ${order.orderId} was rejected. Reason: ${reason}`,
+        data: {
+          type: "ORDER_REJECTED",
+          orderId: order._id.toString(),
+          orderNo: order.orderId,
+          reason: String(reason).trim(),
+        },
+      });
+    }
+  } catch (nErr) {
+    console.warn("Rejection notification failed:", nErr.message);
+  }
+
+  return successResponse(res, "Order rejected successfully. Stock restored.", 200, {
+    order,
+    rejection: {
+      reason: order.rejection_reason,
+      rejected_by: order.rejected_by,
+      rejected_at: order.rejected_at,
+    },
+  });
+});
+
+/**
+ * ADMIN: Get full order details (with Payment, Shipment, Tracking)
+ */
+exports.getOrderDetailsAdmin = catchAsync(async (req, res) => {
+  const isAdmin = await ensureAdmin(req.user?.id);
+  if (!isAdmin) {
+    return errorResponse(res, "Forbidden: admin access required", 403);
+  }
+
+  const { orderId } = req.params;
+  if (!orderId) {
+    return validationErrorResponse(res, "orderId parameter is required");
+  }
+
+  const cleanOrderId = String(orderId).trim().replace(/^#/, "");
+  const queryConditions = [
+    { orderId: cleanOrderId },
+    { orderId: `ORD-${cleanOrderId}` },
+    { tracking_number: cleanOrderId },
+  ];
+  if (mongoose.Types.ObjectId.isValid(cleanOrderId)) {
+    queryConditions.push({ _id: cleanOrderId });
+  }
+
+  const order = await Order.findOne({ $or: queryConditions })
+    .populate({ path: "product.id", model: "Product" })
+    .populate({ path: "userId", model: "User", select: "name email phone role profileImage" })
+    .populate({ path: "approved_by", model: "User", select: "name email" })
+    .populate({ path: "rejected_by", model: "User", select: "name email" });
+
+  if (!order) {
+    return errorResponse(res, `Order not found with ID: ${orderId}`, 404);
+  }
+
+  const payment = await Payment.findOne({ OrderID: order._id })
+    .sort({ createdAt: -1 })
+    .lean();
+
+  let syncedTransit = {};
+  try {
+    syncedTransit = await hydrateOrderShipmentDetails(order, {
+      userId: order.userId,
+      syncCourier: true,
+      persist: true,
+    });
+  } catch (transitErr) {
+    console.warn("Admin order details transit sync notice:", transitErr.message);
+  }
+
+  const formattedWeb = formatOrderDetailsForWeb(order, syncedTransit);
+
+  return successResponse(res, "Admin order details fetched successfully", 200, {
+    order: order.toObject(),
+    payment: payment || null,
+    user: order.userId || null,
+    approvedBy: order.approved_by || null,
+    rejectedBy: order.rejected_by || null,
+    shipment: {
+      trackingNumber: order.tracking_number || null,
+      shippingStatus: order.shipping_status,
+      courierName: order.courier_name || null,
+      labelData: order.labelData || null,
+      shippingTimeline: order.shipping_timeline || [],
+      shippingMeta: order.shipping_meta || null,
+      syncedTransit,
+    },
+    formattedForWeb: formattedWeb,
+    approval: {
+      admin_approval_status: order.admin_approval_status,
+      approved_by: order.approved_by || null,
+      approved_at: order.approved_at || null,
+      rejected_by: order.rejected_by || null,
+      rejected_at: order.rejected_at || null,
+      rejection_reason: order.rejection_reason || null,
+    },
+  });
+});
