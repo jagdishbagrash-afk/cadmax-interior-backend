@@ -129,8 +129,20 @@ const formatOrderDetailsForWeb = (order, syncedTransit = {}) => {
 
   // Shipment Details
   const shipmentId = order.labelData?.shipmentId || order.shipping_meta?.shipmentId || `SHP-${(order.orderId || "").replace(/^ORD-/, "") || "554789"}`;
-  const courierPartner = order.courier_name || "Ecom Express";
-  const trackingId = order.tracking_number || "1234567890";
+  const courierPartner = order.courier_name || order.labelData?.carrier?.name || "BLUE_DART";
+  const trackingId =
+    order.tracking_number ||
+    order.labelData?.trackingNumber ||
+    order.labelData?.awbNumber ||
+    order.labelData?.awbNo ||
+    order.labelData?.awb ||
+    order.shipping_response?.AWBNo ||
+    order.shipping_response?.awbNumber ||
+    order.shipping_response?.GenerateWayBillResult?.AWBNo ||
+    order.shipping_response?.data?.AWBNo ||
+    order.shipping_meta?.trackingNumber ||
+    order.shipping_meta?.awbNumber ||
+    null;
 
   return {
     orderHeader: {
@@ -173,6 +185,8 @@ const formatOrderDetailsForWeb = (order, syncedTransit = {}) => {
       shipmentId: shipmentId,
       courierPartner: courierPartner,
       trackingId: trackingId,
+      awbNumber: trackingId,
+      trackingNumber: trackingId,
       shippedOn: formatDate(order.dispatched_at || order.createdAt, "datetime"),
       deliveredOn: formatDate(order.delivered_at, "datetime"),
       status: order.shipping_status || order.status || "Delivered",

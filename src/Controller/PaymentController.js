@@ -373,10 +373,7 @@ exports.paymentAdd = catchAsync(async (req, res) => {
   order.payment_status = normalizedPaymentStatus;
 
   if (isCOD) {
-    // Synthetic reference; not an actual Razorpay payment ID
     order.PaymentId = effectivePaymentId;
-
-    // Use your actual schema field names
     order.cod_amount = numericAmount;
     order.collectable_amount = numericAmount;
   } else {
@@ -385,143 +382,52 @@ exports.paymentAdd = catchAsync(async (req, res) => {
     order.collectable_amount = 0;
   }
 
-  /*
-   * Create shipment when:
-   * Online payment is successful
-   * OR payment method is COD
-   */
-  const shouldCreateShipment =
-    isCOD ||
-    normalizedPaymentStatus === "success";
-
-  if (shouldCreateShipment) {
-    if (order.status === "pending") {
-      order.status = "confirmed";
-    }
-
-    // Reuse existing shipment
-    if (
-      order.shipping_status === "shipment_created" &&
-      order.tracking_number
-    ) {
-      shipment = {
-        success: true,
-        data: order.shipping_response,
-        trackingNumber: order.tracking_number,
-        reusedExistingShipment: true,
-      };
-    } else {
-      const desiredProvider =
-        shipping_provider || shippingProvider;
-
-      const created = await createShipmentForOrder({
-        order,
-
-        receiverAddress:
-          toCourierAddress(shippingAddress),
-
-        shippingProvider:
-          desiredProvider,
-
-        // Pass COD details to courier service
-        paymentMethod:
-          selectedPaymentMethod,
-
-        isCOD,
-
-        codAmount:
-          isCOD ? numericAmount : 0,
-
-        collectableAmount:
-          isCOD ? numericAmount : 0,
-      });
-
-      shipment = created.shipment;
-
-      if (shipment.success) {
-        order.tracking_number = created.trackingNumber;
-        order.shipping_status = "shipment_created";
-        order.shipping_response = shipment.data;
-        persistShipmentMeta({
-          order,
-          shipment,
-          provider: created.provider,
-        });
-        appendTimelineEvent(order, {
-          status: "Shipment created",
-          location: order?.labelData?.shipFrom?.city || "",
-          remarks: `Shipment created with ${created.provider}`,
-        });
-      } else {
-        order.shipping_status = "shipment_failed";
-        order.shipping_response = shipment.error;
-        persistShipmentMeta({
-          order,
-          shipment,
-          provider: created.provider,
-        });
-        appendTimelineEvent(order, {
-          status: "Shipment failed",
-          location: order?.labelData?.shipFrom?.city || "",
-          remarks: shipment?.error?.message || shipment?.error?.title || "Shipment creation failed",
-        });
-      }
-    }
-  }
+  // Keep order pending for admin approval; do NOT create shipment yet
+  // Shipment will be created only after admin approves the order
+  order.status = "pending";
+  order.admin_approval_status = order.admin_approval_status || "pending_approval";
 
   await order.save();
 
   // Online failed response
-  if (
-    !isCOD &&
-    normalizedPaymentStatus === "failed"
-  ) {
+  if (!isCOD && normalizedPaymentStatus === "failed") {
     return res.status(200).json({
       status: "failed",
-      message:
-        "Payment failed and was saved successfully",
+      message: "Payment failed and was saved successfully",
       record,
       order,
       shipment: null,
     });
   }
 
+  const adminApprovalMeta = {
+    status: order.admin_approval_status,
+    message: "Payment verified. Order is awaiting admin approval.",
+    nextStep: "Admin will review and approve/reject this order. Shipment & tracking ID will be generated after approval.",
+  };
+
   // COD response
   if (isCOD) {
     return res.status(200).json({
-      status: shipment?.success
-        ? "success"
-        : "failed",
-
-      message: shipment?.success
-        ? "COD order and shipment created successfully"
-        : "COD order saved but shipment creation failed",
-
+      status: "success",
+      message: "COD order placed successfully. Awaiting admin approval.",
       record,
       order,
-      shipment,
-
-      trackingNumber:
-        order.tracking_number || null,
+      shipment: null,
+      trackingNumber: null,
+      adminApproval: adminApprovalMeta,
     });
   }
 
   // Online success response
   return res.status(200).json({
-    status: shipment?.success
-      ? "success"
-      : "failed",
-
-    message: shipment?.success
-      ? "Payment verified and shipment created successfully"
-      : "Payment verified but shipment creation failed",
-
+    status: "success",
+    message: "Payment verified successfully. Order is awaiting admin approval.",
     record,
     order,
-    shipment,
-
-    trackingNumber:
-      order.tracking_number || null,
+    shipment: null,
+    trackingNumber: null,
+    adminApproval: adminApprovalMeta,
   });
 });
 

@@ -601,13 +601,22 @@ const createShipmentForOrder = async ({ order, receiverAddress, shippingProvider
   const receiverName = receiverAddress?.name || order?.shippingAddress?.name || order?.name;
   const receiverMobile = receiverAddress?.mobile || order?.shippingAddress?.mobile || order?.mobile;
   const isCod = toSafeString(order?.paymentMethod).toUpperCase() === "COD";
-  const collectableAmount = order?.amount;
+  const collectableAmount = isCod ? Number(order?.amount || 0) : 0;
   const productCode = order?.shipping_meta?.productCode || order?.labelData?.carrier?.blueDart?.productCode;
   const subProductCode = order?.shipping_meta?.subProductCode || order?.labelData?.carrier?.blueDart?.subProductCode;
+
+  console.log("--------------------------------------------------");
+  console.log(`[CREATE SHIPMENT FOR ORDER] Provider: ${provider}`);
+  console.log(`Order ID: ${order?.orderId || order?._id}`);
+  console.log(`Receiver Name: ${receiverName}, Mobile: ${receiverMobile}`);
+  console.log(`Payment Method: ${order?.paymentMethod || "ONLINE"} | Is COD: ${isCod}`);
+  console.log(`Total Amount: ${order?.amount} | Collectable Amount: ${collectableAmount}`);
+  console.log("--------------------------------------------------");
 
   if (provider === "BLUE_DART") {
     const shipFrom = resolveBlueDartShipFrom(order?.labelData?.shipFrom);
 
+    console.log(`[BLUE_DART WAYBILL GENERATION ATTEMPT]`);
     const shipment = await createBlueDartWaybill({
       orderId: order.orderId,
       name: receiverName,
@@ -622,6 +631,13 @@ const createShipmentForOrder = async ({ order, receiverAddress, shippingProvider
       subProductCode,
     });
 
+    console.log(`[BLUE_DART RESULT] Success: ${shipment.success}`);
+    if (shipment.success) {
+      console.log(`[BLUE_DART AWB NUMBER] ${shipment.awbNumber}`);
+    } else {
+      console.log(`[BLUE_DART ERROR DETAILS]`, shipment.error);
+    }
+
     return {
       provider,
       shipment,
@@ -631,6 +647,7 @@ const createShipmentForOrder = async ({ order, receiverAddress, shippingProvider
     };
   }
 
+  console.log(`[DHL SHIPMENT BOOKING ATTEMPT]`);
   const shipment = await createDhlShipment({
     name: receiverName,
     mobile: receiverMobile,
@@ -639,6 +656,13 @@ const createShipmentForOrder = async ({ order, receiverAddress, shippingProvider
     totalAmount: order.amount,
     orderId: order.orderId,
   });
+
+  console.log(`[DHL RESULT] Success: ${shipment.success}`);
+  if (shipment.success) {
+    console.log(`[DHL TRACKING NUMBER] ${getShipmentTrackingNumber(shipment.data)}`);
+  } else {
+    console.log(`[DHL ERROR DETAILS]`, shipment.error);
+  }
 
   return {
     provider: "DHL",
@@ -1358,21 +1382,17 @@ exports.TrackShipment = async (req, res) => {
   }
 };
 
-exports.CreateOrderShipment = catchAsync(async (req, res) => {
-  const order = await Order.findOne({
-    _id: req.params.id,
-    userId: req.user.id,
-  });
+exports.processOrderShipmentCreation = async (order, options = {}) => {
+  console.log("==================================================");
+  console.log(`[PROCESS ORDER SHIPMENT CREATION] Order ID: ${order?._id}`);
+  console.log(`Order Number: ${order?.orderId}`);
+  console.log(`Existing Shipping Status: ${order?.shipping_status || "None"}`);
+  console.log(`Existing Tracking Number: ${order?.tracking_number || "None"}`);
+  console.log("==================================================");
 
-  if (!order) {
-    return res.status(404).json({
-      status: false,
-      message: "Order not found",
-    });
-  }
-
+  const userId = options.userId || order.userId;
   const { shippingAddress, hydrated, addressRecord } = await ensureOrderShippingAddress(order, {
-    userId: req.user.id,
+    userId,
   });
   const shipFrom = ensureOrderShipFrom(order);
 
@@ -1381,31 +1401,39 @@ exports.CreateOrderShipment = catchAsync(async (req, res) => {
   }
 
   if (order.shipping_status === "shipment_created" && order.tracking_number) {
+    console.log(`[SHIPMENT EXISTS ALREADY] Order ${order._id} already has tracking ${order.tracking_number}`);
     order.labelData = getOrderLabelData({ order, savedAddress: addressRecord });
     await order.save();
 
-    return res.status(200).json({
-      status: true,
-      message: "Shipment already exists for this order",
-      data: buildShipmentResponseData({ order, savedAddress: addressRecord }),
-    });
-  }
+    const synced = await hydrateOrderShipmentDetails(order, { userId, persist: false });
 
-  if (!order.PaymentId) {
-    return res.status(400).json({
-      status: false,
-      message: "Order payment is not verified yet",
-    });
+    return {
+      success: true,
+      alreadyExists: true,
+      message: "Shipment already exists for this order",
+      order,
+      data: buildShipmentResponseData({
+        order,
+        savedAddress: synced?.addressRecord || addressRecord,
+        liveTracking: synced?.liveTracking,
+        trackingError: synced?.trackingError,
+        transitEstimate: synced?.transitEstimate,
+        serviceability: synced?.serviceability,
+        trackingPending: synced?.trackingPending,
+      }),
+    };
   }
 
   if (!shippingAddress) {
-    return res.status(400).json({
-      status: false,
+    console.error(`[SHIPMENT ABORTED] Shipping address is missing for Order ${order._id}`);
+    return {
+      success: false,
       message: "Order shipping address is missing",
-    });
+    };
   }
 
-  const desiredProvider = req.body?.shipping_provider || req.body?.shippingProvider;
+  const desiredProvider = options.shippingProvider || process.env.DEFAULT_SHIPPING_PROVIDER || "DHL";
+  console.log(`[SELECTED SHIPPING PROVIDER] ${desiredProvider}`);
 
   const created = await createShipmentForOrder({
     order,
@@ -1417,6 +1445,7 @@ exports.CreateOrderShipment = catchAsync(async (req, res) => {
   order.courier_name = created.provider;
 
   if (shipment.success) {
+    console.log(`[SHIPMENT CREATION SUCCESS] Tracking Number: ${created.trackingNumber}`);
     order.tracking_number = created.trackingNumber;
     order.shipping_status = "shipment_created";
     order.shipping_response = shipment.data;
@@ -1429,6 +1458,7 @@ exports.CreateOrderShipment = catchAsync(async (req, res) => {
       }),
     ]);
   } else {
+    console.error(`[SHIPMENT CREATION FAILED] Provider: ${created.provider}`);
     order.shipping_status = "shipment_failed";
     order.shipping_response = shipment.error;
     appendOrderTimelineEvents(order, [
@@ -1465,22 +1495,23 @@ exports.CreateOrderShipment = catchAsync(async (req, res) => {
 
   const synced = shipment.success
     ? await hydrateOrderShipmentDetails(order, {
-      userId: req.user.id,
-      persist: false,
-    })
+        userId,
+        persist: false,
+      })
     : {
-      addressRecord,
-      liveTracking: null,
-      trackingError: null,
-      transitEstimate: null,
-      serviceability: null,
-      trackingPending: false,
-    };
+        addressRecord,
+        liveTracking: null,
+        trackingError: null,
+        transitEstimate: null,
+        serviceability: null,
+        trackingPending: false,
+      };
 
   await order.save();
+  console.log(`[ORDER SAVED AFTER SHIPMENT PROCESSING] Status: ${order.shipping_status}`);
 
-  return res.status(200).json({
-    status: shipment.success,
+  return {
+    success: Boolean(shipment.success),
     message: shipment.success
       ? "Shipment created successfully"
       : "Shipment creation failed",
@@ -1494,6 +1525,49 @@ exports.CreateOrderShipment = catchAsync(async (req, res) => {
       trackingPending: synced.trackingPending,
     }),
     shipment,
+    order,
+  };
+};
+
+exports.CreateOrderShipment = catchAsync(async (req, res) => {
+  const order = await Order.findOne({
+    _id: req.params.id,
+    userId: req.user.id,
+  });
+
+  if (!order) {
+    return res.status(404).json({
+      status: false,
+      message: "Order not found",
+    });
+  }
+
+  if (!order.PaymentId) {
+    return res.status(400).json({
+      status: false,
+      message: "Order payment is not verified yet",
+    });
+  }
+
+  const desiredProvider = req.body?.shipping_provider || req.body?.shippingProvider;
+
+  const result = await exports.processOrderShipmentCreation(order, {
+    shippingProvider: desiredProvider,
+    userId: req.user.id,
+  });
+
+  if (!result.success && result.message === "Order shipping address is missing") {
+    return res.status(400).json({
+      status: false,
+      message: result.message,
+    });
+  }
+
+  return res.status(200).json({
+    status: result.success,
+    message: result.message,
+    data: result.data,
+    shipment: result.shipment,
   });
 });
 

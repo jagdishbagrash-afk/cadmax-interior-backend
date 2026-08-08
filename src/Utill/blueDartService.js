@@ -659,15 +659,25 @@ const buildGenerateWaybillPayload = ({
   }
 
   const resolvedShipFrom = resolveBlueDartShipFrom(shipFrom);
-  const resolvedProductCode = String(
+  let resolvedProductCode = String(
     productCode || process.env.BLUE_DART_PRODUCT_CODE || "A"
-  );
-  const resolvedSubProductCode = String(
+  ).toUpperCase();
+  let resolvedSubProductCode = String(
     subProductCode ||
       (isCod
         ? process.env.BLUE_DART_COD_SUB_PRODUCT_CODE || "C"
         : process.env.BLUE_DART_SUB_PRODUCT_CODE || "P")
-  );
+  ).toUpperCase();
+
+  // Fix: ProductCode "D" (Domestic Priority Document) mismatches SubProductCode "P" or "C" (Parcel). Use "A" (Apex Air Cargo) for parcels.
+  if (resolvedProductCode === "D" && (resolvedSubProductCode === "P" || resolvedSubProductCode === "C")) {
+    resolvedProductCode = "A";
+  }
+
+  // Fix: CollectableAmount MUST be 0 for non-COD shipments to prevent BlueDart InvalidCollectableAmount error.
+  const finalCollectableAmount = isCod && (resolvedSubProductCode === "C" || resolvedSubProductCode === "DOD" || resolvedSubProductCode === "DODFOD")
+    ? (coerceNumber(collectableAmount) ?? coerceNumber(declaredValue) ?? 0)
+    : 0;
 
   const payload = {
     Request: {
@@ -708,8 +718,7 @@ const buildGenerateWaybillPayload = ({
       Services: {
         AWBNo: "",
         ActualWeight: String(getApproxWeightKg(products).toFixed(2)),
-        CollectableAmount:
-          coerceNumber(collectableAmount) ?? (isCod ? coerceNumber(declaredValue) ?? 0 : 0),
+        CollectableAmount: finalCollectableAmount,
         Commodity: buildCommodity(),
         CreditReferenceNo: toLimitedString(orderId || "", 20, ""),
         CreditReferenceNo2: "",
