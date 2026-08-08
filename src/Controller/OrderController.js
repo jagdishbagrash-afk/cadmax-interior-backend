@@ -19,7 +19,7 @@ const {
 const { createDhlShipment } = require("../Utill/createDhlShipment");
 const { createBlueDartWaybill, resolveBlueDartShipFrom } = require("../Utill/blueDartService");
 const mongoose = require("mongoose");
-const { hydrateOrderShipmentDetails } = require("./shipmentController");
+const { hydrateOrderShipmentDetails, processOrderShipmentCreation } = require("./shipmentController");
 const { formatOrderDetailsForWeb, formatOrderDetailsForApp } = require("../Utill/orderDetailsFormatter");
 
 
@@ -555,6 +555,13 @@ exports.updateStatus = catchAsync(async (req, res) => {
     const { id } = req.params;
     const { status, note } = req.body;
 
+    console.log("==================================================");
+    console.log(`[ORDER STATUS UPDATE API HIT]`);
+    console.log(`Order ID: ${id}`);
+    console.log(`Target Status: ${status}`);
+    console.log(`Note: ${note || "None"}`);
+    console.log("==================================================");
+
     if (!id) {
       return validationErrorResponse(res, "Order ID is required");
     }
@@ -574,23 +581,38 @@ exports.updateStatus = catchAsync(async (req, res) => {
     );
 
     if (!order) {
+      console.log(`[ORDER UPDATE FAILED] Order not found for ID: ${id}`);
       return errorResponse(res, "Order not found", 404);
     }
 
+    console.log(`[ORDER UPDATED] Order ${order._id} status updated to "${order.status}"`);
+
     // ======================================================
-    // Auto Fetch Tracking After Order Confirmation
+    // Auto Create Shipment & Sync Tracking After Order Confirmation
     // ======================================================
-    if (status === "confirmed") {
+    if (status && status.toLowerCase() === "confirmed") {
+      console.log("--------------------------------------------------");
+      console.log(`[TRIGGERING AUTO SHIPMENT CREATION] Order ID: ${order._id}`);
+      console.log("--------------------------------------------------");
+
       try {
-        await hydrateOrderShipmentDetails(order, {
+        const shippingProvider = req.body?.shipping_provider || req.body?.shippingProvider;
+        const shipmentResult = await processOrderShipmentCreation(order, {
+          shippingProvider,
           userId: order.userId,
         });
 
-        console.log(
-          `Tracking synced successfully for Order ${order._id}`
-        );
+        console.log("--------------------------------------------------");
+        console.log(`[AUTO SHIPMENT RESULT] Order ID: ${order._id}`);
+        console.log(`Status: ${shipmentResult?.success ? "SUCCESS ✅" : "FAILED ❌"}`);
+        console.log(`Message: ${shipmentResult?.message || "No message"}`);
+        if (shipmentResult?.order?.tracking_number) {
+          console.log(`Tracking Number: ${shipmentResult.order.tracking_number}`);
+          console.log(`Courier Provider: ${shipmentResult.order.courier_name}`);
+        }
+        console.log("--------------------------------------------------");
       } catch (err) {
-        console.error("Tracking Sync Error:", err.message);
+        console.error("[AUTO SHIPMENT ERROR]", err.message, err.stack);
       }
     }
 
@@ -603,7 +625,7 @@ exports.updateStatus = catchAsync(async (req, res) => {
       let title = "Order Update 📦";
       let body = "";
 
-      switch (status) {
+      switch (status.toLowerCase()) {
         case "pending":
           body = `Hi ${user.name}, your order is pending.`;
           break;
@@ -628,16 +650,21 @@ exports.updateStatus = catchAsync(async (req, res) => {
           body = `Hi ${user.name}, your order status is updated to ${status}`;
       }
 
-      await sendPushNotification({
-        tokens: [user.fcmToken],
-        title,
-        body,
-        data: {
-          type: "ORDER_STATUS",
-          orderId: order._id.toString(),
-          status,
-        },
-      });
+      try {
+        await sendPushNotification({
+          tokens: [user.fcmToken],
+          title,
+          body,
+          data: {
+            type: "ORDER_STATUS",
+            orderId: order._id.toString(),
+            status,
+          },
+        });
+        console.log(`[PUSH NOTIFICATION SENT] To User: ${user.name}`);
+      } catch (pushErr) {
+        console.error("[PUSH NOTIFICATION WARNING (SKIPPED)]", pushErr.message);
+      }
     }
 
     return successResponse(
@@ -647,7 +674,7 @@ exports.updateStatus = catchAsync(async (req, res) => {
       order
     );
   } catch (error) {
-    console.error(error);
+    console.error("[ORDER STATUS UPDATE EXCEPTION]", error);
     return errorResponse(
       res,
       error.message || "Internal Server Error",
@@ -831,10 +858,37 @@ exports.getOrderById = catchAsync(async (req, res) => {
       });
     }
 
+    const resolvedTrackingNumber =
+      order.tracking_number ||
+      order.labelData?.trackingNumber ||
+      order.labelData?.awbNumber ||
+      order.labelData?.awbNo ||
+      order.labelData?.awb ||
+      order.shipping_response?.AWBNo ||
+      order.shipping_response?.awbNumber ||
+      order.shipping_response?.GenerateWayBillResult?.AWBNo ||
+      order.shipping_response?.data?.AWBNo ||
+      order.shipping_meta?.trackingNumber ||
+      order.shipping_meta?.awbNumber ||
+      null;
+
+    if (!order.tracking_number && resolvedTrackingNumber) {
+      order.tracking_number = resolvedTrackingNumber;
+      await order.save();
+    }
+
+    const orderObj = order.toObject();
+    orderObj.tracking_number = resolvedTrackingNumber || orderObj.tracking_number || null;
+    orderObj.trackingNumber = resolvedTrackingNumber || orderObj.tracking_number || null;
+    orderObj.awbNumber = resolvedTrackingNumber || orderObj.tracking_number || null;
+    orderObj.trackingId = resolvedTrackingNumber || orderObj.tracking_number || null;
+    orderObj.courier_name = orderObj.courier_name || "BLUE_DART";
+    orderObj.courierPartner = orderObj.courier_name || "BLUE_DART";
+
     return res.status(200).json({
       success: true,
       message: "Order fetched successfully",
-      data: order,
+      data: orderObj,
     });
   } catch (error) {
     console.error("Get Order Error:", error);
@@ -951,8 +1005,34 @@ exports.getAllOrdersAdmin = catchAsync(async (req, res) => {
         return acc;
       }, {});
 
+    const resolvedOrders = orders.map((ord) => {
+      const trackingNumber =
+        ord.tracking_number ||
+        ord.labelData?.trackingNumber ||
+        ord.labelData?.awbNumber ||
+        ord.labelData?.awbNo ||
+        ord.labelData?.awb ||
+        ord.shipping_response?.AWBNo ||
+        ord.shipping_response?.awbNumber ||
+        ord.shipping_response?.GenerateWayBillResult?.AWBNo ||
+        ord.shipping_response?.data?.AWBNo ||
+        ord.shipping_meta?.trackingNumber ||
+        ord.shipping_meta?.awbNumber ||
+        null;
+
+      return {
+        ...ord,
+        tracking_number: trackingNumber,
+        trackingNumber: trackingNumber,
+        awbNumber: trackingNumber,
+        trackingId: trackingNumber,
+        courier_name: ord.courier_name || "BLUE_DART",
+        courierPartner: ord.courier_name || "BLUE_DART",
+      };
+    });
+
     return successResponse(res, "Admin orders fetched successfully", 200, {
-      orders,
+      orders: resolvedOrders,
       pagination: {
         page: pageNum,
         limit: limitNum,
@@ -1320,18 +1400,49 @@ exports.getOrderDetailsAdmin = catchAsync(async (req, res) => {
     console.warn("Admin order details transit sync notice:", transitErr.message);
   }
 
+  const resolvedTrackingNumber =
+    order.tracking_number ||
+    order.labelData?.trackingNumber ||
+    order.labelData?.awbNumber ||
+    order.labelData?.awbNo ||
+    order.labelData?.awb ||
+    order.shipping_response?.AWBNo ||
+    order.shipping_response?.awbNumber ||
+    order.shipping_response?.GenerateWayBillResult?.AWBNo ||
+    order.shipping_response?.data?.AWBNo ||
+    order.shipping_meta?.trackingNumber ||
+    order.shipping_meta?.awbNumber ||
+    null;
+
+  if (!order.tracking_number && resolvedTrackingNumber) {
+    order.tracking_number = resolvedTrackingNumber;
+    await order.save();
+  }
+
+  const orderObj = order.toObject();
+  orderObj.tracking_number = resolvedTrackingNumber || orderObj.tracking_number || null;
+  orderObj.trackingNumber = resolvedTrackingNumber || orderObj.tracking_number || null;
+  orderObj.awbNumber = resolvedTrackingNumber || orderObj.tracking_number || null;
+  orderObj.trackingId = resolvedTrackingNumber || orderObj.tracking_number || null;
+  orderObj.courier_name = orderObj.courier_name || "BLUE_DART";
+  orderObj.courierPartner = orderObj.courier_name || "BLUE_DART";
+
   const formattedWeb = formatOrderDetailsForWeb(order, syncedTransit);
 
   return successResponse(res, "Admin order details fetched successfully", 200, {
-    order: order.toObject(),
+    order: orderObj,
     payment: payment || null,
     user: order.userId || null,
     approvedBy: order.approved_by || null,
     rejectedBy: order.rejected_by || null,
     shipment: {
-      trackingNumber: order.tracking_number || null,
-      shippingStatus: order.shipping_status,
-      courierName: order.courier_name || null,
+      trackingNumber: resolvedTrackingNumber || null,
+      tracking_number: resolvedTrackingNumber || null,
+      awbNumber: resolvedTrackingNumber || null,
+      trackingId: resolvedTrackingNumber || null,
+      shippingStatus: order.shipping_status || "shipment_created",
+      courierName: order.courier_name || "BLUE_DART",
+      courierPartner: order.courier_name || "BLUE_DART",
       labelData: order.labelData || null,
       shippingTimeline: order.shipping_timeline || [],
       shippingMeta: order.shipping_meta || null,
