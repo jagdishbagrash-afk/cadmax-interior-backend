@@ -1428,15 +1428,23 @@ exports.getCart = catchAsync(async (req, res) => {
       return successResponse(res, "Cart is empty", 200, {
         items: [],
         summary: {
+          amount: 0,
+          final_amount: 0,
+
           subtotal: 0,
+          finalSubtotal: 0,
+
           totalDiscount: 0,
           cartDiscount: 0,
           cartDiscountAmount: 0,
+
           tax: 2,
           taxAmount: 0,
           totalAmount: 0,
+
           itemCount: 0,
           uniqueItems: 0,
+
           status: "pending",
           hasOutOfStockItems: false,
           lastUpdated: new Date(),
@@ -1444,8 +1452,21 @@ exports.getCart = catchAsync(async (req, res) => {
       });
     }
 
+    // ==========================================
+    // TOTAL PRODUCT AMOUNT
+    // ==========================================
+    let amount = 0;
+
+    // ==========================================
+    // TOTAL PRODUCT FINAL AMOUNT
+    // ==========================================
+    let final_amount = 0;
+
+    // Existing calculations
     let subtotal = 0;
+    let finalSubtotal = 0;
     let totalDiscount = 0;
+
     let hasOutOfStockItems = false;
 
     const items = [];
@@ -1455,9 +1476,9 @@ exports.getCart = catchAsync(async (req, res) => {
 
       if (!product) continue;
 
-      // ==========================
+      // ==========================================
       // Selected Variant
-      // ==========================
+      // ==========================================
       const selectedVariant =
         product?.variants?.find(
           (variant) =>
@@ -1465,9 +1486,9 @@ exports.getCart = catchAsync(async (req, res) => {
             item?.variant?.toLowerCase()?.trim()
         ) || null;
 
-      // ==========================
+      // ==========================================
       // Selected Price Section
-      // ==========================
+      // ==========================================
       let selectedPriceSection = null;
       let selectedSize = null;
 
@@ -1499,19 +1520,97 @@ exports.getCart = catchAsync(async (req, res) => {
         }
       }
 
-      // ==========================
-      // Price Calculation
-      // ==========================
+      // ==========================================
+      // Quantity
+      // ==========================================
+      const quantity = item.quantity || 1;
+
+      // ==========================================
+      // PRODUCT AMOUNT
+      // ==========================================
+      let productAmount =
+        product?.amount || 0;
+
+      let productFinalAmount =
+        product?.final_amount ||
+        productAmount;
+
+      // ==========================================
+      // If Variant Selected
+      // ==========================================
+      if (selectedVariant) {
+        productAmount =
+          selectedVariant?.amount ||
+          productAmount;
+
+        productFinalAmount =
+          selectedVariant?.final_amount ||
+          productAmount;
+      }
+
+      // ==========================================
+      // If Size Selected
+      // ==========================================
+      if (selectedSize) {
+        productAmount =
+          selectedSize?.amount ||
+          productAmount;
+
+        productFinalAmount =
+          selectedSize?.final_amount ||
+          productAmount;
+      }
+
+      // ==========================================
+      // If Price Section Selected
+      // ==========================================
+      else if (selectedPriceSection) {
+        productAmount =
+          selectedPriceSection?.amount ||
+          productAmount;
+
+        productFinalAmount =
+          selectedPriceSection?.final_amount ||
+          productAmount;
+      }
+
+      // ==========================================
+      // ITEM TOTAL
+      // ==========================================
+      const itemAmount =
+        productAmount * quantity;
+
+      const itemFinalAmount =
+        productFinalAmount * quantity;
+
+      // ==========================================
+      // ADD TO SUMMARY TOTAL
+      // ==========================================
+      amount += itemAmount;
+
+      final_amount += itemFinalAmount;
+
+      // ==========================================
+      // Existing Price Calculation
+      // ==========================================
       let itemPrice = item.price || 0;
-      let itemOriginalPrice = item.originalPrice || 0;
-      let itemDiscount = item.discount || 0;
+
+      let itemOriginalPrice =
+        item.originalPrice || 0;
+
+      let itemDiscount =
+        item.discount || 0;
 
       if (selectedSize) {
         itemPrice =
-          item.price || selectedSize.final_amount || 0;
+          item.price ||
+          selectedSize.final_amount ||
+          0;
 
         itemOriginalPrice =
-          item.originalPrice || selectedSize.amount || 0;
+          item.originalPrice ||
+          selectedSize.amount ||
+          0;
 
         itemDiscount =
           item.discount ||
@@ -1555,18 +1654,31 @@ exports.getCart = catchAsync(async (req, res) => {
           0;
       }
 
-      const quantity = item.quantity || 1;
+      // ==========================================
+      // ITEM SUBTOTAL
+      // ==========================================
+      const itemSubtotal =
+        itemPrice * quantity;
 
-      const itemSubtotal = itemPrice * quantity;
       const itemOriginalSubtotal =
         itemOriginalPrice * quantity;
 
       const itemDiscountAmount =
-        itemOriginalSubtotal - itemSubtotal;
+        Math.max(
+          itemOriginalSubtotal -
+          itemSubtotal,
+          0
+        );
 
       subtotal += itemOriginalSubtotal;
+
+      finalSubtotal += itemSubtotal;
+
       totalDiscount += itemDiscountAmount;
 
+      // ==========================================
+      // STOCK
+      // ==========================================
       const availableStock =
         selectedVariant?.stock ??
         product?.stock ??
@@ -1579,20 +1691,25 @@ exports.getCart = catchAsync(async (req, res) => {
         hasOutOfStockItems = true;
       }
 
-      // ==========================
-      // Filter Product Data
-      // ==========================
+      // ==========================================
+      // FILTER PRODUCT
+      // ==========================================
       const filteredProduct = {
         ...product,
+
         variants: selectedVariant
           ? [selectedVariant]
           : [],
+
         product_price_section:
           selectedPriceSection
             ? [selectedPriceSection]
             : [],
       };
 
+      // ==========================================
+      // ITEM RESPONSE
+      // ==========================================
       items.push({
         cartItemId: item._id,
 
@@ -1600,19 +1717,35 @@ exports.getCart = catchAsync(async (req, res) => {
 
         quantity,
 
+        // Product price
+        amount: productAmount,
+
+        final_amount: productFinalAmount,
+
+        // Item total
+        itemAmount,
+
+        itemFinalAmount,
 
         itemSubtotal,
+
         itemOriginalSubtotal,
+
         itemDiscountAmount,
 
         availableStock,
+
         isOutOfStock,
 
         stock_status:
-          product.stock_status || "in_stock",
+          product.stock_status ||
+          "in_stock",
       });
     }
 
+    // ==========================================
+    // CART DISCOUNT
+    // ==========================================
     const cartDiscountPercentage =
       cart.discount || 2;
 
@@ -1620,31 +1753,81 @@ exports.getCart = catchAsync(async (req, res) => {
       cart.tax || 2;
 
     const cartDiscountAmount =
-      (subtotal * cartDiscountPercentage) / 100;
+      (final_amount *
+        cartDiscountPercentage) /
+      100;
 
+    // ==========================================
+    // TAXABLE AMOUNT
+    // ==========================================
     const taxableAmount =
-      subtotal -
-      totalDiscount -
+      final_amount -
       cartDiscountAmount;
 
+    // ==========================================
+    // TAX
+    // ==========================================
     const taxAmount =
-      (taxableAmount * taxPercentage) / 100;
+      (taxableAmount *
+        taxPercentage) /
+      100;
 
+    // ==========================================
+    // FINAL TOTAL
+    // ==========================================
     const totalAmount =
-      taxableAmount + taxAmount;
+      taxableAmount +
+      taxAmount;
 
+    // ==========================================
+    // TOTAL SAVINGS
+    // ==========================================
+    const productDiscount =
+      Math.max(
+        amount - final_amount,
+        0
+      );
+
+    const totalSavings =
+      productDiscount +
+      cartDiscountAmount;
+
+    // ==========================================
+    // SUMMARY
+    // ==========================================
     const summary = {
-      subtotal: Number(subtotal.toFixed(2)),
-      totalDiscount: Number(totalDiscount.toFixed(2)),
-
-      savings: Number(
-        (
-          totalDiscount +
-          cartDiscountAmount
-        ).toFixed(2)
+      // Total of product.amount × quantity
+      amount: Number(
+        amount.toFixed(2)
       ),
 
-      cartDiscount: cartDiscountPercentage,
+      // Total of product.final_amount × quantity
+      final_amount: Number(
+        final_amount.toFixed(2)
+      ),
+
+      // Original subtotal
+      subtotal: Number(
+        subtotal.toFixed(2)
+      ),
+
+      // Final subtotal
+      finalSubtotal: Number(
+        finalSubtotal.toFixed(2)
+      ),
+
+      // Product discount
+      totalDiscount: Number(
+        totalDiscount.toFixed(2)
+      ),
+
+      // Total savings
+      savings: Number(
+        totalSavings.toFixed(2)
+      ),
+
+      cartDiscount:
+        cartDiscountPercentage,
 
       cartDiscountAmount: Number(
         cartDiscountAmount.toFixed(2)
@@ -1661,7 +1844,8 @@ exports.getCart = catchAsync(async (req, res) => {
       ),
 
       itemCount: items.reduce(
-        (sum, item) => sum + item.quantity,
+        (sum, item) =>
+          sum + item.quantity,
         0
       ),
 
@@ -1676,6 +1860,9 @@ exports.getCart = catchAsync(async (req, res) => {
       lastUpdated: cart.updatedAt,
     };
 
+    // ==========================================
+    // RESPONSE
+    // ==========================================
     return successResponse(
       res,
       "Cart fetched successfully",
@@ -1686,11 +1873,15 @@ exports.getCart = catchAsync(async (req, res) => {
       }
     );
   } catch (error) {
-    console.error("Get Cart Error:", error);
+    console.error(
+      "Get Cart Error:",
+      error
+    );
 
     return errorResponse(
       res,
-      error.message || "Internal Server Error",
+      error.message ||
+      "Internal Server Error",
       500
     );
   }
