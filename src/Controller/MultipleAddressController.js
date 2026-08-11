@@ -10,7 +10,7 @@ exports.addAddress = catchAsync(
       if (!userId) {
         return errorResponse(res, "This Address is Not Found", 403);
       }
-      const { pincode, city, state, country, street_address, addressType ,flatNo } = req.body;
+      const { pincode, city, state, country, street_address, addressType, flatNo } = req.body;
 
       const record = new Address({ pincode, userId, city, state, country, addressType, street_address, flatNo });
       const result = await record.save();
@@ -30,7 +30,7 @@ exports.getAddresses = catchAsync(async (req, res) => {
 
   const addresses = await Address.find({
     userId,
-    deletedAt: null, 
+    deletedAt: null,
   });
 
   return successResponse(
@@ -68,7 +68,7 @@ exports.updateAddress = async (req, res) => {
     const userId = req.user.id;
     const id = req.params.id;
 
-    const { pincode, city, state, country, street_address, addressType ,flatNo } = req.body;
+    const { pincode, city, state, country, street_address, addressType, flatNo } = req.body;
 
 
     const address = await Address.findByIdAndUpdate(
