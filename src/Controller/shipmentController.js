@@ -3,6 +3,7 @@ const catchAsync = require("../Utill/catchAsync");
 const { trackDhlShipment, createDhlShipment } = require("../Utill/createDhlShipment");
 const {
   cancelBlueDartPickup,
+  cancelBlueDartWaybill,
   trackBlueDartShipment,
   createBlueDartWaybill,
   getBlueDartServicesForPincode,
@@ -1679,6 +1680,91 @@ exports.RefreshOrderShipment = catchAsync(async (req, res) => {
   });
 });
 
+/**
+ * Direct BlueDart Waybill Cancellation API
+ * Accepts AWBNo / awbNo in req.body, req.params or req.query
+ * Hits BlueDart CancelWaybill API, formats status response, and syncs order status.
+ */
+exports.CancelBlueDartWaybill = catchAsync(async (req, res) => {
+  const awbNo = toSafeString(
+    req.body?.AWBNo ||
+      req.body?.awbNo ||
+      req.body?.awb_number ||
+      req.body?.awb ||
+      req.body?.trackingNumber ||
+      req.params?.awb ||
+      req.query?.awbNo ||
+      req.query?.AWBNo
+  );
+
+  if (!awbNo) {
+    return res.status(400).json({
+      status: false,
+      message: "AWBNo (Waybill Number) is required",
+    });
+  }
+
+  const result = await cancelBlueDartWaybill({ awbNo });
+
+  const order = await Order.findOne({
+    $or: [{ tracking_number: awbNo }, { orderId: awbNo }],
+  });
+
+  if (order) {
+    if (result.success) {
+      order.shipping_status = "cancelled";
+      order.status = "cancelled";
+    }
+
+    order.shipping_meta = {
+      ...(order.shipping_meta || {}),
+      waybillCancellation: {
+        awbNo,
+        isError: result.isError,
+        statusCode: result.statusCode,
+        statusInformation: result.statusInformation,
+        requestPayload: result.requestPayload,
+        response: result.data,
+        cancelledAt: new Date().toISOString(),
+      },
+    };
+
+    appendOrderTimelineEvents(order, [
+      buildTimelineEvent({
+        status: result.success ? "Waybill cancelled" : "Waybill cancellation failed",
+        remarks: result.statusInformation,
+        source: "manual",
+      }),
+    ]);
+
+    await order.save();
+  }
+
+  const responseData = {
+    CancelWaybillResult: {
+      AWBNo: result.awbNumber || awbNo,
+      CCRCRDREF: result.ccrCrdRef || null,
+      IsError: result.isError,
+      Status:
+        result.status && result.status.length > 0
+          ? result.status
+          : [
+              {
+                StatusCode: result.statusCode,
+                StatusInformation: result.statusInformation,
+              },
+            ],
+    },
+  };
+
+  return res.status(200).json({
+    status: !result.isError,
+    message: result.statusInformation,
+    data: responseData,
+    ...(order ? { orderId: order._id, orderNumber: order.orderId } : {}),
+  });
+});
+
 exports.CancelOrderShipment = catchAsync(async (req, res) => {
   const order = await Order.findOne({
     _id: req.params.id,
@@ -1699,26 +1785,33 @@ exports.CancelOrderShipment = catchAsync(async (req, res) => {
     });
   }
 
-  const { tokenNumber, pickupRegistrationDate } = getPickupCancellationPayload(order);
+  let cancellation = null;
+  const awbNo = order.tracking_number;
 
-  if (!tokenNumber || !pickupRegistrationDate) {
-    return res.status(400).json({
-      status: false,
-      message: "Pickup token or pickup registration date is missing for this order",
+  if (awbNo) {
+    cancellation = await cancelBlueDartWaybill({ awbNo });
+  } else {
+    const { tokenNumber, pickupRegistrationDate } = getPickupCancellationPayload(order);
+
+    if (!tokenNumber || !pickupRegistrationDate) {
+      return res.status(400).json({
+        status: false,
+        message: "AWB Number or Pickup Token is missing for this order",
+      });
+    }
+
+    cancellation = await cancelBlueDartPickup({
+      tokenNumber,
+      pickupRegistrationDate,
+      remarks: req.body?.remarks || null,
     });
   }
 
-  const cancellation = await cancelBlueDartPickup({
-    tokenNumber,
-    pickupRegistrationDate,
-    remarks: req.body?.remarks || null,
-  });
-
-  if (!cancellation.success) {
-    return res.status(502).json({
+  if (!cancellation.success && cancellation.isError) {
+    return res.status(200).json({
       status: false,
-      message: "Shipment cancellation failed",
-      error: cancellation.error,
+      message: cancellation.statusInformation || "Shipment cancellation failed",
+      data: cancellation.data || cancellation.error,
     });
   }
 
@@ -1732,10 +1825,11 @@ exports.CancelOrderShipment = catchAsync(async (req, res) => {
       cancelledAt: new Date().toISOString(),
     },
   };
+
   appendOrderTimelineEvents(order, [
     buildTimelineEvent({
       status: "Shipment cancelled",
-      remarks: req.body?.remarks || "Pickup cancelled from backend",
+      remarks: cancellation.statusInformation || req.body?.remarks || "Cancelled from backend",
       source: "manual",
     }),
   ]);
@@ -1746,11 +1840,12 @@ exports.CancelOrderShipment = catchAsync(async (req, res) => {
     syncCourier: false,
     applyTrackingStatus: false,
   });
+
   await order.save();
 
   return res.status(200).json({
     status: true,
-    message: "Shipment cancelled successfully",
+    message: cancellation.statusInformation || "Shipment cancelled successfully",
     data: buildShipmentResponseData({
       order,
       savedAddress: synced.addressRecord,
