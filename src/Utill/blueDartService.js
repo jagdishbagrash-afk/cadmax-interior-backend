@@ -1141,8 +1141,85 @@ const getBlueDartServicesForPincode = async ({
   }
 };
 
+const cancelBlueDartWaybill = async ({
+  awbNo,
+  loginId,
+  licenceKey,
+  apiType,
+} = {}) => {
+  try {
+    const awb = String(awbNo || "").trim();
+    if (!awb) {
+      throw new Error("AWBNo (Waybill Number) is required");
+    }
+
+    const payload = {
+      Request: {
+        AWBNo: awb,
+      },
+      Profile: buildBlueDartProfile({
+        apiType: apiType || getBlueDartShippingApiType(),
+        licenceKey: licenceKey || getBlueDartShippingLicenceKey(),
+        loginId: loginId || getBlueDartLoginId(),
+      }),
+    };
+
+    const response = await postBlueDartJson({
+      path: "/waybill/v1/CancelWaybill",
+      payload,
+      action: "Cancel waybill request",
+    });
+
+    const result =
+      response?.CancelWaybillResult ||
+      response?.cancelWaybillResult ||
+      response;
+
+    const isError = Boolean(result?.IsError ?? result?.isError);
+    const statusList = Array.isArray(result?.Status) ? result.Status : [];
+    const firstStatus = statusList[0] || {};
+    const statusCode =
+      firstStatus?.StatusCode ||
+      firstStatus?.statusCode ||
+      (isError ? "CancelFailure" : "Valid");
+
+    const statusInformation =
+      firstStatus?.StatusInformation ||
+      firstStatus?.statusInformation ||
+      (isError
+        ? "Waybill cancellation failed"
+        : "Your registered shipment has been cancelled successfully");
+
+    return {
+      success: !isError,
+      isError,
+      awbNumber: result?.AWBNo || result?.awbNo || awb,
+      ccrCrdRef: result?.CCRCRDREF || null,
+      statusCode,
+      statusInformation,
+      status: statusList,
+      data: response,
+      requestPayload: payload,
+    };
+  } catch (error) {
+    console.log("BLUE_DART CANCEL WAYBILL ERROR", extractError(error));
+
+    return {
+      success: false,
+      isError: true,
+      statusCode: "Error",
+      statusInformation:
+        error?.response?.data?.message ||
+        error.message ||
+        "Failed to cancel BlueDart waybill",
+      error: extractError(error),
+    };
+  }
+};
+
 module.exports = {
   cancelBlueDartPickup,
+  cancelBlueDartWaybill,
   createBlueDartWaybill,
   extractAwbNumber,
   extractPickupRegistrationDate,
@@ -1151,3 +1228,4 @@ module.exports = {
   resolveBlueDartShipFrom,
   trackBlueDartShipment,
 };
+

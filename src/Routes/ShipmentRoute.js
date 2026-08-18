@@ -1,5 +1,6 @@
 const router = require("express").Router();
 const {
+  CancelBlueDartWaybill,
   CancelOrderShipment,
   TrackShipment,
   CreateOrderShipment,
@@ -15,6 +16,8 @@ const { verifyToken } = require("../Utill/tokenVerify");
 
 router.get("/shipment/track/:trackingNumber", TrackShipment);
 router.get("/shipment/transit-time", GetPincodeTransitTime);
+router.post("/shipment/cancel-waybill", CancelBlueDartWaybill);
+router.post("/shipment/cancel-waybill/:awb", CancelBlueDartWaybill);
 router.post("/order/:id/shipment/create", verifyToken, CreateOrderShipment);
 router.get("/order/:id/shipment", verifyToken, GetOrderShipment);
 router.post("/order/:id/shipment/refresh", verifyToken, RefreshOrderShipment);
