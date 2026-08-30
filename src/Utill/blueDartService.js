@@ -52,7 +52,9 @@ const getBlueDartClientId = () => process.env.BLUE_DART_CLIENT_ID || "";
 
 const getBlueDartClientSecret = () => process.env.BLUE_DART_CLIENT_SECRET || "";
 
-const getBlueDartTokenUrl = () => process.env.BLUE_DART_TOKEN_URL || "";
+const getBlueDartTokenUrl = () =>
+  process.env.BLUE_DART_TOKEN_URL ||
+  `${buildBlueDartBaseUrl()}/token/v1/login`;
 
 const getBlueDartCustomerCode = () =>
   process.env.BLUE_DART_CUSTOMER_CODE ||
@@ -120,17 +122,18 @@ const getBlueDartStaticJwtToken = () => {
 };
 
 const hasDynamicBlueDartTokenConfig = () =>
-  Boolean(getBlueDartClientId() && getBlueDartClientSecret() && getBlueDartTokenUrl());
+  Boolean(getBlueDartClientId() && getBlueDartClientSecret());
 
 const readBlueDartTokenResponse = (payload = {}) =>
+  payload?.JWTToken ||
+  payload?.jwtToken ||
   payload?.access_token ||
   payload?.token ||
-  payload?.jwtToken ||
-  payload?.JWTToken ||
   payload?.id_token ||
+  payload?.data?.JWTToken ||
+  payload?.data?.jwtToken ||
   payload?.data?.access_token ||
   payload?.data?.token ||
-  payload?.data?.jwtToken ||
   null;
 
 const readBlueDartTokenExpiry = (payload = {}, fallbackToken = "") => {
@@ -174,49 +177,48 @@ const fetchBlueDartJwtToken = async ({ forceRefresh = false } = {}) => {
     return staticToken;
   }
 
+  const tokenUrl = getBlueDartTokenUrl();
+  const clientId = getBlueDartClientId();
+  const clientSecret = getBlueDartClientSecret();
+
   console.log(
     "[BLUE_DART TOKEN] Refresh attempt",
     JSON.stringify(
       maskObject({
-        tokenUrl: getBlueDartTokenUrl(),
-        clientId: getBlueDartClientId(),
+        tokenUrl,
+        clientId,
         forceRefresh,
       })
     )
   );
 
-  const tokenPayload = new URLSearchParams({
-    grant_type: process.env.BLUE_DART_TOKEN_GRANT_TYPE || "client_credentials",
-    client_id: getBlueDartClientId(),
-    client_secret: getBlueDartClientSecret(),
-  });
-
-  if (process.env.BLUE_DART_TOKEN_SCOPE) {
-    tokenPayload.append("scope", process.env.BLUE_DART_TOKEN_SCOPE);
-  }
-
-  if (process.env.BLUE_DART_TOKEN_AUDIENCE) {
-    tokenPayload.append("audience", process.env.BLUE_DART_TOKEN_AUDIENCE);
-  }
-
   try {
-    const response = await axios.post(getBlueDartTokenUrl(), tokenPayload.toString(), {
+    const response = await axios.get(tokenUrl, {
       headers: {
         accept: "application/json",
-        "content-type": "application/x-www-form-urlencoded",
+        ClientID: clientId,
+        clientSecret: clientSecret,
       },
     });
 
     const token = readBlueDartTokenResponse(response.data);
     if (!token) {
-      throw new Error("Blue Dart token response does not contain an access token");
+      throw new Error("Blue Dart token response does not contain a valid JWTToken");
     }
 
     blueDartTokenCache = {
       value: token,
       expiresAt: readBlueDartTokenExpiry(response.data, token),
-      source: "oauth",
+      source: "login_api",
     };
+
+    console.log(
+      "[BLUE_DART TOKEN] Successfully acquired new JWTToken from Auth API",
+      JSON.stringify({
+        source: blueDartTokenCache.source,
+        expiresAt: new Date(blueDartTokenCache.expiresAt).toISOString(),
+      })
+    );
 
     return token;
   } catch (error) {
@@ -307,12 +309,29 @@ const requestBlueDart = async ({
 
     return response.data;
   } catch (error) {
+    const status = error?.response?.status;
+    const errorDataStr = JSON.stringify(error?.response?.data || {}).toLowerCase();
+    const errorMsgStr = String(error?.message || "").toLowerCase();
+
+    const isUnauthorizedOrExpired =
+      status === 401 ||
+      status === 403 ||
+      errorDataStr.includes("jwt") ||
+      errorDataStr.includes("token expired") ||
+      errorDataStr.includes("invalid token") ||
+      errorDataStr.includes("unauthorized") ||
+      errorMsgStr.includes("jwt") ||
+      errorMsgStr.includes("token expired");
+
     console.log(
       `[BLUE_DART API] ${action} error`,
       JSON.stringify(maskObject(error?.response?.data || { message: error.message }), null, 2)
     );
 
-    if (error?.response?.status === 401 && retryOn401) {
+    if (isUnauthorizedOrExpired && retryOn401) {
+      console.log(
+        `[BLUE_DART API] ${action}: Token expired or unauthorized (status: ${status}), refreshing JWT token and retrying...`
+      );
       await fetchBlueDartJwtToken({ forceRefresh: true });
       return requestBlueDart({
         method,
@@ -1223,6 +1242,7 @@ module.exports = {
   createBlueDartWaybill,
   extractAwbNumber,
   extractPickupRegistrationDate,
+  fetchBlueDartJwtToken,
   getBlueDartServicesForPincode,
   getBlueDartTransitTime,
   resolveBlueDartShipFrom,
