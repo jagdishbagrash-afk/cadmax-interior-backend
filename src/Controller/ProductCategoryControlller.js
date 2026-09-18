@@ -81,9 +81,9 @@ exports.updateCategory = CatchAsync(async (req, res) => {
             category.name = name;
             category.slug = await generateUniqueSlug(Category, name, id);
         }
-            if (req.body.meta_title) category.meta_title = req.body.meta_title;
-    if (req.body.meta_description) category.meta_description = req.body.meta_description;
-    if (req.body.meta_keywords) category.meta_keywords = req.body.meta_keywords;
+        if (req.body.meta_title) category.meta_title = req.body.meta_title;
+        if (req.body.meta_description) category.meta_description = req.body.meta_description;
+        if (req.body.meta_keywords) category.meta_keywords = req.body.meta_keywords;
 
         // Update image if new file uploaded
         if (req.file && req.file.location) {
@@ -113,7 +113,7 @@ exports.updateCategory = CatchAsync(async (req, res) => {
 exports.getAllCategorys = CatchAsync(
     async (req, res) => {
         try {
-            const Categorys = await Category.find({status :  true}).sort({ createdAt: -1 });
+            const Categorys = await Category.find({ status: true }).sort({ createdAt: -1 });
             return successResponse(res, "Categorys list successfully.", 201, Categorys);
         } catch (error) {
             return errorResponse(res, error.message || "Internal Server Error", 500);
@@ -164,7 +164,7 @@ exports.toggleCategoryStatus = CatchAsync(
 exports.getAllCategoryStatus = CatchAsync(
     async (req, res) => {
         try {
-              const Categorys = await Category.find({status : true}).sort({ createdAt: -1 });
+            const Categorys = await Category.find({ status: true }).sort({ createdAt: 1 });
             return successResponse(res, "Categorys list successfully.", 201, Categorys);
         } catch (error) {
             return errorResponse(res, error.message || "Internal Server Error", 500);
@@ -177,39 +177,39 @@ exports.deleteCategory = CatchAsync(
     async (req, res) => {
         try {
             const { id } = req.params;
-            
+
             const subCategory = await Categroy.findById(id);
-            
+
             if (!subCategory) {
                 return validationErrorResponse(res, "SubCategory not found.", 400);
             }
 
-                 const productsSubCategory = await SubCategory.find({ category: id });
-            
+            const productsSubCategory = await SubCategory.find({ category: id });
+
             if (productsSubCategory.length > 0) {
                 return validationErrorResponse(
-                    res, 
+                    res,
                     400,
                     `Cannot delete category "${subCategory.name}" because it is currently being used in ${productsSubCategory.length} Subcategory(s). Please remove or reassign these Subcategory first.`,
                 );
             }
-            
-            
+
+
             // Check if this subcategory is being used in any product
-            
+
             const productsUsingSubCategory = await Product.find({ category: id });
-            
+
             if (productsUsingSubCategory.length > 0) {
                 return validationErrorResponse(
-                    res, 
+                    res,
                     400,
                     `Cannot delete category "${subCategory.name}" because it is currently being used in ${productsUsingSubCategory.length} product(s). Please remove or reassign these products first.`,
                 );
             }
-            
+
             // Delete the subcategory
             await Category.findByIdAndDelete(id);
-            
+
             return successResponse(
                 res,
                 `Category "${subCategory.name}" deleted successfully.`,
