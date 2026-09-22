@@ -143,6 +143,11 @@ const ProductSchema = mongoose.Schema(
       required: [true, "Dimensions is required"],
     },
 
+    weight: {
+      type: Number,
+      default: 0.5,
+    },
+
     material: {
       type: String,
       required: [true, "Material is required"],

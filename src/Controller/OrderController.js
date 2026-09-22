@@ -284,6 +284,8 @@ exports.addOrder = catchAsync(async (req, res) => {
       variantTitle: item.variantTitle || null,
       priceSectionTitle:
         item.priceSectionTitle || null,
+      dimensions: item.dimensions || productData.dimensions || "",
+      weight: item.weight || productData.weight || null,
     });
   }
 
