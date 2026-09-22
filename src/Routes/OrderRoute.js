@@ -11,6 +11,7 @@ const {
   approveOrder,
   rejectOrder,
   getOrderDetailsAdmin,
+  getOrderInvoicePdf,
 } = require("../Controller/OrderController");
 const { verifyToken } = require("../Utill/tokenVerify");
 
@@ -18,6 +19,10 @@ router.post("/order/add", verifyToken, addOrder);
 router.get("/order/getAll", getAllOrders);
 router.post("/order/status/update/:id", verifyToken, updateStatus);
 router.get("/order/getbyUser", verifyToken, getOrdersByUser);   
+
+// Invoice PDF API Endpoint
+router.get("/order/invoice/:orderId", getOrderInvoicePdf);
+router.get("/order/:orderId/invoice", getOrderInvoicePdf);
 
 router.get("/order/:id", getOrderById);
 
