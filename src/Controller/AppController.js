@@ -917,12 +917,29 @@ exports.AppOrder = catchAsync(async (req, res) => {
     });
     const legacyAddress = buildLegacyAddressString(shippingAddress) || address;
 
+    const enrichedProducts = await Promise.all(
+      (Array.isArray(product) ? product : []).map(async (p) => {
+        const prodId = p.id || p._id || p.productId;
+        if (prodId && mongoose.Types.ObjectId.isValid(prodId)) {
+          const dbProd = await Product.findById(prodId).select("dimensions weight").lean();
+          if (dbProd) {
+            return {
+              ...p,
+              dimensions: p.dimensions || dbProd.dimensions || "",
+              weight: p.weight !== undefined ? p.weight : (dbProd.weight || null),
+            };
+          }
+        }
+        return p;
+      })
+    );
+
     // ✅ Save Order
     const newOrder = new Order({
       name,
       mobile,
       address: legacyAddress,
-      product,
+      product: enrichedProducts,
       addressId,
       shippingAddress,
       amount,
