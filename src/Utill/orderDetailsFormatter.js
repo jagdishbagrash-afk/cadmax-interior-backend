@@ -93,7 +93,7 @@ const formatOrderDetailsForWeb = (order, syncedTransit = {}) => {
   const products = (order.product || []).map((item) => {
     const itemTotal = item.total || (item.price * item.quantity);
     const prodRef = item.id && typeof item.id === "object" ? item.id : null;
-    const imageUrl = prodRef?.thumbnail || prodRef?.images?.[0] || prodRef?.mainImage || null;
+    const imageUrl = prodRef?.thumbnail || prodRef?.images?.[0] || item.image || null;
 
     return {
       productId: prodRef?._id || item.id,

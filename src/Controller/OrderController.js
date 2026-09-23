@@ -22,7 +22,7 @@ const mongoose = require("mongoose");
 const { hydrateOrderShipmentDetails, processOrderShipmentCreation } = require("./shipmentController");
 const { formatOrderDetailsForWeb, formatOrderDetailsForApp } = require("../Utill/orderDetailsFormatter");
 const { generateOrderInvoicePdf } = require("../Utill/invoicePdfGenerator");
-
+const path = require("path");
 
 
 // exports.addOrder = catchAsync(async (req, res) => {
@@ -275,6 +275,9 @@ exports.addOrder = catchAsync(async (req, res) => {
     orderProducts.push({
       id: productData._id,
       title: productData.title,
+      // Product image
+      image: item.image || "",
+      images: item.images || [],
       price: item.price,
       originalPrice: item.originalPrice || item.price,
       discount: item.discount || 0,
@@ -410,10 +413,10 @@ exports.addOrder = catchAsync(async (req, res) => {
 
 exports.getAllOrders = catchAsync(async (req, res) => {
   try {
-    const orders = await Order.find()  .populate({
-        path: "product.id",
-        model: "Product",
-      })
+    const orders = await Order.find().populate({
+      path: "product.id",
+      model: "Product",
+    })
       .populate({
         path: "addressId",
         model: "Address", // apne Address model ka naam yahan likhein
@@ -686,7 +689,7 @@ exports.updateStatus = catchAsync(async (req, res) => {
   }
 });
 
-  exports.getOrdersByUser = catchAsync(async (req, res) => {
+exports.getOrdersByUser = catchAsync(async (req, res) => {
   try {
     const userId = req.user?.id;
 
@@ -1472,7 +1475,7 @@ exports.getOrderInvoicePdf = catchAsync(async (req, res) => {
     const { orderId } = req.params;
 
     if (!orderId) {
-      return validationErrorResponse(res, "orderId parameter is required");
+      return validationErrorResponse(res, "Order ID is required");
     }
 
     const cleanOrderId = String(orderId).trim().replace(/^#/, "");
@@ -1488,19 +1491,51 @@ exports.getOrderInvoicePdf = catchAsync(async (req, res) => {
     }
 
     const order = await Order.findOne({ $or: queryConditions })
-      .populate({ path: "product.id", model: "Product" })
-      .populate({ path: "userId", model: "User", select: "name email mobile" });
+      .populate({
+        path: "product.id",
+        model: "Product",
+      })
+      .populate({
+        path: "userId",
+        model: "User",
+        select: "name email mobile",
+      });
 
     if (!order) {
-      return errorResponse(res, `Order not found with ID: ${orderId}`, 404);
+      return errorResponse(res, "Order not found", 404);
     }
 
-    // Generate & Stream PDF Invoice
-    generateOrderInvoicePdf(order, res);
+    // Generate PDF and save it to uploads/invoices
+    const pdfPath = await generateOrderInvoicePdf(order);
+
+    const fileName = path.basename(pdfPath);
+
+    const baseUrl =
+      process.env.PUBLIC_API_URL ||
+      `${req.protocol}://${req.get("host")}`;
+
+    const pdfUrl = `${baseUrl}/uploads/invoices/${encodeURIComponent(
+      fileName
+    )}`;
+
+    return successResponse(
+      res,
+      "Invoice generated successfully",
+      200,
+      {
+        orderId: order.orderId,
+        pdfUrl,
+      }
+    );
   } catch (error) {
     console.error("getOrderInvoicePdf Error:", error);
+
     if (!res.headersSent) {
-      return errorResponse(res, error.message || "Internal Server Error", 500);
+      return errorResponse(
+        res,
+        error.message || "Internal Server Error",
+        500
+      );
     }
   }
 });
