@@ -9,6 +9,9 @@ const {
   getBlueDartServicesForPincode,
   getBlueDartTransitTime,
   resolveBlueDartShipFrom,
+  getApproxWeightKg,
+  calculatePackageDimensions,
+  parseDimensionValues,
 } = require("../Utill/blueDartService");
 
 
@@ -623,13 +626,16 @@ const createShipmentForOrder = async ({ order, receiverAddress, shippingProvider
       name: receiverName,
       mobile: receiverMobile,
       receiverAddress,
-      shipFrom,
+      shipFrom: options?.shipFrom || shipFrom,
       products: order.product,
       declaredValue: order.amount,
       isCod,
       collectableAmount,
       productCode,
       subProductCode,
+      dimensions: options?.dimensions || options?.dimensionsCm || order?.labelData?.package?.dimensionsCm || order?.dimensions,
+      weight: options?.weight || options?.weightKg || order?.labelData?.package?.weightKg || order?.weight,
+      sender: options?.sender || shipFrom?.sender,
     });
 
     console.log(`[BLUE_DART RESULT] Success: ${shipment.success}`);
@@ -846,27 +852,64 @@ const getShipmentPackageDetails = (shipmentResponse = {}, order = {}) => {
     ? order.product.reduce((sum, item) => sum + Math.max(toSafeNumber(item.quantity), 0), 0)
     : 0;
 
+  const computedWeight = getApproxWeightKg(order.product || []);
+  const resolvedWeight = toSafeNumber(
+    pickFirstValue(
+      serviceDetails?.ActualWeight,
+      pkg?.weight,
+      order?.labelData?.package?.weightKg,
+      order?.weight,
+      order?.shipping_meta?.weight,
+      computedWeight,
+      process.env.BLUE_DART_DEFAULT_PIECE_WEIGHT_KG,
+      0.5
+    )
+  );
+
+  const computedDim = calculatePackageDimensions(order.product || []);
+  const resolvedLength = toSafeNumber(
+    pickFirstValue(
+      serviceDetails?.Dimensions?.[0]?.Length,
+      pkg?.dimensions?.length,
+      order?.labelData?.package?.dimensionsCm?.length,
+      parseDimensionValues(order?.dimensions)?.length,
+      computedDim.length,
+      process.env.BLUE_DART_DIMENSION_LENGTH,
+      10
+    )
+  );
+  const resolvedBreadth = toSafeNumber(
+    pickFirstValue(
+      serviceDetails?.Dimensions?.[0]?.Breadth,
+      pkg?.dimensions?.width,
+      order?.labelData?.package?.dimensionsCm?.breadth,
+      parseDimensionValues(order?.dimensions)?.breadth,
+      computedDim.breadth,
+      process.env.BLUE_DART_DIMENSION_BREADTH,
+      10
+    )
+  );
+  const resolvedHeight = toSafeNumber(
+    pickFirstValue(
+      serviceDetails?.Dimensions?.[0]?.Height,
+      pkg?.dimensions?.height,
+      order?.labelData?.package?.dimensionsCm?.height,
+      parseDimensionValues(order?.dimensions)?.height,
+      computedDim.height,
+      process.env.BLUE_DART_DIMENSION_HEIGHT,
+      10
+    )
+  );
+
   return {
-    weightKg: toSafeNumber(
-      pickFirstValue(
-        serviceDetails?.ActualWeight,
-        pkg?.weight,
-        process.env.BLUE_DART_DEFAULT_PIECE_WEIGHT_KG
-      )
-    ),
+    weightKg: resolvedWeight,
     pieceCount: toSafeNumber(
       pickFirstValue(serviceDetails?.PieceCount, serviceDetails?.ItemCount, pieceCountFromOrder, 0)
     ),
     dimensionsCm: {
-      length: toSafeNumber(
-        pickFirstValue(serviceDetails?.Dimensions?.[0]?.Length, pkg?.dimensions?.length, process.env.BLUE_DART_DIMENSION_LENGTH)
-      ),
-      breadth: toSafeNumber(
-        pickFirstValue(serviceDetails?.Dimensions?.[0]?.Breadth, pkg?.dimensions?.width, process.env.BLUE_DART_DIMENSION_BREADTH)
-      ),
-      height: toSafeNumber(
-        pickFirstValue(serviceDetails?.Dimensions?.[0]?.Height, pkg?.dimensions?.height, process.env.BLUE_DART_DIMENSION_HEIGHT)
-      ),
+      length: resolvedLength,
+      breadth: resolvedBreadth,
+      height: resolvedHeight,
     },
   };
 };
@@ -1039,7 +1082,9 @@ const buildLabelData = ({ order, savedAddress, shipmentResponse }) => {
         shipFrom.sender,
         shipperDetails?.Sender,
         shipmentResponse?.sender,
-        process.env.BLUE_DART_SENDER
+        process.env.BLUE_DART_SHIPPER_NAME,
+        process.env.BLUE_DART_SENDER,
+        "Cadmax Atelier Pvt. Ltd."
       )
     ),
     vendorCode: toSafeString(

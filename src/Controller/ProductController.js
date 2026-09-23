@@ -145,6 +145,7 @@ exports.addProduct = CatchAsync(async (req, res) => {
       category: req.body.category || "",
       subcategory: req.body.subcategory || "",
       dimensions: req.body.dimensions || "",
+      weight: Number(req.body.weight) || 0.5,
       material: req.body.material || "",
       type: req.body.type || "",
       terms: req.body.terms || "",
@@ -260,6 +261,7 @@ exports.updateProduct = CatchAsync(async (req, res) => {
     if (req.body.subcategory) product.subcategory = req.body.subcategory;
     if (req.body.subsubcategory) product.subsubcategory = req.body.subsubcategory;
     if (req.body.dimensions) product.dimensions = req.body.dimensions;
+    if (req.body.weight !== undefined) product.weight = Number(req.body.weight);
     if (req.body.material) product.material = req.body.material;
     if (req.body.type) product.type = req.body.type;
     if (req.body.terms) product.terms = req.body.terms;

@@ -21,6 +21,7 @@ const { createBlueDartWaybill, resolveBlueDartShipFrom } = require("../Utill/blu
 const mongoose = require("mongoose");
 const { hydrateOrderShipmentDetails, processOrderShipmentCreation } = require("./shipmentController");
 const { formatOrderDetailsForWeb, formatOrderDetailsForApp } = require("../Utill/orderDetailsFormatter");
+const { generateOrderInvoicePdf } = require("../Utill/invoicePdfGenerator");
 
 
 
@@ -283,6 +284,8 @@ exports.addOrder = catchAsync(async (req, res) => {
       variantTitle: item.variantTitle || null,
       priceSectionTitle:
         item.priceSectionTitle || null,
+      dimensions: item.dimensions || productData.dimensions || "",
+      weight: item.weight || productData.weight || null,
     });
   }
 
@@ -1458,4 +1461,46 @@ exports.getOrderDetailsAdmin = catchAsync(async (req, res) => {
       rejection_reason: order.rejection_reason || null,
     },
   });
+});
+
+/**
+ * GET Order Invoice PDF API
+ * Fetches order by orderId/mongoId/tracking_number and streams PDF invoice directly
+ */
+exports.getOrderInvoicePdf = catchAsync(async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    if (!orderId) {
+      return validationErrorResponse(res, "orderId parameter is required");
+    }
+
+    const cleanOrderId = String(orderId).trim().replace(/^#/, "");
+
+    const queryConditions = [
+      { orderId: cleanOrderId },
+      { orderId: `ORD-${cleanOrderId}` },
+      { tracking_number: cleanOrderId },
+    ];
+
+    if (mongoose.Types.ObjectId.isValid(cleanOrderId)) {
+      queryConditions.push({ _id: cleanOrderId });
+    }
+
+    const order = await Order.findOne({ $or: queryConditions })
+      .populate({ path: "product.id", model: "Product" })
+      .populate({ path: "userId", model: "User", select: "name email mobile" });
+
+    if (!order) {
+      return errorResponse(res, `Order not found with ID: ${orderId}`, 404);
+    }
+
+    // Generate & Stream PDF Invoice
+    generateOrderInvoicePdf(order, res);
+  } catch (error) {
+    console.error("getOrderInvoicePdf Error:", error);
+    if (!res.headersSent) {
+      return errorResponse(res, error.message || "Internal Server Error", 500);
+    }
+  }
 });

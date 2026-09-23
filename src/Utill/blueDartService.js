@@ -510,9 +510,18 @@ const resolveBlueDartShipFrom = (shipFrom = {}) => {
       shipFrom?.CustomerGSTNumber ||
       process.env.BLUE_DART_SHIPPER_GST
   );
-  const sender = toSafeString(
-    shipFrom?.sender || shipFrom?.Sender || process.env.BLUE_DART_SENDER
-  );
+  const rawSender = toSafeString(shipFrom?.sender || shipFrom?.Sender);
+  const sender =
+    rawSender && rawSender !== "ABCD-NAME"
+      ? rawSender
+      : process.env.BLUE_DART_SENDER && process.env.BLUE_DART_SENDER !== "ABCD-NAME"
+      ? process.env.BLUE_DART_SENDER
+      : toSafeString(
+          shipFrom?.name ||
+            shipFrom?.CustomerName ||
+            process.env.BLUE_DART_SHIPPER_NAME ||
+            "Cadmax Atelier Pvt. Ltd."
+        );
   const vendorCode = toSafeString(
     shipFrom?.vendorCode || shipFrom?.VendorCode || process.env.BLUE_DART_VENDOR_CODE
   );
@@ -568,24 +577,118 @@ const getTotalPieces = (products = []) => {
   return count > 0 ? count : 1;
 };
 
-const getApproxWeightKg = (products = []) => {
-  const pieceCount = getTotalPieces(products);
-  const perPieceKg =
+const getApproxWeightKg = (products = [], customWeight = null) => {
+  const forcedWeight = coerceNumber(customWeight);
+  if (forcedWeight && forcedWeight > 0) {
+    return forcedWeight;
+  }
+
+  const defaultPerPiece =
     coerceNumber(process.env.BLUE_DART_DEFAULT_PIECE_WEIGHT_KG) ?? 0.5;
-  const total = pieceCount * perPieceKg;
-  return Math.max(total, perPieceKg);
+
+  if (!Array.isArray(products) || products.length === 0) {
+    return defaultPerPiece;
+  }
+
+  let calculatedWeight = 0;
+
+  for (const item of products) {
+    const qty = Math.max(coerceNumber(item?.quantity) ?? 1, 1);
+    const itemWeight = coerceNumber(
+      item?.weight || item?.weightKg || item?.id?.weight
+    );
+    if (itemWeight && itemWeight > 0) {
+      calculatedWeight += itemWeight * qty;
+    } else {
+      calculatedWeight += defaultPerPiece * qty;
+    }
+  }
+
+  return Math.max(calculatedWeight, defaultPerPiece);
 };
 
-const buildDefaultDimensions = (pieceCount) => {
-  const length = coerceNumber(process.env.BLUE_DART_DIMENSION_LENGTH) ?? 10;
-  const breadth = coerceNumber(process.env.BLUE_DART_DIMENSION_BREADTH) ?? 10;
-  const height = coerceNumber(process.env.BLUE_DART_DIMENSION_HEIGHT) ?? 10;
+const parseDimensionValues = (dimInput) => {
+  if (!dimInput) return null;
+
+  if (typeof dimInput === "object") {
+    const l = coerceNumber(dimInput.length || dimInput.Length || dimInput.l);
+    const b = coerceNumber(dimInput.breadth || dimInput.width || dimInput.Breadth || dimInput.b || dimInput.w);
+    const h = coerceNumber(dimInput.height || dimInput.Height || dimInput.h);
+
+    if (l !== null || b !== null || h !== null) {
+      return {
+        length: l ?? 10,
+        breadth: b ?? 10,
+        height: h ?? 10,
+      };
+    }
+  }
+
+  if (typeof dimInput === "string") {
+    const numbers = dimInput.match(/\d+(\.\d+)?/g);
+    if (numbers && numbers.length >= 3) {
+      return {
+        length: parseFloat(numbers[0]) || 10,
+        breadth: parseFloat(numbers[1]) || 10,
+        height: parseFloat(numbers[2]) || 10,
+      };
+    } else if (numbers && numbers.length === 1) {
+      const val = parseFloat(numbers[0]) || 10;
+      return { length: val, breadth: val, height: val };
+    }
+  }
+
+  return null;
+};
+
+const calculatePackageDimensions = (products = [], customDimensions = null) => {
+  const custom = parseDimensionValues(customDimensions);
+  if (custom) return custom;
+
+  const defaultLength = coerceNumber(process.env.BLUE_DART_DIMENSION_LENGTH) ?? 10;
+  const defaultBreadth = coerceNumber(process.env.BLUE_DART_DIMENSION_BREADTH) ?? 10;
+  const defaultHeight = coerceNumber(process.env.BLUE_DART_DIMENSION_HEIGHT) ?? 10;
+
+  if (!Array.isArray(products) || products.length === 0) {
+    return { length: defaultLength, breadth: defaultBreadth, height: defaultHeight };
+  }
+
+  let maxL = 0;
+  let maxB = 0;
+  let maxH = 0;
+  let hasValid = false;
+
+  for (const item of products) {
+    const dim = parseDimensionValues(
+      item?.dimensions || item?.dimensionsCm || item?.id?.dimensions
+    );
+    if (dim) {
+      hasValid = true;
+      maxL = Math.max(maxL, dim.length);
+      maxB = Math.max(maxB, dim.breadth);
+      maxH = Math.max(maxH, dim.height);
+    }
+  }
+
+  if (hasValid && (maxL > 0 || maxB > 0 || maxH > 0)) {
+    return {
+      length: maxL || defaultLength,
+      breadth: maxB || defaultBreadth,
+      height: maxH || defaultHeight,
+    };
+  }
+
+  return { length: defaultLength, breadth: defaultBreadth, height: defaultHeight };
+};
+
+const buildDefaultDimensions = (pieceCount, products = [], customDimensions = null) => {
+  const dims = calculatePackageDimensions(products, customDimensions);
 
   return [
     {
-      Length: length,
-      Breadth: breadth,
-      Height: height,
+      Length: dims.length,
+      Breadth: dims.breadth,
+      Height: dims.height,
       Count: pieceCount,
     },
   ];
@@ -657,6 +760,9 @@ const buildGenerateWaybillPayload = ({
   collectableAmount,
   productCode,
   subProductCode,
+  dimensions,
+  weight,
+  sender,
   overrides = {},
 }) => {
   const pieceCount = getTotalPieces(products);
@@ -677,7 +783,11 @@ const buildGenerateWaybillPayload = ({
     throw new Error("Receiver address must include pincode and address line 1");
   }
 
-  const resolvedShipFrom = resolveBlueDartShipFrom(shipFrom);
+  const shipFromWithSender = {
+    ...(shipFrom || {}),
+    ...(sender ? { sender } : {}),
+  };
+  const resolvedShipFrom = resolveBlueDartShipFrom(shipFromWithSender);
   let resolvedProductCode = String(
     productCode || process.env.BLUE_DART_PRODUCT_CODE || "A"
   ).toUpperCase();
@@ -697,6 +807,9 @@ const buildGenerateWaybillPayload = ({
   const finalCollectableAmount = isCod && (resolvedSubProductCode === "C" || resolvedSubProductCode === "DOD" || resolvedSubProductCode === "DODFOD")
     ? (coerceNumber(collectableAmount) ?? coerceNumber(declaredValue) ?? 0)
     : 0;
+
+  const actualWeightKg = getApproxWeightKg(products, weight || overrides?.weight);
+  const packageDimensions = buildDefaultDimensions(pieceCount, products, dimensions || overrides?.dimensions);
 
   const payload = {
     Request: {
@@ -736,7 +849,7 @@ const buildGenerateWaybillPayload = ({
       },
       Services: {
         AWBNo: "",
-        ActualWeight: String(getApproxWeightKg(products).toFixed(2)),
+        ActualWeight: String(actualWeightKg.toFixed(2)),
         CollectableAmount: finalCollectableAmount,
         Commodity: buildCommodity(),
         CreditReferenceNo: toLimitedString(orderId || "", 20, ""),
@@ -745,7 +858,7 @@ const buildGenerateWaybillPayload = ({
         CurrencyCode: "",
         DeclaredValue: coerceNumber(declaredValue) ?? 0,
         DeliveryTimeSlot: "",
-        Dimensions: buildDefaultDimensions(pieceCount),
+        Dimensions: packageDimensions,
         FavouringName: "",
         ForwardAWBNo: "",
         ForwardLogisticCompName: "",
@@ -928,6 +1041,9 @@ const createBlueDartWaybill = async ({
   collectableAmount,
   productCode,
   subProductCode,
+  dimensions,
+  weight,
+  sender,
   overrides,
 }) => {
   try {
@@ -943,6 +1059,9 @@ const createBlueDartWaybill = async ({
       collectableAmount,
       productCode,
       subProductCode,
+      dimensions,
+      weight,
+      sender,
       overrides,
     });
 
@@ -1237,14 +1356,18 @@ const cancelBlueDartWaybill = async ({
 };
 
 module.exports = {
+  buildDefaultDimensions,
+  calculatePackageDimensions,
   cancelBlueDartPickup,
   cancelBlueDartWaybill,
   createBlueDartWaybill,
   extractAwbNumber,
   extractPickupRegistrationDate,
   fetchBlueDartJwtToken,
+  getApproxWeightKg,
   getBlueDartServicesForPincode,
   getBlueDartTransitTime,
+  parseDimensionValues,
   resolveBlueDartShipFrom,
   trackBlueDartShipment,
 };

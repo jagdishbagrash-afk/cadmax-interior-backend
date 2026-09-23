@@ -55,6 +55,16 @@ const OrderProductSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+
+    dimensions: {
+      type: String,
+      default: "",
+    },
+
+    weight: {
+      type: Number,
+      default: null,
+    },
   },
   { _id: false }
 );
@@ -107,6 +117,8 @@ const OrderSchema = new mongoose.Schema(
       default: "ONLINE",
     },
     amount: { type: Number, required: true },
+    dimensions: { type: String, default: "" },
+    weight: { type: Number, default: null },
     tracking_number: { type: String },
     shipping_status: { type: String, default: "pending" },
     courier_name: { type: String },
