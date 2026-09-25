@@ -1,6 +1,75 @@
 const PDFDocument = require("pdfkit");
 const path = require("path");
 const fs = require("fs");
+const os = require("os");
+const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
+
+const s3Client = new S3Client({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  },
+});
+
+const hasCloudStorageConfig = () =>
+  Boolean(
+    process.env.S3_BUCKET_NAME &&
+    process.env.AWS_REGION &&
+    process.env.AWS_ACCESS_KEY_ID &&
+    process.env.AWS_SECRET_ACCESS_KEY
+  );
+
+function cleanupLocalInvoiceFolder() {
+  if (!hasCloudStorageConfig()) {
+    return;
+  }
+
+  const localInvoiceDir = path.join(process.cwd(), "uploads", "invoices");
+
+  if (!fs.existsSync(localInvoiceDir)) {
+    return;
+  }
+
+  try {
+    const files = fs.readdirSync(localInvoiceDir);
+    for (const file of files) {
+      const filePath = path.join(localInvoiceDir, file);
+      if (fs.statSync(filePath).isFile()) {
+        fs.unlinkSync(filePath);
+      }
+    }
+  } catch (error) {
+    console.error("Local invoice cleanup failed:", error);
+  }
+}
+
+async function uploadInvoicePdfToCloud(filePath, fileName = path.basename(filePath)) {
+  if (!hasCloudStorageConfig()) {
+    return null;
+  }
+
+  try {
+    const pdfBuffer = fs.readFileSync(filePath);
+    const safeFileName = String(fileName).replace(/\s+/g, "-");
+    const key = `cadmax-interior-invoices/${Date.now()}-${safeFileName}`;
+
+    await s3Client.send(
+      new PutObjectCommand({
+        Bucket: process.env.S3_BUCKET_NAME,
+        Key: key,
+        Body: pdfBuffer,
+        ContentType: "application/pdf",
+        ContentDisposition: "inline",
+      })
+    );
+
+    return `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+  } catch (error) {
+    console.error("Cloud invoice upload failed:", error);
+    return null;
+  }
+}
 
 /**
  * Format currency with Indian Rupee formatting
@@ -38,6 +107,7 @@ const formatDate = (dateInput) => {
 function generateOrderInvoicePdf(order) {
   return new Promise((resolve, reject) => {
     try {
+      cleanupLocalInvoiceFolder();
 
       const doc = new PDFDocument({
         margin: 40,
@@ -53,13 +123,9 @@ function generateOrderInvoicePdf(order) {
       const filename =
         `Invoice-${safeOrderId}.pdf`;
 
-      // IMPORTANT:
-      // Always save from project root
-      const invoiceDir = path.join(
-        process.cwd(),
-        "uploads",
-        "invoices"
-      );
+      const invoiceDir = hasCloudStorageConfig()
+        ? path.join(os.tmpdir(), "cadmax-invoice-temp")
+        : path.join(process.cwd(), "uploads", "invoices");
 
       if (!fs.existsSync(invoiceDir)) {
         fs.mkdirSync(invoiceDir, {
@@ -1691,4 +1757,5 @@ function generateOrderInvoicePdf(order) {
 
 module.exports = {
   generateOrderInvoicePdf,
+  uploadInvoicePdfToCloud,
 };

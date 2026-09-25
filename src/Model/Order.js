@@ -128,6 +128,8 @@ const OrderSchema = new mongoose.Schema(
     dispatched_at: { type: Date, default: null },
     delivered_at: { type: Date, default: null },
     shipping_response: { type: Object },
+    invoiceUrl: { type: String, default: "" },
+    pdfUrl: { type: String, default: "" },
   },
   { timestamps: true }
 );

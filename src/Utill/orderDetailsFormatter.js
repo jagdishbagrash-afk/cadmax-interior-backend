@@ -41,6 +41,18 @@ const formatCurrency = (amount) => {
   })}`;
 };
 
+const buildInvoiceDownloadUrl = (orderId) => {
+  const cleanOrderId = String(orderId || "").trim().replace(/^#/, "");
+  const invoicePath = `/api/order/invoice/${encodeURIComponent(cleanOrderId)}`;
+  const configuredBase = (process.env.PUBLIC_API_URL || process.env.API_BASE_URL || process.env.FRONTEND_URL || "").replace(/\/+$/, "");
+
+  if (!configuredBase) {
+    return invoicePath;
+  }
+
+  return `${configuredBase}${invoicePath.startsWith("/") ? invoicePath : `/${invoicePath}`}`;
+};
+
 /**
  * Format order details for WEB frontend based on exact design screenshot
  */
@@ -193,7 +205,9 @@ const formatOrderDetailsForWeb = (order, syncedTransit = {}) => {
       actions: {
         canTrackShipment: Boolean(trackingId),
         canDownloadInvoice: true,
-        invoiceUrl: `/api/order/invoice/${order.orderId}`,
+        invoiceUrl: buildInvoiceDownloadUrl(order.orderId),
+        invoiceDownloadUrl: buildInvoiceDownloadUrl(order.orderId),
+        downloadInvoiceUrl: buildInvoiceDownloadUrl(order.orderId),
         trackShipmentUrl: `/api/shipment/track/${trackingId}`,
       },
     },
