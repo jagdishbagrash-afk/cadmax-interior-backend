@@ -41,6 +41,18 @@ const formatCurrency = (amount) => {
   })}`;
 };
 
+const buildInvoiceDownloadUrl = (orderId) => {
+  const cleanOrderId = String(orderId || "").trim().replace(/^#/, "");
+  const invoicePath = `/api/order/invoice/${encodeURIComponent(cleanOrderId)}`;
+  const configuredBase = (process.env.PUBLIC_API_URL || process.env.API_BASE_URL || process.env.FRONTEND_URL || "").replace(/\/+$/, "");
+
+  if (!configuredBase) {
+    return invoicePath;
+  }
+
+  return `${configuredBase}${invoicePath.startsWith("/") ? invoicePath : `/${invoicePath}`}`;
+};
+
 /**
  * Format order details for WEB frontend based on exact design screenshot
  */
@@ -93,7 +105,7 @@ const formatOrderDetailsForWeb = (order, syncedTransit = {}) => {
   const products = (order.product || []).map((item) => {
     const itemTotal = item.total || (item.price * item.quantity);
     const prodRef = item.id && typeof item.id === "object" ? item.id : null;
-    const imageUrl = prodRef?.thumbnail || prodRef?.images?.[0] || prodRef?.mainImage || null;
+    const imageUrl = prodRef?.thumbnail || prodRef?.images?.[0] || item.image || null;
 
     return {
       productId: prodRef?._id || item.id,
@@ -193,7 +205,9 @@ const formatOrderDetailsForWeb = (order, syncedTransit = {}) => {
       actions: {
         canTrackShipment: Boolean(trackingId),
         canDownloadInvoice: true,
-        invoiceUrl: `/api/order/invoice/${order.orderId}`,
+        invoiceUrl: buildInvoiceDownloadUrl(order.orderId),
+        invoiceDownloadUrl: buildInvoiceDownloadUrl(order.orderId),
+        downloadInvoiceUrl: buildInvoiceDownloadUrl(order.orderId),
         trackShipmentUrl: `/api/shipment/track/${trackingId}`,
       },
     },

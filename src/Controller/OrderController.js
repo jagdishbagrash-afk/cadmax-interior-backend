@@ -21,9 +21,34 @@ const { createBlueDartWaybill, resolveBlueDartShipFrom } = require("../Utill/blu
 const mongoose = require("mongoose");
 const { hydrateOrderShipmentDetails, processOrderShipmentCreation } = require("./shipmentController");
 const { formatOrderDetailsForWeb, formatOrderDetailsForApp } = require("../Utill/orderDetailsFormatter");
-const { generateOrderInvoicePdf } = require("../Utill/invoicePdfGenerator");
+const { generateOrderInvoicePdf, uploadInvoicePdfToCloud } = require("../Utill/invoicePdfGenerator");
+const path = require("path");
+const fs = require("fs");
 
+const resolveOrderInvoiceUrl = (order = {}) => {
+  const candidates = [
+    order?.invoiceUrl,
+    order?.pdfUrl,
+    order?.invoicePdfUrl,
+    order?.awsUrl,
+    order?.awsInvoiceUrl,
+    order?.invoice_url,
+    order?.pdf_url,
+    order?.aws_invoice_url,
+    order?.invoice?.url,
+    order?.data?.invoiceUrl,
+    order?.data?.pdfUrl,
+    order?.data?.awsUrl,
+  ];
 
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim()) {
+      return candidate.trim();
+    }
+  }
+
+  return null;
+};
 
 // exports.addOrder = catchAsync(async (req, res) => {
 //   try {
@@ -275,6 +300,9 @@ exports.addOrder = catchAsync(async (req, res) => {
     orderProducts.push({
       id: productData._id,
       title: productData.title,
+      // Product image
+      image: item.image || "",
+      images: item.images || [],
       price: item.price,
       originalPrice: item.originalPrice || item.price,
       discount: item.discount || 0,
@@ -410,10 +438,10 @@ exports.addOrder = catchAsync(async (req, res) => {
 
 exports.getAllOrders = catchAsync(async (req, res) => {
   try {
-    const orders = await Order.find()  .populate({
-        path: "product.id",
-        model: "Product",
-      })
+    const orders = await Order.find().populate({
+      path: "product.id",
+      model: "Product",
+    })
       .populate({
         path: "addressId",
         model: "Address", // apne Address model ka naam yahan likhein
@@ -686,7 +714,7 @@ exports.updateStatus = catchAsync(async (req, res) => {
   }
 });
 
-  exports.getOrdersByUser = catchAsync(async (req, res) => {
+exports.getOrdersByUser = catchAsync(async (req, res) => {
   try {
     const userId = req.user?.id;
 
@@ -1472,7 +1500,7 @@ exports.getOrderInvoicePdf = catchAsync(async (req, res) => {
     const { orderId } = req.params;
 
     if (!orderId) {
-      return validationErrorResponse(res, "orderId parameter is required");
+      return validationErrorResponse(res, "Order ID is required");
     }
 
     const cleanOrderId = String(orderId).trim().replace(/^#/, "");
@@ -1488,19 +1516,138 @@ exports.getOrderInvoicePdf = catchAsync(async (req, res) => {
     }
 
     const order = await Order.findOne({ $or: queryConditions })
-      .populate({ path: "product.id", model: "Product" })
-      .populate({ path: "userId", model: "User", select: "name email mobile" });
+      .populate({
+        path: "product.id",
+        model: "Product",
+      })
+      .populate({
+        path: "userId",
+        model: "User",
+        select: "name email mobile",
+      });
 
     if (!order) {
-      return errorResponse(res, `Order not found with ID: ${orderId}`, 404);
+      return errorResponse(res, "Order not found", 404);
     }
 
-    // Generate & Stream PDF Invoice
-    generateOrderInvoicePdf(order, res);
+    const existingInvoiceUrl = resolveOrderInvoiceUrl(order);
+
+    const isLocalInvoiceUrl = (url) => {
+      if (!url) return false;
+
+      try {
+        const parsed = new URL(String(url));
+
+        return (
+          parsed.hostname === "localhost" ||
+          parsed.hostname === "127.0.0.1" ||
+          parsed.hostname === "0.0.0.0"
+        );
+      } catch {
+        return false;
+      }
+    };
+
+    if (existingInvoiceUrl && !isLocalInvoiceUrl(existingInvoiceUrl)) {
+      return successResponse(
+        res,
+        "Invoice already available",
+        200,
+        {
+          orderId: order.orderId,
+          pdfUrl: existingInvoiceUrl,
+          downloadUrl: existingInvoiceUrl,
+          invoiceUrl: existingInvoiceUrl,
+          awsUrl: existingInvoiceUrl,
+        }
+      );
+    }
+
+    // Generate PDF and save it to uploads/invoices
+    const pdfPath = await generateOrderInvoicePdf(order);
+
+    const fileName = path.basename(pdfPath);
+
+    const hasCloudStorageConfig = Boolean(
+      process.env.S3_BUCKET_NAME &&
+      process.env.AWS_REGION &&
+      process.env.AWS_ACCESS_KEY_ID &&
+      process.env.AWS_SECRET_ACCESS_KEY
+    );
+
+    const baseUrl =
+      process.env.PUBLIC_API_URL ||
+      `${req.protocol}://${req.get("host")}`;
+
+    let pdfUrl = `${baseUrl}/uploads/invoices/${encodeURIComponent(
+      fileName
+    )}`;
+
+    try {
+      const cloudPdfUrl = hasCloudStorageConfig
+        ? await uploadInvoicePdfToCloud(pdfPath, fileName)
+        : null;
+
+      if (cloudPdfUrl) {
+        pdfUrl = cloudPdfUrl;
+      }
+
+      if (pdfUrl) {
+        await Order.findByIdAndUpdate(
+          order._id,
+          { $set: { invoiceUrl: pdfUrl, pdfUrl } },
+          { new: true }
+        );
+      }
+    } catch (error) {
+      console.error("Invoice cloud upload fallback active:", error);
+    } finally {
+      try {
+        if (pdfPath && fs.existsSync(pdfPath)) {
+          fs.unlinkSync(pdfPath);
+        }
+
+        const localInvoiceDir = path.join(process.cwd(), "uploads", "invoices");
+        if (fs.existsSync(localInvoiceDir)) {
+          const files = fs.readdirSync(localInvoiceDir);
+          for (const file of files) {
+            const fullPath = path.join(localInvoiceDir, file);
+            if (fs.statSync(fullPath).isFile()) {
+              fs.unlinkSync(fullPath);
+            }
+          }
+        }
+      } catch (cleanupError) {
+        console.error("Invoice temp file cleanup failed:", cleanupError);
+      }
+    }
+
+    return successResponse(
+      res,
+      "Invoice generated successfully",
+      200,
+      {
+        orderId: order.orderId,
+        pdfUrl,
+        downloadUrl: pdfUrl,
+        invoiceUrl: pdfUrl,
+        awsUrl: pdfUrl,
+      }
+    );
   } catch (error) {
     console.error("getOrderInvoicePdf Error:", error);
+
     if (!res.headersSent) {
-      return errorResponse(res, error.message || "Internal Server Error", 500);
+      return errorResponse(
+        res,
+        error.message || "Internal Server Error",
+        500
+      );
     }
   }
 });
+
+module.exports = {
+  ...module.exports,
+  resolveOrderInvoiceUrl,
+};
