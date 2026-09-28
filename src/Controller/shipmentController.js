@@ -600,7 +600,7 @@ const resolveDefaultShippingProvider = (value) =>
   normalizeCourier(process.env.DEFAULT_SHIPPING_PROVIDER) ||
   "DHL";
 
-const createShipmentForOrder = async ({ order, receiverAddress, shippingProvider }) => {
+const createShipmentForOrder = async ({ order, receiverAddress, shippingProvider, options = {} }) => {
   const provider = resolveDefaultShippingProvider(shippingProvider);
   const receiverName = receiverAddress?.name || order?.shippingAddress?.name || order?.name;
   const receiverMobile = receiverAddress?.mobile || order?.shippingAddress?.mobile || order?.mobile;
@@ -1485,6 +1485,7 @@ exports.processOrderShipmentCreation = async (order, options = {}) => {
     order,
     receiverAddress: toCourierAddress(shippingAddress),
     shippingProvider: desiredProvider,
+    options,
   });
 
   const shipment = created.shipment;
