@@ -114,23 +114,42 @@ const formatDate = (dateInput) => {
  * Generate PDF Invoice Document and pipe into express response or stream
  */
 function generateOrderInvoicePdf(order, res) {
-  try {
-    const doc = new PDFDocument({ margin: 40, size: "A4" });
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({ margin: 40, size: "A4" });
 
-    const orderIdentifier = order.orderId || order._id || "Order";
-    const cleanId = String(orderIdentifier).replace(/^#/, "").replace(/[^\w-]/g, "");
-    const filename = `Invoice-${cleanId}.pdf`;
+      const orderIdentifier = order?.orderId || order?._id || "Order";
+      const cleanId = String(orderIdentifier).replace(/^#/, "").replace(/[^\w-]/g, "");
+      const filename = `Invoice-${cleanId}.pdf`;
 
-    // Set response headers for direct file download if express res object
-    if (res && typeof res.setHeader === "function") {
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-      res.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
-    }
+      let outPath = null;
 
-    if (res && typeof doc.pipe === "function") {
-      doc.pipe(res);
-    }
+      // Set response headers for direct file download if express res object
+      if (res && typeof res.setHeader === "function") {
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+        res.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
+        if (typeof doc.pipe === "function") {
+          doc.pipe(res);
+        }
+      } else {
+        cleanupLocalInvoiceFolder();
+        const outDir = hasCloudStorageConfig()
+          ? os.tmpdir()
+          : path.join(process.cwd(), "uploads", "invoices");
+        if (!fs.existsSync(outDir)) {
+          fs.mkdirSync(outDir, { recursive: true });
+        }
+        outPath = path.join(outDir, filename);
+        const writeStream = fs.createWriteStream(outPath);
+        doc.pipe(writeStream);
+        writeStream.on("finish", () => resolve(outPath));
+        writeStream.on("error", reject);
+      }
+
+      if (res) {
+        res.on && res.on("finish", () => resolve(filename));
+      }
 
     const primaryColor = "#0f172a";   // Dark slate blue
     const accentColor = "#0284c7";    // Ocean blue accent
@@ -414,12 +433,14 @@ function generateOrderInvoicePdf(order, res) {
       .text("Cadmax Interior Design & Furnishings | www.cadmax.com", 40, pageHeight - 28, { align: "center" });
 
     doc.end();
-  } catch (err) {
-    console.error("generateOrderInvoicePdf Exception:", err);
-    if (res && typeof res.status === "function" && !res.headersSent) {
-      res.status(500).json({ status: false, message: "Error generating invoice PDF: " + err.message });
+    } catch (err) {
+      console.error("generateOrderInvoicePdf Exception:", err);
+      if (res && typeof res.status === "function" && !res.headersSent) {
+        res.status(500).json({ status: false, message: "Error generating invoice PDF: " + err.message });
+      }
+      reject(err);
     }
-  }
+  });
 }
 
 module.exports = {
