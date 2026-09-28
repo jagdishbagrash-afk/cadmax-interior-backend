@@ -205,9 +205,7 @@ const formatOrderDetailsForWeb = (order, syncedTransit = {}) => {
       actions: {
         canTrackShipment: Boolean(trackingId),
         canDownloadInvoice: true,
-        invoiceUrl: buildInvoiceDownloadUrl(order.orderId),
-        invoiceDownloadUrl: buildInvoiceDownloadUrl(order.orderId),
-        downloadInvoiceUrl: buildInvoiceDownloadUrl(order.orderId),
+        invoiceUrl: `/api/order/invoice/${order.orderId || order._id}`,
         trackShipmentUrl: `/api/shipment/track/${trackingId}`,
       },
     },
