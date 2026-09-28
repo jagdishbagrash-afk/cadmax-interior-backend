@@ -12,7 +12,15 @@ const OrderProductSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    image: {
+      type: String,
+      default: "",
+    },
 
+    images: {
+      type: [String],
+      default: [],
+    },
     price: {
       type: Number,
       required: true,
@@ -95,7 +103,7 @@ const OrderSchema = new mongoose.Schema(
     product: { type: [OrderProductSchema], required: true },
     status: {
       type: String,
-      enum: ["pending", "confirmed", "shipped", "delivered", "cancelled" , "returned", "failed", "on-hold", 'processing'],
+      enum: ["pending", "confirmed", "shipped", "delivered", "cancelled", "returned", "failed", "on-hold", 'processing'],
       default: "pending",
     },
     note: { type: String },
@@ -120,6 +128,8 @@ const OrderSchema = new mongoose.Schema(
     dispatched_at: { type: Date, default: null },
     delivered_at: { type: Date, default: null },
     shipping_response: { type: Object },
+    invoiceUrl: { type: String, default: "" },
+    pdfUrl: { type: String, default: "" },
   },
   { timestamps: true }
 );
