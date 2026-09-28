@@ -20,28 +20,10 @@ const hasCloudStorageConfig = () =>
     process.env.AWS_SECRET_ACCESS_KEY
   );
 
-function cleanupLocalInvoiceFolder() {
-  if (!hasCloudStorageConfig()) {
-    return;
-  }
-
+function ensureLocalInvoiceDir() {
   const localInvoiceDir = path.join(process.cwd(), "uploads", "invoices");
-
-  if (!fs.existsSync(localInvoiceDir)) {
-    return;
-  }
-
-  try {
-    const files = fs.readdirSync(localInvoiceDir);
-    for (const file of files) {
-      const filePath = path.join(localInvoiceDir, file);
-      if (fs.statSync(filePath).isFile()) {
-        fs.unlinkSync(filePath);
-      }
-    }
-  } catch (error) {
-    console.error("Local invoice cleanup failed:", error);
-  }
+  fs.mkdirSync(localInvoiceDir, { recursive: true });
+  return localInvoiceDir;
 }
 
 async function uploadInvoicePdfToCloud(filePath, fileName = path.basename(filePath)) {
@@ -61,6 +43,7 @@ async function uploadInvoicePdfToCloud(filePath, fileName = path.basename(filePa
         Body: pdfBuffer,
         ContentType: "application/pdf",
         ContentDisposition: "inline",
+        ACL: "public-read",
       })
     );
 
@@ -116,323 +99,147 @@ const formatDate = (dateInput) => {
 function generateOrderInvoicePdf(order, res) {
   return new Promise((resolve, reject) => {
     try {
-      const doc = new PDFDocument({ margin: 40, size: "A4" });
-
-      const orderIdentifier = order?.orderId || order?._id || "Order";
+      const orderIdentifier = order.orderId || order._id || "Order";
       const cleanId = String(orderIdentifier).replace(/^#/, "").replace(/[^\w-]/g, "");
       const filename = `Invoice-${cleanId}.pdf`;
+      const localInvoiceDir = ensureLocalInvoiceDir();
+      const pdfPath = path.join(localInvoiceDir, `${Date.now()}-${filename}`);
 
-      let outPath = null;
-
-      // Set response headers for direct file download if express res object
       if (res && typeof res.setHeader === "function") {
         res.setHeader("Content-Type", "application/pdf");
         res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
         res.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
-        if (typeof doc.pipe === "function") {
-          doc.pipe(res);
+      }
+
+      const doc = new PDFDocument({ margin: 25, size: "A4" });
+      const writeStream = fs.createWriteStream(pdfPath);
+
+      if (res && typeof doc.pipe === "function") {
+        doc.pipe(res);
+      }
+
+      doc.pipe(writeStream);
+      writeStream.on("finish", () => resolve(pdfPath));
+      writeStream.on("error", reject);
+      doc.on("error", reject);
+
+      const primaryColor = "#0f172a";
+      const accentColor = "#0284c7";
+      const lightBg = "#f8fafc";
+      const tableHeaderBg = "#1e293b";
+      const borderColor = "#cbd5e1";
+
+      const shipAddr = order.shippingAddress || {};
+      const customerName = cleanText(shipAddr.name || order.name || order.userId?.name || "Valued Customer");
+      const rawMobile = shipAddr.mobile || order.mobile || order.userId?.mobile;
+      const customerPhone = rawMobile ? `+91 ${cleanText(rawMobile)}` : "N/A";
+      const addressLines = [];
+
+      if (shipAddr.street_address) addressLines.push(cleanText(shipAddr.street_address));
+      if (shipAddr.city || shipAddr.state || shipAddr.pincode) {
+        addressLines.push([shipAddr.city, shipAddr.state, shipAddr.pincode].filter(Boolean).map(cleanText).join(", "));
+      }
+      if (!addressLines.length && order.address) {
+        addressLines.push(cleanText(order.address));
+      }
+
+      const products = Array.isArray(order.product || order.products || order.items)
+        ? (order.product || order.products || order.items)
+        : [];
+
+      doc.fillColor(primaryColor).fontSize(18).font("Helvetica-Bold").text("CADMAX INTERIOR", { align: "right" });
+      doc.fillColor("#475569").fontSize(9).font("Helvetica").text("Cadmax Interior Design & Furnishings Pvt. Ltd.", { align: "right" });
+      doc.text("Email: support@cadmaxinterior.com", { align: "right" });
+      doc.text("Phone: +91 98765 43210 | Web: www.cadmax.com", { align: "right" });
+      doc.moveTo(40, 95).lineTo(555, 95).strokeColor(borderColor).lineWidth(1).stroke();
+
+      doc.rect(40, 105, 515, 26).fill(lightBg);
+      doc.fillColor(primaryColor).fontSize(14).font("Helvetica-Bold").text("TAX INVOICE", 52, 111);
+      doc.fillColor(accentColor).fontSize(11).font("Helvetica-Bold").text(`NO: ${cleanText(order.orderId || order._id || "N/A")}`, 400, 112, { align: "right" });
+
+      let y = 145;
+      doc.fontSize(10).font("Helvetica-Bold").fillColor(primaryColor).text("ORDER & PAYMENT DETAILS", 40, y);
+      doc.fontSize(9).font("Helvetica").fillColor("#475569").text(`Invoice Date: ${formatDate(order.createdAt)}`, 40, y + 16);
+      doc.text(`Order Status: ${cleanText((order.status || "Pending").toUpperCase())}`, 40, y + 28);
+      doc.text(`Payment Method: ${cleanText((order.paymentMethod || "ONLINE").toUpperCase())}`, 40, y + 40);
+      doc.text(`Transaction ID: ${cleanText(order.PaymentId || "N/A")}`, 40, y + 52);
+
+      doc.fontSize(10).font("Helvetica-Bold").fillColor(primaryColor).text("SHIPMENT & TRACKING", 310, y);
+      doc.fontSize(9).font("Helvetica").fillColor("#475569").text(`Courier: ${cleanText(order.courier_name || "BLUE_DART")}`, 310, y + 16);
+      doc.text(`Tracking No: ${cleanText(order.tracking_number || "N/A")}`, 310, y + 28);
+      doc.text(`Shipping Mode: ${cleanText(order.shippingMode || "Express Shipping")}`, 310, y + 40);
+      doc.text(`Shipment Status: ${cleanText(order.shipmentStatus || "N/A")}`, 310, y + 52);
+
+      y = 230;
+      doc.fontSize(10).font("Helvetica-Bold").fillColor(primaryColor).text("BILLING ADDRESS", 40, y);
+      doc.fontSize(9).font("Helvetica").fillColor("#475569").text(customerName, 40, y + 16);
+      doc.text(addressLines[0] || "N/A", 40, y + 28, { width: 220 });
+      if (addressLines[1]) { doc.text(addressLines[1], 40, y + 40, { width: 220 }); }
+      doc.text(`Phone: ${customerPhone}`, 40, y + 52);
+
+      doc.fontSize(10).font("Helvetica-Bold").fillColor(primaryColor).text("SHIPPING ADDRESS", 310, y);
+      doc.fontSize(9).font("Helvetica").fillColor("#475569").text(customerName, 310, y + 16);
+      doc.text(addressLines[0] || "N/A", 310, y + 28, { width: 220 });
+      if (addressLines[1]) { doc.text(addressLines[1], 310, y + 40, { width: 220 }); }
+      doc.text(`Phone: ${customerPhone}`, 310, y + 52);
+
+      const tableY = 320;
+      doc.rect(40, tableY, 515, 20).fill(tableHeaderBg);
+      doc.fillColor("#ffffff").fontSize(8).font("Helvetica-Bold")
+        .text("#", 48, tableY + 6)
+        .text("ITEM", 75, tableY + 6)
+        .text("QTY", 332, tableY + 6, { width: 30, align: "center" })
+        .text("PRICE", 385, tableY + 6, { width: 70, align: "right" })
+        .text("TOTAL", 470, tableY + 6, { width: 75, align: "right" });
+
+      let itemY = tableY + 20;
+      products.forEach((item, index) => {
+        const title = cleanText(item.title || item.name || "Item");
+        const qty = Number(item.quantity || item.qty || 1);
+        const price = Number(item.price || item.originalPrice || 0);
+        const total = Number(item.total || price * qty || 0);
+
+        if (index % 2 === 1) {
+          doc.rect(40, itemY, 515, 18).fill("#f1f5f9");
         }
-      } else {
-        cleanupLocalInvoiceFolder();
-        const outDir = hasCloudStorageConfig()
-          ? os.tmpdir()
-          : path.join(process.cwd(), "uploads", "invoices");
-        if (!fs.existsSync(outDir)) {
-          fs.mkdirSync(outDir, { recursive: true });
-        }
-        outPath = path.join(outDir, filename);
-        const writeStream = fs.createWriteStream(outPath);
-        doc.pipe(writeStream);
-        writeStream.on("finish", () => resolve(outPath));
-        writeStream.on("error", reject);
-      }
 
-      if (res) {
-        res.on && res.on("finish", () => resolve(filename));
-      }
-
-    const primaryColor = "#0f172a";   // Dark slate blue
-    const accentColor = "#0284c7";    // Ocean blue accent
-    const lightBg = "#f8fafc";        // Slate light background
-    const tableHeaderBg = "#1e293b";  // Dark header background
-    const borderColor = "#cbd5e1";    // Slate border
-
-    // ==========================================
-    // HEADER SECTION (LOGO & COMPANY DETAILS)
-    // ==========================================
-    const logoPath = path.join(__dirname, "../logo.png");
-    
-    if (fs.existsSync(logoPath)) {
-      try {
-        doc.image(logoPath, 40, 35, { width: 120 });
-      } catch (e) {
-        console.warn("Could not load logo image for PDF:", e.message);
-      }
-    }
-
-    // Company Name & Info on Right
-    doc
-      .fillColor(primaryColor)
-      .fontSize(18)
-      .font("Helvetica-Bold")
-      .text("CADMAX INTERIOR", 320, 35, { align: "right" });
-
-    doc
-      .fontSize(9)
-      .font("Helvetica")
-      .fillColor("#475569")
-      .text("Cadmax Interior Design & Furnishings Pvt. Ltd.", 320, 58, { align: "right" })
-      .text("Email: support@cadmaxinterior.com", 320, 71, { align: "right" })
-      .text("Phone: +91 98765 43210 | Web: www.cadmax.com", 320, 84, { align: "right" });
-
-    // Horizontal Divider Line
-    doc
-      .moveTo(40, 108)
-      .lineTo(555, 108)
-      .strokeColor(borderColor)
-      .lineWidth(1)
-      .stroke();
-
-    // ==========================================
-    // INVOICE TITLE & SUMMARY BANNER
-    // ==========================================
-    doc.rect(40, 118, 515, 32).fill(lightBg);
-
-    doc
-      .fillColor(primaryColor)
-      .fontSize(14)
-      .font("Helvetica-Bold")
-      .text("TAX INVOICE", 52, 126);
-
-    doc
-      .fillColor(accentColor)
-      .fontSize(11)
-      .font("Helvetica-Bold")
-      .text(`NO: ${cleanText(order.orderId || order._id || "N/A")}`, 400, 127, { align: "right" });
-
-    // ==========================================
-    // TWO COLUMN DETAILS: INVOICE INFO & BILLED TO
-    // ==========================================
-    const startY = 162;
-
-    // Left Column: Invoice & Order Metadata
-    doc
-      .fontSize(10)
-      .font("Helvetica-Bold")
-      .fillColor(primaryColor)
-      .text("INVOICE DETAILS", 40, startY);
-
-    doc
-      .fontSize(9)
-      .font("Helvetica")
-      .fillColor("#475569")
-      .text(`Invoice Date: `, 40, startY + 16, { continued: true })
-      .font("Helvetica-Bold").fillColor(primaryColor).text(formatDate(order.createdAt))
-      
-      .font("Helvetica").fillColor("#475569")
-      .text(`Order Status: `, 40, startY + 30, { continued: true })
-      .font("Helvetica-Bold").fillColor(primaryColor).text(cleanText((order.status || "Pending").toUpperCase()))
-      
-      .font("Helvetica").fillColor("#475569")
-      .text(`Payment Method: `, 40, startY + 44, { continued: true })
-      .font("Helvetica-Bold").fillColor(primaryColor).text(cleanText((order.paymentMethod || "ONLINE").toUpperCase()))
-      
-      .font("Helvetica").fillColor("#475569")
-      .text(`Transaction ID: `, 40, startY + 58, { continued: true })
-      .font("Helvetica-Bold").fillColor(primaryColor).text(cleanText(order.PaymentId || "N/A"));
-
-    if (order.tracking_number) {
-      doc
-        .font("Helvetica").fillColor("#475569")
-        .text(`Courier & Tracking: `, 40, startY + 72, { continued: true })
-        .font("Helvetica-Bold").fillColor(accentColor).text(`${cleanText(order.courier_name || "Courier")} (${cleanText(order.tracking_number)})`);
-    }
-
-    // Right Column: Customer & Shipping Details
-    const rightX = 310;
-    const shipAddr = order.shippingAddress || {};
-    const customerName = cleanText(shipAddr.name || order.name || order.userId?.name || "Valued Customer");
-    const rawMobile = shipAddr.mobile || order.mobile || order.userId?.mobile;
-    const customerPhone = rawMobile ? `+91 ${cleanText(rawMobile)}` : "N/A";
-    
-    const addressLines = [];
-    if (shipAddr.street_address) addressLines.push(cleanText(shipAddr.street_address));
-    if (shipAddr.city || shipAddr.state || shipAddr.pincode) {
-      addressLines.push([shipAddr.city, shipAddr.state, shipAddr.pincode].filter(Boolean).map(cleanText).join(", "));
-    }
-    if (!addressLines.length && order.address) {
-      addressLines.push(cleanText(order.address));
-    }
-
-    doc
-      .fontSize(10)
-      .font("Helvetica-Bold")
-      .fillColor(primaryColor)
-      .text("BILLED / SHIPPED TO", rightX, startY);
-
-    doc
-      .fontSize(9)
-      .font("Helvetica-Bold")
-      .fillColor(primaryColor)
-      .text(customerName, rightX, startY + 16);
-
-    doc
-      .font("Helvetica")
-      .fillColor("#475569")
-      .text(`Phone: ${customerPhone}`, rightX, startY + 30);
-
-    let addrY = startY + 44;
-    addressLines.forEach((line) => {
-      doc.text(line, rightX, addrY, { width: 240 });
-      addrY += 13;
-    });
-
-    // ==========================================
-    // PRODUCTS TABLE
-    // ==========================================
-    let tableTop = Math.max(startY + 95, addrY + 15);
-
-    // Table Header Box
-    doc.rect(40, tableTop, 515, 24).fill(tableHeaderBg);
-
-    doc
-      .fillColor("#ffffff")
-      .fontSize(9)
-      .font("Helvetica-Bold")
-      .text("#", 48, tableTop + 7)
-      .text("PRODUCT / ITEM DESCRIPTION", 75, tableTop + 7)
-      .text("QTY", 330, tableTop + 7, { width: 40, align: "center" })
-      .text("PRICE", 385, tableTop + 7, { width: 75, align: "right" })
-      .text("TOTAL", 470, tableTop + 7, { width: 75, align: "right" });
-
-    let rowY = tableTop + 24;
-    const rawProducts = order.product || order.products || order.items || [];
-    const products = Array.isArray(rawProducts) ? rawProducts : [];
-
-    products.forEach((item, index) => {
-      const prodRef = item.id && typeof item.id === "object" ? item.id : null;
-      const title = cleanText(item.title || prodRef?.title || "Item");
-      const quantity = Number(item.quantity || item.qty || 1);
-      const price = Number(item.price || prodRef?.price || 0);
-      const itemTotal = Number(item.total || (price * quantity));
-      const variantVal = item.variant || item.variantTitle;
-      const variantStr = variantVal ? `Variant: ${cleanText(variantVal)}` : null;
-
-      // Alternate background shading
-      if (index % 2 === 1) {
-        doc.rect(40, rowY, 515, variantStr ? 32 : 24).fill("#f1f5f9");
-      }
-
-      doc
-        .fillColor(primaryColor)
-        .fontSize(9)
-        .font("Helvetica")
-        .text(`${index + 1}`, 48, rowY + 7)
-        .font("Helvetica-Bold")
-        .text(title, 75, rowY + 7, { width: 240, height: 14, ellipsis: true })
-        .font("Helvetica")
-        .text(`${quantity}`, 330, rowY + 7, { width: 40, align: "center" })
-        .text(formatINR(price), 385, rowY + 7, { width: 75, align: "right" })
-        .font("Helvetica-Bold")
-        .text(formatINR(itemTotal), 470, rowY + 7, { width: 75, align: "right" });
-
-      if (variantStr) {
-        doc
-          .fontSize(8)
+        doc.fillColor(primaryColor).fontSize(8).font("Helvetica")
+          .text(String(index + 1), 48, itemY + 5)
+          .font("Helvetica-Bold")
+          .text(title, 75, itemY + 5, { width: 240, ellipsis: true })
           .font("Helvetica")
-          .fillColor("#64748b")
-          .text(variantStr, 75, rowY + 19);
-        rowY += 32;
-      } else {
-        rowY += 24;
-      }
+          .text(String(qty), 332, itemY + 5, { width: 30, align: "center" })
+          .text(formatINR(price), 385, itemY + 5, { width: 70, align: "right" })
+          .font("Helvetica-Bold")
+          .text(formatINR(total), 470, itemY + 5, { width: 75, align: "right" });
 
-      // Border line beneath row
-      doc
-        .moveTo(40, rowY)
-        .lineTo(555, rowY)
-        .strokeColor("#e2e8f0")
-        .lineWidth(0.5)
-        .stroke();
-    });
+        itemY += 18;
+      });
 
-    // ==========================================
-    // FINANCIAL BREAKDOWN & SUMMARY BOX
-    // ==========================================
-    const summaryTop = rowY + 15;
-    const totalAmount = Number(order.amount || order.totalAmount || order.grandTotal) || 0;
-    const subtotal = Math.round(totalAmount * 0.8475);
-    const gstTax = Math.round(totalAmount * 0.1525);
-    const shippingFee = Math.max(0, totalAmount - (subtotal + gstTax));
+      const totalAmount = Number(order.amount || order.totalAmount || order.grandTotal) || 0;
+      const subtotal = Math.round(totalAmount * 0.8475);
+      const gstTax = Math.round(totalAmount * 0.1525);
+      const shippingFee = Math.max(0, totalAmount - (subtotal + gstTax));
+      const summaryY = itemY + 18;
 
-    // Left Note Box
-    doc.rect(40, summaryTop, 260, 85).fill(lightBg);
-    doc
-      .fillColor(primaryColor)
-      .fontSize(9)
-      .font("Helvetica-Bold")
-      .text("TERMS & CONDITIONS", 50, summaryTop + 10)
-      .font("Helvetica")
-      .fontSize(8)
-      .fillColor("#475569")
-      .text("1. All sales are subject to Cadmax Interior standard policies.", 50, summaryTop + 25)
-      .text("2. This is a computer-generated tax invoice and requires no physical signature.", 50, summaryTop + 37, { width: 240 })
-      .text("3. For warranty or returns, contact support@cadmaxinterior.com.", 50, summaryTop + 59, { width: 240 });
+      doc.rect(40, summaryY, 260, 70).fill(lightBg);
+      doc.fillColor(primaryColor).fontSize(9).font("Helvetica-Bold").text("TERMS & CONDITIONS", 50, summaryY + 8)
+        .font("Helvetica").fontSize(8).fillColor("#475569").text("1. All sales are subject to Cadmax Interior standard policies.", 50, summaryY + 20)
+        .text("2. This is a computer-generated invoice.", 50, summaryY + 30)
+        .text("3. For support, contact support@cadmaxinterior.com.", 50, summaryY + 40);
 
-    // Right Summary Table
-    const sumRightX = 320;
-    let sumY = summaryTop;
+      doc.fillColor(primaryColor).fontSize(9).font("Helvetica").text("Subtotal", 330, summaryY + 10).text(formatINR(subtotal), 475, summaryY + 10, { width: 70, align: "right" });
+      doc.text("Tax/GST", 330, summaryY + 24).text(formatINR(gstTax), 475, summaryY + 24, { width: 70, align: "right" });
+      doc.text("Shipping", 330, summaryY + 38).text(shippingFee > 0 ? formatINR(shippingFee) : "FREE", 475, summaryY + 38, { width: 70, align: "right" });
+      doc.moveTo(330, summaryY + 52).lineTo(555, summaryY + 52).strokeColor(primaryColor).lineWidth(1).stroke();
+      doc.rect(330, summaryY + 54, 220, 20).fill(accentColor);
+      doc.fillColor("#ffffff").fontSize(10).font("Helvetica-Bold").text("GRAND TOTAL", 340, summaryY + 58).text(formatINR(totalAmount), 475, summaryY + 58, { width: 70, align: "right" });
 
-    const drawSummaryRow = (label, val, isBold = false) => {
-      doc
-        .fontSize(9)
-        .font(isBold ? "Helvetica-Bold" : "Helvetica")
-        .fillColor(isBold ? primaryColor : "#475569")
-        .text(label, sumRightX, sumY, { width: 130 })
-        .text(val, sumRightX + 130, sumY, { width: 105, align: "right" });
-      sumY += 18;
-    };
+      doc.moveTo(40, 760).lineTo(555, 760).strokeColor(borderColor).lineWidth(0.5).stroke();
+      doc.fontSize(8).font("Helvetica").fillColor("#94a3b8").text("Thank you for choosing Cadmax Interior!", 40, 768, { align: "center" });
+      doc.text("Cadmax Interior Design & Furnishings | www.cadmax.com", 40, 776, { align: "center" });
 
-    drawSummaryRow("Subtotal (Excl. Tax):", formatINR(subtotal));
-    drawSummaryRow("Estimated GST (18%):", formatINR(gstTax));
-    drawSummaryRow("Shipping & Handling:", shippingFee > 0 ? formatINR(shippingFee) : "FREE");
-
-    // Horizontal divider before total
-    doc
-      .moveTo(sumRightX, sumY - 4)
-      .lineTo(555, sumY - 4)
-      .strokeColor(primaryColor)
-      .lineWidth(1)
-      .stroke();
-
-    // Grand Total Row Highlight
-    doc.rect(sumRightX - 5, sumY - 2, 240, 24).fill(accentColor);
-    doc
-      .fillColor("#ffffff")
-      .fontSize(10)
-      .font("Helvetica-Bold")
-      .text("GRAND TOTAL:", sumRightX + 5, sumY + 4)
-      .text(formatINR(totalAmount), sumRightX + 110, sumY + 4, { width: 120, align: "right" });
-
-    // ==========================================
-    // FOOTER SECTION
-    // ==========================================
-    const pageHeight = doc.page.height;
-    doc
-      .moveTo(40, pageHeight - 50)
-      .lineTo(555, pageHeight - 50)
-      .strokeColor(borderColor)
-      .lineWidth(0.5)
-      .stroke();
-
-    doc
-      .fontSize(8)
-      .font("Helvetica")
-      .fillColor("#94a3b8")
-      .text("Thank you for choosing Cadmax Interior!", 40, pageHeight - 40, { align: "center" })
-      .text("Cadmax Interior Design & Furnishings | www.cadmax.com", 40, pageHeight - 28, { align: "center" });
-
-    doc.end();
+      doc.end();
     } catch (err) {
       console.error("generateOrderInvoicePdf Exception:", err);
       if (res && typeof res.status === "function" && !res.headersSent) {
