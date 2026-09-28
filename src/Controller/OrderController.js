@@ -1603,19 +1603,11 @@ exports.getOrderInvoicePdf = catchAsync(async (req, res) => {
       console.error("Invoice cloud upload fallback active:", error);
     } finally {
       try {
-        if (pdfPath && fs.existsSync(pdfPath)) {
-          fs.unlinkSync(pdfPath);
-        }
+        const isCloudUrl = Boolean(pdfUrl && /^https?:\/\//i.test(pdfUrl));
+        const shouldKeepLocalCopy = !hasCloudStorageConfig || !isCloudUrl;
 
-        const localInvoiceDir = path.join(process.cwd(), "uploads", "invoices");
-        if (fs.existsSync(localInvoiceDir)) {
-          const files = fs.readdirSync(localInvoiceDir);
-          for (const file of files) {
-            const fullPath = path.join(localInvoiceDir, file);
-            if (fs.statSync(fullPath).isFile()) {
-              fs.unlinkSync(fullPath);
-            }
-          }
+        if (pdfPath && fs.existsSync(pdfPath) && shouldKeepLocalCopy === false) {
+          fs.unlinkSync(pdfPath);
         }
       } catch (cleanupError) {
         console.error("Invoice temp file cleanup failed:", cleanupError);
