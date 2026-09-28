@@ -3,6 +3,7 @@ dotenv.config();
 
 require("./dbconfigration");
 const express = require("express");
+const path = require("path");
 const app = express();
 const cors = require("cors");
 const corsOptions = {
@@ -15,7 +16,12 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1"]);
-
+app.use(
+  "/uploads",
+  express.static(
+    path.join(process.cwd(), "uploads")
+  )
+)
 const expandLoopbackOrigin = (origin) => {
   try {
     const parsedUrl = new URL(origin);
