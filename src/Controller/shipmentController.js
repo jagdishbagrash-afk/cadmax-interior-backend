@@ -1542,17 +1542,17 @@ exports.processOrderShipmentCreation = async (order, options = {}) => {
 
   const synced = shipment.success
     ? await hydrateOrderShipmentDetails(order, {
-        userId,
-        persist: false,
-      })
+      userId,
+      persist: false,
+    })
     : {
-        addressRecord,
-        liveTracking: null,
-        trackingError: null,
-        transitEstimate: null,
-        serviceability: null,
-        trackingPending: false,
-      };
+      addressRecord,
+      liveTracking: null,
+      trackingError: null,
+      transitEstimate: null,
+      serviceability: null,
+      trackingPending: false,
+    };
 
   await order.save();
   console.log(`[ORDER SAVED AFTER SHIPMENT PROCESSING] Status: ${order.shipping_status}`);
@@ -1734,13 +1734,13 @@ exports.RefreshOrderShipment = catchAsync(async (req, res) => {
 exports.CancelBlueDartWaybill = catchAsync(async (req, res) => {
   const awbNo = toSafeString(
     req.body?.AWBNo ||
-      req.body?.awbNo ||
-      req.body?.awb_number ||
-      req.body?.awb ||
-      req.body?.trackingNumber ||
-      req.params?.awb ||
-      req.query?.awbNo ||
-      req.query?.AWBNo
+    req.body?.awbNo ||
+    req.body?.awb_number ||
+    req.body?.awb ||
+    req.body?.trackingNumber ||
+    req.params?.awb ||
+    req.query?.awbNo ||
+    req.query?.AWBNo
   );
 
   if (!awbNo) {
@@ -1795,11 +1795,11 @@ exports.CancelBlueDartWaybill = catchAsync(async (req, res) => {
         result.status && result.status.length > 0
           ? result.status
           : [
-              {
-                StatusCode: result.statusCode,
-                StatusInformation: result.statusInformation,
-              },
-            ],
+            {
+              StatusCode: result.statusCode,
+              StatusInformation: result.statusInformation,
+            },
+          ],
     },
   };
 
