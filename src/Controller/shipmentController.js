@@ -595,6 +595,8 @@ const getShipmentTrackingNumber = (shipmentResponse = {}) =>
   shipmentResponse?.pieces?.[0]?.trackingNumber ||
   null;
 
+
+
 const resolveDefaultShippingProvider = (value) =>
   normalizeCourier(value) ||
   normalizeCourier(process.env.DEFAULT_SHIPPING_PROVIDER) ||
