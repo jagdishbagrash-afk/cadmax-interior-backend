@@ -1532,25 +1532,38 @@ exports.getOrderInvoicePdf = catchAsync(async (req, res) => {
 
     const existingInvoiceUrl = resolveOrderInvoiceUrl(order);
 
-    const isLocalInvoiceUrl = (url) => {
-      if (!url) return false;
+    const isRealCloudInvoiceUrl = (url) => {
+      if (!url || typeof url !== "string") return false;
+      const str = url.trim();
 
-      try {
-        const parsed = new URL(String(url));
-
-        return (
-          parsed.hostname === "localhost" ||
-          parsed.hostname === "127.0.0.1" ||
-          parsed.hostname === "0.0.0.0"
-        );
-      } catch {
+      // Any site flow local / server uploads path is NOT a valid AWS S3 cloud URL
+      if (str.includes("/uploads/") || str.includes("/uploads/invoices/") || /localhost|127\.0\.0\.1|0\.0\.0\.0/i.test(str)) {
         return false;
       }
+
+      // Check if it's an AWS S3, Cloudflare, R2, or CDN URL
+      if (
+        str.includes("amazonaws.com") ||
+        str.includes("s3.ap-south-1.amazonaws.com") ||
+        str.includes("cadmaxpro-buket") ||
+        str.includes("r2.dev") ||
+        str.includes("cloudflarestorage.com") ||
+        str.includes("cloudfront.net")
+      ) {
+        return true;
+      }
+
+      const cfDomain = process.env.CLOUDFLARE_INVOICE_URL || process.env.CLOUDFLARE_R2_PUBLIC_URL || process.env.CLOUDFLARE_CDN_URL || process.env.CLOUDFLARE_DOMAIN;
+      if (cfDomain && str.startsWith(cfDomain.replace(/\/+$/, ""))) {
+        return true;
+      }
+
+      return false;
     };
 
     const cloudflareInvoiceUrl = toCloudflareInvoiceUrl(existingInvoiceUrl);
 
-    if (existingInvoiceUrl && !isLocalInvoiceUrl(existingInvoiceUrl)) {
+    if (existingInvoiceUrl && isRealCloudInvoiceUrl(existingInvoiceUrl)) {
       if (req.query.redirect === "true" || req.query.redirect === "1" || req.query.download === "true") {
         return res.redirect(cloudflareInvoiceUrl);
       }
@@ -1570,46 +1583,31 @@ exports.getOrderInvoicePdf = catchAsync(async (req, res) => {
       );
     }
 
-    // Generate PDF and save it to uploads/invoices
+    // Generate PDF and upload directly to AWS S3
     const pdfPath = await generateOrderInvoicePdf(order);
-
     const fileName = path.basename(pdfPath);
 
-    const hasCloudStorageConfig = Boolean(
-      process.env.S3_BUCKET_NAME &&
-      process.env.AWS_REGION &&
-      process.env.AWS_ACCESS_KEY_ID &&
-      process.env.AWS_SECRET_ACCESS_KEY
-    );
-
-    const baseUrl =
-      process.env.PUBLIC_API_URL ||
-      `${req.protocol}://${req.get("host")}`;
-
-    let pdfUrl = `${baseUrl}/uploads/invoices/${encodeURIComponent(
-      fileName
-    )}`;
+    let pdfUrl = null;
 
     try {
-      const cloudPdfUrl = hasCloudStorageConfig
-        ? await uploadInvoicePdfToCloud(pdfPath, fileName)
-        : null;
+      const cloudPdfUrl = await uploadInvoicePdfToCloud(pdfPath, fileName);
 
       if (cloudPdfUrl) {
         pdfUrl = toCloudflareInvoiceUrl(cloudPdfUrl);
       } else {
-        pdfUrl = toCloudflareInvoiceUrl(pdfUrl);
+        const baseUrl = process.env.PUBLIC_API_URL || `${req.protocol}://${req.get("host")}`;
+        pdfUrl = `${baseUrl}/uploads/invoices/${encodeURIComponent(fileName)}`;
       }
 
       if (pdfUrl) {
         await Order.findByIdAndUpdate(
           order._id,
-          { $set: { invoiceUrl: pdfUrl, pdfUrl } },
+          { $set: { invoiceUrl: pdfUrl, pdfUrl: pdfUrl, awsInvoiceUrl: pdfUrl } },
           { new: true }
         );
       }
     } catch (error) {
-      console.error("Invoice cloud upload fallback active:", error);
+      console.error("Invoice AWS cloud upload notice:", error);
     } finally {
       try {
         if (pdfPath && fs.existsSync(pdfPath)) {
