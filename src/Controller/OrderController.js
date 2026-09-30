@@ -21,7 +21,7 @@ const { createBlueDartWaybill, resolveBlueDartShipFrom } = require("../Utill/blu
 const mongoose = require("mongoose");
 const { hydrateOrderShipmentDetails, processOrderShipmentCreation } = require("./shipmentController");
 const { formatOrderDetailsForWeb, formatOrderDetailsForApp } = require("../Utill/orderDetailsFormatter");
-const { generateOrderInvoicePdf, uploadInvoicePdfToCloud } = require("../Utill/invoicePdfGenerator");
+const { generateOrderInvoicePdf, uploadInvoicePdfToCloud, toCloudflareInvoiceUrl } = require("../Utill/invoicePdfGenerator");
 const path = require("path");
 const fs = require("fs");
 
@@ -43,7 +43,7 @@ const resolveOrderInvoiceUrl = (order = {}) => {
 
   for (const candidate of candidates) {
     if (typeof candidate === "string" && candidate.trim()) {
-      return candidate.trim();
+      return toCloudflareInvoiceUrl(candidate.trim());
     }
   }
 
@@ -1548,17 +1548,24 @@ exports.getOrderInvoicePdf = catchAsync(async (req, res) => {
       }
     };
 
+    const cloudflareInvoiceUrl = toCloudflareInvoiceUrl(existingInvoiceUrl);
+
     if (existingInvoiceUrl && !isLocalInvoiceUrl(existingInvoiceUrl)) {
+      if (req.query.redirect === "true" || req.query.redirect === "1" || req.query.download === "true") {
+        return res.redirect(cloudflareInvoiceUrl);
+      }
+
       return successResponse(
         res,
         "Invoice already available",
         200,
         {
           orderId: order.orderId,
-          pdfUrl: existingInvoiceUrl,
-          downloadUrl: existingInvoiceUrl,
-          invoiceUrl: existingInvoiceUrl,
-          awsUrl: existingInvoiceUrl,
+          pdfUrl: cloudflareInvoiceUrl,
+          downloadUrl: cloudflareInvoiceUrl,
+          invoiceUrl: cloudflareInvoiceUrl,
+          cloudflareUrl: cloudflareInvoiceUrl,
+          awsUrl: cloudflareInvoiceUrl,
         }
       );
     }
@@ -1589,7 +1596,9 @@ exports.getOrderInvoicePdf = catchAsync(async (req, res) => {
         : null;
 
       if (cloudPdfUrl) {
-        pdfUrl = cloudPdfUrl;
+        pdfUrl = toCloudflareInvoiceUrl(cloudPdfUrl);
+      } else {
+        pdfUrl = toCloudflareInvoiceUrl(pdfUrl);
       }
 
       if (pdfUrl) {
@@ -1622,6 +1631,10 @@ exports.getOrderInvoicePdf = catchAsync(async (req, res) => {
       }
     }
 
+    if (req.query.redirect === "true" || req.query.redirect === "1" || req.query.download === "true") {
+      return res.redirect(pdfUrl);
+    }
+
     return successResponse(
       res,
       "Invoice generated successfully",
@@ -1631,6 +1644,7 @@ exports.getOrderInvoicePdf = catchAsync(async (req, res) => {
         pdfUrl,
         downloadUrl: pdfUrl,
         invoiceUrl: pdfUrl,
+        cloudflareUrl: pdfUrl,
         awsUrl: pdfUrl,
       }
     );

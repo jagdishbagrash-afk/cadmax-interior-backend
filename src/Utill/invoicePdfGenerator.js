@@ -44,6 +44,36 @@ function cleanupLocalInvoiceFolder() {
   }
 }
 
+const toCloudflareInvoiceUrl = (rawUrl) => {
+  if (!rawUrl || typeof rawUrl !== "string") return rawUrl;
+
+  const cfDomain = (
+    process.env.CLOUDFLARE_INVOICE_URL ||
+    process.env.CLOUDFLARE_R2_PUBLIC_URL ||
+    process.env.CLOUDFLARE_CDN_URL ||
+    process.env.CLOUDFLARE_DOMAIN ||
+    process.env.CLOUDFLARE_URL ||
+    process.env.CLOUDFLARE_BASE_URL ||
+    process.env.CDN_URL ||
+    ""
+  ).trim().replace(/\/+$/, "");
+
+  if (!cfDomain) return rawUrl;
+
+  if (rawUrl.startsWith(cfDomain)) return rawUrl;
+
+  const s3Match = rawUrl.match(/https?:\/\/[^\/]+\.s3[^\/]*\/(.+)$/);
+  if (s3Match && s3Match[1]) {
+    return `${cfDomain}/${s3Match[1]}`;
+  }
+
+  if (rawUrl.startsWith("/")) {
+    return `${cfDomain}${rawUrl}`;
+  }
+
+  return rawUrl;
+};
+
 async function uploadInvoicePdfToCloud(filePath, fileName = path.basename(filePath)) {
   if (!hasCloudStorageConfig()) {
     return null;
@@ -64,7 +94,8 @@ async function uploadInvoicePdfToCloud(filePath, fileName = path.basename(filePa
       })
     );
 
-    return `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+    const rawCloudUrl = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+    return toCloudflareInvoiceUrl(rawCloudUrl);
   } catch (error) {
     console.error("Cloud invoice upload failed:", error);
     return null;
@@ -446,5 +477,6 @@ function generateOrderInvoicePdf(order, res) {
 module.exports = {
   generateOrderInvoicePdf,
   uploadInvoicePdfToCloud,
+  toCloudflareInvoiceUrl,
 };
 

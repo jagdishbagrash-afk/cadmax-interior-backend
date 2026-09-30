@@ -44,7 +44,18 @@ const formatCurrency = (amount) => {
 const buildInvoiceDownloadUrl = (orderId) => {
   const cleanOrderId = String(orderId || "").trim().replace(/^#/, "");
   const invoicePath = `/api/order/invoice/${encodeURIComponent(cleanOrderId)}`;
-  const configuredBase = (process.env.PUBLIC_API_URL || process.env.API_BASE_URL || process.env.FRONTEND_URL || "").replace(/\/+$/, "");
+  const configuredBase = (
+    process.env.CLOUDFLARE_INVOICE_URL ||
+    process.env.CLOUDFLARE_R2_PUBLIC_URL ||
+    process.env.CLOUDFLARE_CDN_URL ||
+    process.env.CLOUDFLARE_DOMAIN ||
+    process.env.CLOUDFLARE_URL ||
+    process.env.CLOUDFLARE_BASE_URL ||
+    process.env.PUBLIC_API_URL ||
+    process.env.API_BASE_URL ||
+    process.env.FRONTEND_URL ||
+    ""
+  ).replace(/\/+$/, "");
 
   if (!configuredBase) {
     return invoicePath;
@@ -62,6 +73,25 @@ const formatOrderDetailsForWeb = (order, syncedTransit = {}) => {
   const isConfirmed = ["confirmed", "shipped", "out_for_delivery", "delivered"].includes((order.status || "").toLowerCase());
   const isOutForDelivery = ["out_for_delivery", "delivered"].includes((order.status || "").toLowerCase());
 
+  // Calculate sequential dates with 1-day buffer for each step
+  const step1Date = order.createdAt ? new Date(order.createdAt) : new Date();
+  
+  const step2Date = (order.confirmed_at || order.confirmedAt)
+    ? new Date(order.confirmed_at || order.confirmedAt)
+    : new Date(step1Date.getTime() + 1 * 24 * 60 * 60 * 1000); // +1 day buffer
+
+  const step3Date = order.dispatched_at
+    ? new Date(order.dispatched_at)
+    : new Date(step2Date.getTime() + 1 * 24 * 60 * 60 * 1000); // +1 day buffer
+
+  const step4Date = (order.out_for_delivery_at || order.outForDeliveryAt)
+    ? new Date(order.out_for_delivery_at || order.outForDeliveryAt)
+    : new Date(step3Date.getTime() + 1 * 24 * 60 * 60 * 1000); // +1 day buffer
+
+  const step5Date = order.delivered_at
+    ? new Date(order.delivered_at)
+    : new Date(step4Date.getTime() + 1 * 24 * 60 * 60 * 1000); // +1 day buffer
+
   // Stepper timeline matching design
   const timelineStepper = [
     {
@@ -69,35 +99,35 @@ const formatOrderDetailsForWeb = (order, syncedTransit = {}) => {
       key: "order_placed",
       title: "Order Placed",
       completed: true,
-      timestamp: formatDate(order.createdAt, "shortDatetime"),
+      timestamp: formatDate(step1Date, "shortDatetime"),
     },
     {
       step: 2,
       key: "confirmed",
       title: "Confirmed",
       completed: isConfirmed,
-      timestamp: isConfirmed ? formatDate(order.createdAt ? new Date(new Date(order.createdAt).getTime() + 23 * 60 * 1000) : null, "shortDatetime") : null,
+      timestamp: formatDate(step2Date, "shortDatetime"),
     },
     {
       step: 3,
       key: "shipped",
       title: "Shipped",
       completed: isShipped,
-      timestamp: formatDate(order.dispatched_at || (isShipped ? order.updatedAt : null), "shortDatetime"),
+      timestamp: formatDate(step3Date, "shortDatetime"),
     },
     {
       step: 4,
       key: "out_for_delivery",
       title: "Out for Delivery",
       completed: isOutForDelivery,
-      timestamp: isOutForDelivery ? formatDate(order.delivered_at ? new Date(new Date(order.delivered_at).getTime() - 3 * 3600 * 1000) : null, "shortDatetime") : null,
+      timestamp: formatDate(step4Date, "shortDatetime"),
     },
     {
       step: 5,
       key: "delivered",
       title: "Delivered",
       completed: isDelivered,
-      timestamp: formatDate(order.delivered_at || (isDelivered ? order.updatedAt : null), "shortDatetime"),
+      timestamp: formatDate(step5Date, "shortDatetime"),
     },
   ];
 
@@ -199,20 +229,20 @@ const formatOrderDetailsForWeb = (order, syncedTransit = {}) => {
       trackingId: trackingId,
       awbNumber: trackingId,
       trackingNumber: trackingId,
-      shippedOn: formatDate(order.dispatched_at || order.createdAt, "datetime"),
-      deliveredOn: formatDate(order.delivered_at, "datetime"),
+      shippedOn: formatDate(order.dispatched_at || step3Date, "datetime"),
+      deliveredOn: formatDate(order.delivered_at || step5Date, "datetime"),
       status: order.shipping_status || order.status || "Delivered",
       actions: {
         canTrackShipment: Boolean(trackingId),
         canDownloadInvoice: true,
-        invoiceUrl: `/api/order/invoice/${order.orderId || order._id}`,
+        invoiceUrl: order.invoiceUrl || order.pdfUrl || buildInvoiceDownloadUrl(order.orderId || order._id),
         trackShipmentUrl: `/api/shipment/track/${trackingId}`,
       },
     },
     estimatedDeliveryInformation: {
       orderedOn: formatDate(order.createdAt, "datetime"),
-      estShipping: formatDate(syncedTransit?.transitEstimate?.estimatedShipping || order.dispatched_at || order.createdAt, "dateOnly"),
-      estDelivery: formatDate(syncedTransit?.transitEstimate?.estimatedDelivery || order.delivered_at || new Date(new Date(order.createdAt).getTime() + 24 * 3600 * 1000), "dateOnly"),
+      estShipping: formatDate(syncedTransit?.transitEstimate?.estimatedShipping || order.dispatched_at || step3Date, "dateOnly"),
+      estDelivery: formatDate(syncedTransit?.transitEstimate?.estimatedDelivery || order.delivered_at || step5Date, "dateOnly"),
       actualDelivery: formatDate(order.delivered_at || (isDelivered ? order.updatedAt : null), "datetime"),
       innerTransitData: {
         provider: order.courier_name || "DHL",
