@@ -140,10 +140,10 @@ const readBlueDartTokenExpiry = (payload = {}, fallbackToken = "") => {
   const expiresInSeconds =
     Number(
       payload?.expires_in ||
-        payload?.expiresIn ||
-        payload?.data?.expires_in ||
-        payload?.data?.expiresIn ||
-        0
+      payload?.expiresIn ||
+      payload?.data?.expires_in ||
+      payload?.data?.expiresIn ||
+      0
     ) || 0;
 
   if (expiresInSeconds > 0) {
@@ -444,83 +444,83 @@ const buildFullAddress = ({
 const resolveBlueDartShipFrom = (shipFrom = {}) => {
   const addressLine1 = toSafeString(
     shipFrom?.addressLine1 ||
-      shipFrom?.CustomerAddress1 ||
-      process.env.BLUE_DART_SHIPPER_ADDRESS1 ||
-      process.env.DHL_SHIPPER_ADDRESS_LINE1
+    shipFrom?.CustomerAddress1 ||
+    process.env.BLUE_DART_SHIPPER_ADDRESS1 ||
+    process.env.DHL_SHIPPER_ADDRESS_LINE1
   );
   const addressLine2 = toSafeString(
     shipFrom?.addressLine2 ||
-      shipFrom?.CustomerAddress2 ||
-      process.env.BLUE_DART_SHIPPER_ADDRESS2 ||
-      process.env.DHL_SHIPPER_ADDRESS_LINE2
+    shipFrom?.CustomerAddress2 ||
+    process.env.BLUE_DART_SHIPPER_ADDRESS2 ||
+    process.env.DHL_SHIPPER_ADDRESS_LINE2
   );
   const addressLine3 = toSafeString(
     shipFrom?.addressLine3 ||
-      shipFrom?.CustomerAddress3 ||
-      process.env.BLUE_DART_SHIPPER_ADDRESS3
+    shipFrom?.CustomerAddress3 ||
+    process.env.BLUE_DART_SHIPPER_ADDRESS3
   );
   const city = toSafeString(
     shipFrom?.city ||
-      shipFrom?.City ||
-      process.env.BLUE_DART_SHIPPER_CITY ||
-      process.env.DHL_SHIPPER_CITY
+    shipFrom?.City ||
+    process.env.BLUE_DART_SHIPPER_CITY ||
+    process.env.DHL_SHIPPER_CITY
   );
   const state = toSafeString(
     shipFrom?.state || shipFrom?.State || process.env.BLUE_DART_SHIPPER_STATE || process.env.DHL_SHIPPER_STATE
   );
   const pincode = toSafeString(
     shipFrom?.pincode ||
-      shipFrom?.CustomerPincode ||
-      process.env.BLUE_DART_SHIPPER_PINCODE ||
-      process.env.DHL_SHIPPER_POSTAL_CODE
+    shipFrom?.CustomerPincode ||
+    process.env.BLUE_DART_SHIPPER_PINCODE ||
+    process.env.DHL_SHIPPER_POSTAL_CODE
   );
   const country = toSafeString(
     shipFrom?.country ||
-      shipFrom?.Country ||
-      process.env.BLUE_DART_SHIPPER_COUNTRY ||
-      process.env.DHL_SHIPPER_COUNTRY ||
-      "India"
+    shipFrom?.Country ||
+    process.env.BLUE_DART_SHIPPER_COUNTRY ||
+    process.env.DHL_SHIPPER_COUNTRY ||
+    "India"
   );
   const name = toSafeString(
     shipFrom?.name ||
-      shipFrom?.CustomerName ||
-      process.env.BLUE_DART_SHIPPER_NAME ||
-      process.env.DHL_SHIPPER_NAME ||
-      "Cadmax"
+    shipFrom?.CustomerName ||
+    process.env.BLUE_DART_SHIPPER_NAME ||
+    process.env.DHL_SHIPPER_NAME ||
+    "Cadmax"
   );
   const mobile = toSafeString(
     shipFrom?.mobile ||
-      shipFrom?.phone ||
-      shipFrom?.CustomerMobile ||
-      process.env.BLUE_DART_SHIPPER_MOBILE ||
-      process.env.DHL_SHIPPER_PHONE
+    shipFrom?.phone ||
+    shipFrom?.CustomerMobile ||
+    process.env.BLUE_DART_SHIPPER_MOBILE ||
+    process.env.DHL_SHIPPER_PHONE
   );
   const telephone = toSafeString(
     shipFrom?.telephone ||
-      shipFrom?.CustomerTelephone ||
-      process.env.BLUE_DART_SHIPPER_TELEPHONE ||
-      process.env.BLUE_DART_SHIPPER_PHONE ||
-      process.env.DHL_SHIPPER_PHONE
+    shipFrom?.CustomerTelephone ||
+    process.env.BLUE_DART_SHIPPER_TELEPHONE ||
+    process.env.BLUE_DART_SHIPPER_PHONE ||
+    process.env.DHL_SHIPPER_PHONE
   );
   const email = toSafeString(
     shipFrom?.email || shipFrom?.CustomerEmailID || process.env.BLUE_DART_SHIPPER_EMAIL
   );
   const gstNumber = toSafeString(
     shipFrom?.gstNumber ||
-      shipFrom?.CustomerGSTNumber ||
-      process.env.BLUE_DART_SHIPPER_GST
+    shipFrom?.CustomerGSTNumber ||
+    process.env.BLUE_DART_SHIPPER_GST
   );
   const rawSender = toSafeString(shipFrom?.sender || shipFrom?.Sender);
   const sender =
     rawSender && rawSender !== "ABCD-NAME"
       ? rawSender
       : process.env.BLUE_DART_SENDER && process.env.BLUE_DART_SENDER !== "ABCD-NAME"
-      ? process.env.BLUE_DART_SENDER
-      : toSafeString(
+        ? process.env.BLUE_DART_SENDER
+        : toSafeString(
           shipFrom?.name ||
-            shipFrom?.CustomerName ||
-            process.env.BLUE_DART_SHIPPER_NAME ||
-            "Cadmax Atelier Pvt. Ltd."
+          shipFrom?.CustomerName ||
+          process.env.BLUE_DART_SHIPPER_NAME ||
+          "Cadmax Atelier Pvt. Ltd."
         );
   const vendorCode = toSafeString(
     shipFrom?.vendorCode || shipFrom?.VendorCode || process.env.BLUE_DART_VENDOR_CODE
@@ -793,9 +793,9 @@ const buildGenerateWaybillPayload = ({
   ).toUpperCase();
   let resolvedSubProductCode = String(
     subProductCode ||
-      (isCod
-        ? process.env.BLUE_DART_COD_SUB_PRODUCT_CODE || "C"
-        : process.env.BLUE_DART_SUB_PRODUCT_CODE || "P")
+    (isCod
+      ? process.env.BLUE_DART_COD_SUB_PRODUCT_CODE || "C"
+      : process.env.BLUE_DART_SUB_PRODUCT_CODE || "P")
   ).toUpperCase();
 
   // Fix: ProductCode "D" (Domestic Priority Document) mismatches SubProductCode "P" or "C" (Parcel). Use "A" (Apex Air Cargo) for parcels.
@@ -1108,7 +1108,7 @@ const trackBlueDartShipment = async (trackingNumber, options = {}) => {
       format: options.format ?? process.env.BLUE_DART_TRACK_FORMAT ?? "json",
       handler: options.handler ?? process.env.BLUE_DART_TRACK_HANDLER ?? "tnt",
       tnt: options.tnt ?? process.env.BLUE_DART_TRACK_TNT ?? "",
-      awb: options.awb ?? "",
+      awb: options.awb ?? "awb",
     };
     const response = await requestBlueDart({
       method: "GET",
@@ -1196,9 +1196,9 @@ const getBlueDartTransitTime = async ({
 
     const resolvedSubProductCode = String(
       subProductCode ||
-        (isCod
-          ? process.env.BLUE_DART_COD_SUB_PRODUCT_CODE || "C"
-          : process.env.BLUE_DART_SUB_PRODUCT_CODE || "P")
+      (isCod
+        ? process.env.BLUE_DART_COD_SUB_PRODUCT_CODE || "C"
+        : process.env.BLUE_DART_SUB_PRODUCT_CODE || "P")
     );
 
     const payload = {

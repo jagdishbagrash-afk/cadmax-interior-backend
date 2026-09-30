@@ -46,9 +46,22 @@ const formatTrackingPayload = (trackingNumber, data) => {
 };
 
 const formatBlueDartTrackingPayload = (trackingNumber, data) => {
+  const shipments =
+    data?.ShipmentData?.Shipment ||
+    data?.shipmentData?.Shipment ||
+    data?.Shipment ||
+    data?.shipment ||
+    [];
+  const shipmentList = Array.isArray(shipments) ? shipments : [shipments];
+  const shipment =
+    shipmentList.find((item) =>
+      String(item?.WaybillNo || item?.waybillNo || "") === String(trackingNumber)
+    ) || shipmentList[0];
   const candidates = [
     data?.Scans,
     data?.scans,
+    shipment?.Scans,
+    shipment?.scans,
     data?.Shipment?.Scans,
     data?.Shipment?.scans,
     data?.Shipment?.ScanDetails,
@@ -59,19 +72,55 @@ const formatBlueDartTrackingPayload = (trackingNumber, data) => {
 
   const scans = candidates.find(Array.isArray) || [];
 
-  const events = scans.map((scan) => ({
-    timestamp:
-      scan?.ScanDateTime ||
-      scan?.scanDateTime ||
-      scan?.Timestamp ||
-      scan?.timestamp ||
-      null,
-    status: scan?.Status || scan?.status || scan?.ScanType || scan?.scanType || "unknown",
-    location: scan?.Location || scan?.location || scan?.ScanLocation || scan?.scanLocation || null,
-    remarks: scan?.Remarks || scan?.remarks || null,
-  }));
+  const parseScanTimestamp = (scan) => {
+    const detail = scan?.ScanDetail || scan?.scanDetail || scan;
+    const directTimestamp =
+      detail?.ScanDateTime ||
+      detail?.scanDateTime ||
+      detail?.Timestamp ||
+      detail?.timestamp;
+
+    if (directTimestamp) {
+      const parsed = new Date(directTimestamp);
+      return Number.isNaN(parsed.getTime()) ? String(directTimestamp) : parsed.toISOString();
+    }
+
+    const date = String(detail?.ScanDate || detail?.scanDate || "").trim();
+    const time = String(detail?.ScanTime || detail?.scanTime || "").trim();
+    const match = date.match(/^(\d{1,2})[-\s]([A-Za-z]{3})[-\s](\d{4})$/);
+    if (match) {
+      const month = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
+        .indexOf(match[2].toLowerCase());
+      const [hours = "0", minutes = "0"] = time.split(":");
+      if (month >= 0) {
+        const parsed = new Date(
+          Number(match[3]),
+          month,
+          Number(match[1]),
+          Number(hours),
+          Number(minutes)
+        );
+        return parsed.toISOString();
+      }
+    }
+
+    const parsed = new Date(date);
+    return date && !Number.isNaN(parsed.getTime()) ? parsed.toISOString() : null;
+  };
+
+  const events = scans.map((scan) => {
+    const detail = scan?.ScanDetail || scan?.scanDetail || scan;
+    return {
+      timestamp: parseScanTimestamp(scan),
+      status: detail?.Scan || detail?.Status || detail?.status || detail?.ScanType || detail?.scanType || "unknown",
+      location: detail?.ScannedLocation || detail?.Location || detail?.location || detail?.ScanLocation || detail?.scanLocation || null,
+      remarks: detail?.Remarks || detail?.remarks || null,
+    };
+  });
 
   const status =
+    shipment?.Status ||
+    shipment?.status ||
     data?.CurrentStatus ||
     data?.currentStatus ||
     data?.Shipment?.CurrentStatus ||
@@ -1310,7 +1359,11 @@ const updateOrderShippingStatusFromTracking = (order, tracking = null) => {
   if (
     status.includes("in transit") ||
     status.includes("manifested") ||
-    status.includes("dispatched")
+    status.includes("dispatched") ||
+    status.includes("picked up") ||
+    status.includes("pick up") ||
+    status.includes("pickup") ||
+    status.includes("shipped")
   ) {
     order.shipping_status = "in_transit";
     order.status = order.status === "delivered" ? "delivered" : "shipped";
