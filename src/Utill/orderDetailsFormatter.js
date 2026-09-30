@@ -64,33 +64,55 @@ const buildInvoiceDownloadUrl = (orderId) => {
   return `${configuredBase}${invoicePath.startsWith("/") ? invoicePath : `/${invoicePath}`}`;
 };
 
+const findTrackingEventTimestamp = (events, pattern) => {
+  if (!Array.isArray(events)) return null;
+  const event = events.find((item) => pattern.test(String(item?.status || "")));
+  return event?.timestamp ? new Date(event.timestamp) : null;
+};
+
 /**
  * Format order details for WEB frontend based on exact design screenshot
  */
 const formatOrderDetailsForWeb = (order, syncedTransit = {}) => {
-  const isDelivered = (order.status || "").toLowerCase() === "delivered" || order.shipping_status === "delivered";
-  const isShipped = ["shipped", "out_for_delivery", "delivered"].includes((order.status || "").toLowerCase()) || Boolean(order.dispatched_at);
-  const isConfirmed = ["confirmed", "shipped", "out_for_delivery", "delivered"].includes((order.status || "").toLowerCase());
-  const isOutForDelivery = ["out_for_delivery", "delivered"].includes((order.status || "").toLowerCase());
+  const shipmentStatuses = [
+    order.status,
+    order.shipping_status,
+    syncedTransit?.liveTracking?.status,
+  ].map((status) => String(status || "").toLowerCase());
+  const isDelivered = shipmentStatuses.some((status) => status.includes("delivered"));
+  const isOutForDelivery = shipmentStatuses.some((status) => status.includes("out for delivery"));
+  const isShipped =
+    isOutForDelivery ||
+    shipmentStatuses.some((status) =>
+      ["shipped", "out_for_delivery", "in transit", "in_transit", "manifested", "dispatched", "picked up", "pick up", "pickup"].some((stage) => status.includes(stage))
+    ) ||
+    Boolean(order.dispatched_at);
+  const isConfirmed =
+    isShipped ||
+    shipmentStatuses.some((status) => ["confirmed", "delivered"].includes(status));
+  const trackingEvents = syncedTransit?.liveTracking?.events || [];
 
   // Calculate sequential dates with 1-day buffer for each step
   const step1Date = order.createdAt ? new Date(order.createdAt) : new Date();
-  
+
   const step2Date = (order.confirmed_at || order.confirmedAt)
     ? new Date(order.confirmed_at || order.confirmedAt)
     : new Date(step1Date.getTime() + 1 * 24 * 60 * 60 * 1000); // +1 day buffer
 
   const step3Date = order.dispatched_at
     ? new Date(order.dispatched_at)
-    : new Date(step2Date.getTime() + 1 * 24 * 60 * 60 * 1000); // +1 day buffer
+    : findTrackingEventTimestamp(trackingEvents, /shipped|picked\s*up|pick\s*up|pickup|dispatched|manifested/i) ||
+    new Date(step2Date.getTime() + 1 * 24 * 60 * 60 * 1000); // +1 day buffer
 
   const step4Date = (order.out_for_delivery_at || order.outForDeliveryAt)
     ? new Date(order.out_for_delivery_at || order.outForDeliveryAt)
-    : new Date(step3Date.getTime() + 1 * 24 * 60 * 60 * 1000); // +1 day buffer
+    : findTrackingEventTimestamp(trackingEvents, /out\s*for\s*delivery/i) ||
+    new Date(step3Date.getTime() + 1 * 24 * 60 * 60 * 1000); // +1 day buffer
 
   const step5Date = order.delivered_at
     ? new Date(order.delivered_at)
-    : new Date(step4Date.getTime() + 1 * 24 * 60 * 60 * 1000); // +1 day buffer
+    : findTrackingEventTimestamp(trackingEvents, /delivered/i) ||
+    new Date(step4Date.getTime() + 1 * 24 * 60 * 60 * 1000); // +1 day buffer
 
   // Stepper timeline matching design
   const timelineStepper = [
