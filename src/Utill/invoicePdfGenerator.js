@@ -14,9 +14,9 @@ const s3Client = new S3Client({
 
 const hasCloudStorageConfig = () =>
   Boolean(
-    process.env.S3_BUCKET_NAME &&
-    process.env.AWS_REGION &&
-    process.env.AWS_ACCESS_KEY_ID &&
+    (process.env.S3_BUCKET_NAME && process.env.S3_BUCKET_NAME !== "your_s3_bucket_name") ||
+    process.env.AWS_REGION ||
+    process.env.AWS_ACCESS_KEY_ID ||
     process.env.AWS_SECRET_ACCESS_KEY
   );
 
@@ -66,9 +66,14 @@ async function uploadInvoicePdfToCloud(filePath, fileName = path.basename(filePa
     const safeFileName = String(fileName).replace(/\s+/g, "-");
     const key = `cadmax-interior-invoices/${Date.now()}-${safeFileName}`;
 
+    const bucket = (process.env.S3_BUCKET_NAME && process.env.S3_BUCKET_NAME !== "your_s3_bucket_name")
+      ? process.env.S3_BUCKET_NAME
+      : "cadmaxpro-buket";
+    const region = process.env.AWS_REGION || "ap-south-1";
+
     await s3Client.send(
       new PutObjectCommand({
-        Bucket: process.env.S3_BUCKET_NAME,
+        Bucket: bucket,
         Key: key,
         Body: pdfBuffer,
         ContentType: "application/pdf",
@@ -77,7 +82,7 @@ async function uploadInvoicePdfToCloud(filePath, fileName = path.basename(filePa
       })
     );
 
-    const rawCloudUrl = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+    const rawCloudUrl = `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
     return toCloudflareInvoiceUrl(rawCloudUrl);
   } catch (error) {
     console.error("Cloud invoice upload failed:", error);
