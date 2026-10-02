@@ -887,7 +887,7 @@ exports.OTPVerify = async (req, res) => {
 exports.AppOrder = catchAsync(async (req, res) => {
   try {
     const { name, mobile, address, product, amount, addressId, PaymentId } = req.body;
-    const userId = req.user?.id || "692dcfbd4816433146e11abd";
+    const userId = req.user.id;
 
     const orderId = `ORD-${uuidv4().slice(0, 8).toUpperCase()}`;
 
@@ -950,21 +950,7 @@ exports.AppOrder = catchAsync(async (req, res) => {
 
     const record = await newOrder.save();
 
-
-    const productIds = product.map(p => p.id); // req.body.product se ids nikalo
-
-    // const cart = await Cart.findOne({
-    //   user: userId,
-    //   status: { $ne: "done" },
-    //   "product.productId": { $in: productIds }
-    // });
-
-
-
-    // if (cart && cart.status !== "done") {
-    //   cart.status = "done"; // 🔥 main fix
-    //   const record = await cart.save();
-    // }
+    await Cart.findOneAndDelete({ user: userId, status: "pending" });
 
     return successResponse(res, "Order added successfully", 201, record);
 
