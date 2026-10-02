@@ -43,4 +43,28 @@ const outForDelivery = { liveTracking: { status: "Out for Delivery" } };
 assert.equal(formatOrderDetailsForWeb(order, outForDelivery).stepperTimeline[3].completed, true);
 assert.equal(formatOrderDetailsForApp(order, outForDelivery).data.timeline[3].isCompleted, true);
 
+const orderWithVariantImage = {
+  ...order,
+  product: [
+    {
+      id: {
+        _id: "product-1",
+        title: "Coffee Table",
+        variants: [
+          { color: "black", images: ["black.jpg"] },
+          { color: "brown", images: ["brown.jpg"] },
+        ],
+      },
+      variant: "brown",
+      price: 100,
+      quantity: 1,
+      total: 100,
+    },
+  ],
+};
+assert.equal(
+  formatOrderDetailsForApp(orderWithVariantImage).data.items[0].imageUrl,
+  "brown.jpg"
+);
+
 console.log("orderDetailsFormatter tracking status checks passed");
