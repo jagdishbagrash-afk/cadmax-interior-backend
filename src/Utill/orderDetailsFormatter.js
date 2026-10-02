@@ -157,7 +157,20 @@ const formatOrderDetailsForWeb = (order, syncedTransit = {}) => {
   const products = (order.product || []).map((item) => {
     const itemTotal = item.total || (item.price * item.quantity);
     const prodRef = item.id && typeof item.id === "object" ? item.id : null;
-    const imageUrl = prodRef?.thumbnail || prodRef?.images?.[0] || item.image || null;
+    const selectedVariant = prodRef?.variants?.find((variant) => {
+      const orderVariant = String(item.variant || item.variantTitle || "").trim().toLowerCase();
+      return [variant.color, variant.title].some(
+        (value) => String(value || "").trim().toLowerCase() === orderVariant
+      );
+    });
+    const imageUrl =
+      item?.thumbnail ||
+      item?.images?.[0] ||
+      item.image ||
+      selectedVariant?.images?.[0] ||
+      prodRef?.images?.[0] ||
+      prodRef?.thumbnail ||
+      null;
 
     return {
       productId: prodRef?._id || item.id,
