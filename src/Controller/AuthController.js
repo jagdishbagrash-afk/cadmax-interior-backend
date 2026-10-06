@@ -63,10 +63,10 @@ exports.signup = catchAsync(async (req, res) => {
       { expiresIn: process.env.JWT_EXPIRES_IN || "365d" }
     );
 
-          try {
+    try {
       const subject = "Welcome to Cadmax! 🎉";
       const emailHtml = Welcome(result.name);
-    
+
       await sendEmail({
         email: result.email,
         subject,
@@ -168,7 +168,7 @@ exports.OTPVerify = async (req, res) => {
 exports.AdminLogin = catchAsync(async (req, res, next) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) {
+    if (typeof email !== "string" || typeof password !== "string" || !email.trim() || !password) {
       return res.status(401).json({
         status: false,
         message: "Email and password are required!",
@@ -177,7 +177,12 @@ exports.AdminLogin = catchAsync(async (req, res, next) => {
 
     // fetch user with password
     const user = await User.findOne({ email }).select("+password");
-    if (!user) {
+    if (
+      !user ||
+      user.role !== "admin" ||
+      !user.password ||
+      !(await bcrypt.compare(password, user.password))
+    ) {
       return res.status(401).json({
         status: false,
         message: "Invalid Email or password",
