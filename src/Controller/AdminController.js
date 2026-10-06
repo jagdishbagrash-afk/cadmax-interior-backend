@@ -17,7 +17,7 @@ exports.isValidEmail = (email) => { const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]
 exports.login = catchAsync(async (req, res, next) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) {
+    if (typeof email !== "string" || typeof password !== "string" || !email.trim() || !password) {
       return res.status(401).json({
         status: false,
         message: "Email and password are required!",
@@ -26,7 +26,12 @@ exports.login = catchAsync(async (req, res, next) => {
 
     // fetch user with password
     const user = await User.findOne({ email }).select("+password");
-    if (!user) {
+    if (
+      !user ||
+      user.role !== "admin" ||
+      !user.password ||
+      !(await bcrypt.compare(password, user.password))
+    ) {
       return res.status(401).json({
         status: false,
         message: "Invalid Email or password",
