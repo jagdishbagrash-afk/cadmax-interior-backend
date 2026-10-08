@@ -3,6 +3,7 @@ const Payment = require("../Model/Payment");
 const Order = require("../Model/Order");
 const Razorpay = require("razorpay");
 const catchAsync = require("../Utill/catchAsync");
+
 const { createDhlShipment } = require("../Utill/createDhlShipment");
 const {
   createBlueDartWaybill,
@@ -463,3 +464,79 @@ exports.PaymentGet = catchAsync(async (_req, res) => {
     });
   }
 });
+
+
+exports.createRazorpayOrder = async (req, res) => {
+  try {
+    const { amount } = req.body;
+
+    console.log("CREATE RAZORPAY ORDER AMOUNT:", amount);
+
+    if (!amount || Number(amount) <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid amount is required",
+      });
+    }
+
+    // Razorpay amount must be in paise
+    const amountInPaise =
+      Math.round(Number(amount) * 100);
+
+    const options = {
+      amount: amountInPaise,
+
+      currency: "INR",
+
+      receipt: `receipt_${Date.now()}`,
+
+      notes: {
+        source: "Cadmax Atelier App",
+      },
+    };
+
+    console.log(
+      "RAZORPAY ORDER OPTIONS:",
+      options
+    );
+
+    const razorpayOrder =
+      await razorpayInstance.orders.create(options);
+
+    console.log(
+      "RAZORPAY ORDER CREATED:",
+      razorpayOrder
+    );
+
+    return res.status(200).json({
+      success: true,
+      message:
+        "Razorpay order created successfully",
+
+      data: {
+        orderId: razorpayOrder.id,
+
+        amount: razorpayOrder.amount,
+
+        currency:
+          razorpayOrder.currency,
+
+        receipt:
+          razorpayOrder.receipt,
+      },
+    });
+  } catch (error) {
+    console.error(
+      "CREATE RAZORPAY ORDER ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        error?.error?.description ||
+        error?.message ||
+        "Failed to create Razorpay order",
+    });
+  }
+};
