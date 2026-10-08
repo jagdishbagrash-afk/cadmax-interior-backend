@@ -96,9 +96,9 @@ const buildCartResponse = async (cart) => {
       items: [],
       summary: {
         subtotal: 0,
-        discountPercent: cart?.discount || 0,
+        discountPercent: cart?.discount ?? 0,
         discountAmount: 0,
-        taxPercent: cart?.tax || 0,
+        taxPercent: cart?.tax ?? 0,
         taxAmount: 0,
         finalAmount: 0
       }
@@ -134,12 +134,12 @@ const buildCartResponse = async (cart) => {
     .filter(Boolean);
 
   // Discount
-  const discountPercent = cart.discount || 0;
+  const discountPercent = cart.discount ?? 0;
   const discountAmount = +(subtotal * (discountPercent / 100)).toFixed(2);
   const afterDiscount = subtotal - discountAmount;
 
   // Tax
-  const taxPercent = cart.tax || 0;
+  const taxPercent = cart.tax ?? 0;
   const taxAmount = +(subtotal * (taxPercent / 100)).toFixed(2);
 
   // Final
@@ -1468,7 +1468,6 @@ exports.getCart = catchAsync(async (req, res) => {
     // Existing calculations
     let subtotal = 0;
     let finalSubtotal = 0;
-    let totalDiscount = 0;
 
     let hasOutOfStockItems = false;
 
@@ -1526,16 +1525,16 @@ exports.getCart = catchAsync(async (req, res) => {
       // ==========================================
       // Quantity
       // ==========================================
-      const quantity = item.quantity || 1;
+      const quantity = item.quantity ?? 1;
 
       // ==========================================
       // PRODUCT AMOUNT
       // ==========================================
       let productAmount =
-        product?.amount || 0;
+        product?.amount ?? 0;
 
       let productFinalAmount =
-        product?.final_amount ||
+        product?.final_amount ??
         productAmount;
 
       // ==========================================
@@ -1543,11 +1542,11 @@ exports.getCart = catchAsync(async (req, res) => {
       // ==========================================
       if (selectedVariant) {
         productAmount =
-          selectedVariant?.amount ||
+          selectedVariant?.amount ??
           productAmount;
 
         productFinalAmount =
-          selectedVariant?.final_amount ||
+          selectedVariant?.final_amount ??
           productAmount;
       }
 
@@ -1556,11 +1555,11 @@ exports.getCart = catchAsync(async (req, res) => {
       // ==========================================
       if (selectedSize) {
         productAmount =
-          selectedSize?.amount ||
+          selectedSize?.amount ??
           productAmount;
 
         productFinalAmount =
-          selectedSize?.final_amount ||
+          selectedSize?.final_amount ??
           productAmount;
       }
 
@@ -1569,11 +1568,11 @@ exports.getCart = catchAsync(async (req, res) => {
       // ==========================================
       else if (selectedPriceSection) {
         productAmount =
-          selectedPriceSection?.amount ||
+          selectedPriceSection?.amount ??
           productAmount;
 
         productFinalAmount =
-          selectedPriceSection?.final_amount ||
+          selectedPriceSection?.final_amount ??
           productAmount;
       }
 
@@ -1596,64 +1595,64 @@ exports.getCart = catchAsync(async (req, res) => {
       // ==========================================
       // Existing Price Calculation
       // ==========================================
-      let itemPrice = item.price || 0;
+      let itemPrice = item.price ?? 0;
 
       let itemOriginalPrice =
-        item.originalPrice || 0;
+        item.originalPrice ?? 0;
 
       let itemDiscount =
-        item.discount || 0;
+        item.discount ?? 0;
 
       if (selectedSize) {
         itemPrice =
-          item.price ||
-          selectedSize.final_amount ||
+          item.price ??
+          selectedSize.final_amount ??
           0;
 
         itemOriginalPrice =
-          item.originalPrice ||
-          selectedSize.amount ||
+          item.originalPrice ??
+          selectedSize.amount ??
           0;
 
         itemDiscount =
-          item.discount ||
-          selectedSize.discount_amount ||
+          item.discount ??
+          selectedSize.discount_amount ??
           0;
       } else if (selectedPriceSection) {
         itemPrice =
-          item.price ||
-          selectedPriceSection.final_amount ||
-          selectedPriceSection.amount ||
+          item.price ??
+          selectedPriceSection.final_amount ??
+          selectedPriceSection.amount ??
           0;
 
         itemOriginalPrice =
-          item.originalPrice ||
-          selectedPriceSection.amount ||
+          item.originalPrice ??
+          selectedPriceSection.amount ??
           0;
 
         itemDiscount =
-          item.discount ||
-          selectedPriceSection.discount_amount ||
+          item.discount ??
+          selectedPriceSection.discount_amount ??
           0;
       } else {
         itemPrice =
-          item.price ||
-          selectedVariant?.final_amount ||
-          selectedVariant?.amount ||
-          product.final_amount ||
-          product.amount ||
+          item.price ??
+          selectedVariant?.final_amount ??
+          selectedVariant?.amount ??
+          product.final_amount ??
+          product.amount ??
           0;
 
         itemOriginalPrice =
-          item.originalPrice ||
-          selectedVariant?.amount ||
-          product.amount ||
+          item.originalPrice ??
+          selectedVariant?.amount ??
+          product.amount ??
           itemPrice;
 
         itemDiscount =
-          item.discount ||
-          selectedVariant?.discount_amount ||
-          product.discount_amount ||
+          item.discount ??
+          selectedVariant?.discount_amount ??
+          product.discount_amount ??
           0;
       }
 
@@ -1676,8 +1675,6 @@ exports.getCart = catchAsync(async (req, res) => {
       subtotal += itemOriginalSubtotal;
 
       finalSubtotal += itemSubtotal;
-
-      totalDiscount += itemDiscountAmount;
 
       // ==========================================
       // STOCK
@@ -1750,10 +1747,10 @@ exports.getCart = catchAsync(async (req, res) => {
     // CART DISCOUNT
     // ==========================================
     const cartDiscountPercentage =
-      cart.discount || 2;
+      cart.discount ?? 2;
 
     const taxPercentage =
-      cart.tax || 2;
+      cart.tax ?? 2;
 
     const cartDiscountAmount =
       (final_amount *
@@ -1821,7 +1818,7 @@ exports.getCart = catchAsync(async (req, res) => {
 
       // Product discount
       totalDiscount: Number(
-        totalDiscount.toFixed(2)
+        (final_amount - finalSubtotal).toFixed(2)
       ),
 
       // Total savings
