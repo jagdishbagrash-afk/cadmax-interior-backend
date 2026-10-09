@@ -81,16 +81,26 @@ exports.AddProject = CatchAsync(async (req, res) => {
     }
 });
 
-exports.GetAllProject = CatchAsync(
-    async (req, res) => {
-        try {
-            const projects = await Project.find().sort({ createdAt: -1 });
-            return successResponse(res, "Project list successfully.", 201, projects);
-        } catch (error) {
-            return errorResponse(res, error.message || "Internal Server Error", 500);
-        }
+exports.GetAllProject = CatchAsync(async (req, res) => {
+    try {
+        const projects = await Project.find({
+            status: true,
+        }).sort({ createdAt: -1 });
+
+        return successResponse(
+            res,
+            "Project list successfully.",
+            200,
+            projects
+        );
+    } catch (error) {
+        return errorResponse(
+            res,
+            error.message || "Internal Server Error",
+            500
+        );
     }
-);
+});
 
 exports.GetProjectById = CatchAsync(
     async (req, res) => {
@@ -127,9 +137,9 @@ exports.UpdateProject = CatchAsync(async (req, res) => {
         if (brief) data.brief = brief;
         if (solution) data.solution = solution;
         if (content) data.content = content;
-    if (req.body.meta_title) data.meta_title = req.body.meta_title;
-    if (req.body.meta_description) data.meta_description = req.body.meta_description;
-    if (req.body.meta_keywords) data.meta_keywords = req.body.meta_keywords;
+        if (req.body.meta_title) data.meta_title = req.body.meta_title;
+        if (req.body.meta_description) data.meta_description = req.body.meta_description;
+        if (req.body.meta_keywords) data.meta_keywords = req.body.meta_keywords;
         // Get files (if any new ones uploaded)
         const Image = req.files?.["image"]?.[0]?.location;
 
@@ -259,27 +269,27 @@ exports.GetAllAdminProject = CatchAsync(
 
 
 exports.DeleteProjectImage = CatchAsync(async (req, res) => {
-  try {
-    const { image } = req.body;
+    try {
+        const { image } = req.body;
 
-    const project = await Project.findById(req.params.id);
+        const project = await Project.findById(req.params.id);
 
-    if (!project) {
-      return validationErrorResponse(res, "Project not found", 404);
+        if (!project) {
+            return validationErrorResponse(res, "Project not found", 404);
+        }
+
+        // remove from array
+        project.multiple_images = project.multiple_images.filter(
+            (img) => img !== image
+        );
+
+        await project.save();
+
+        // OPTIONAL: delete from AWS S3
+        // await DeleteAWSImages([image]);
+
+        return successResponse(res, "Image deleted successfully", 200);
+    } catch (err) {
+        return errorResponse(res, err.message, 500);
     }
-
-    // remove from array
-    project.multiple_images = project.multiple_images.filter(
-      (img) => img !== image
-    );
-
-    await project.save();
-
-    // OPTIONAL: delete from AWS S3
-    // await DeleteAWSImages([image]);
-
-    return successResponse(res, "Image deleted successfully", 200);
-  } catch (err) {
-    return errorResponse(res, err.message, 500);
-  }
 });
