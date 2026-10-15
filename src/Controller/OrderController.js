@@ -22,6 +22,7 @@ const mongoose = require("mongoose");
 const { hydrateOrderShipmentDetails, processOrderShipmentCreation } = require("./shipmentController");
 const { formatOrderDetailsForWeb, formatOrderDetailsForApp } = require("../Utill/orderDetailsFormatter");
 const { generateOrderInvoicePdf, uploadInvoicePdfToCloud, toCloudflareInvoiceUrl } = require("../Utill/invoicePdfGenerator");
+const { attachReturnEligibilityToOrder } = require("./ReturnRequestController");
 const path = require("path");
 const fs = require("fs");
 
@@ -798,11 +799,16 @@ exports.getOrderDetailsWeb = catchAsync(async (req, res) => {
     }
 
     const formattedWebData = formatOrderDetailsForWeb(order, syncedTransit);
+    const { returnEligibility, returnRequest } = await attachReturnEligibilityToOrder(order);
 
     return res.status(200).json({
       status: true,
       message: "Web order details fetched successfully with inner transit API tracking",
-      data: formattedWebData,
+      data: {
+        ...formattedWebData,
+        returnEligibility,
+        returnRequest,
+      },
     });
   } catch (error) {
     console.error("getOrderDetailsWeb Error:", error);
@@ -859,8 +865,13 @@ exports.getOrderDetailsApp = catchAsync(async (req, res) => {
     }
 
     const formattedAppData = formatOrderDetailsForApp(order, syncedTransit);
+    const { returnEligibility, returnRequest } = await attachReturnEligibilityToOrder(order);
 
-    return res.status(200).json(formattedAppData);
+    return res.status(200).json({
+      ...formattedAppData,
+      returnEligibility,
+      returnRequest,
+    });
   } catch (error) {
     console.error("getOrderDetailsApp Error:", error);
     return errorResponse(res, error.message || "Internal Server Error", 500);
@@ -915,6 +926,9 @@ exports.getOrderById = catchAsync(async (req, res) => {
     orderObj.trackingId = resolvedTrackingNumber || orderObj.tracking_number || null;
     orderObj.courier_name = orderObj.courier_name || "BLUE_DART";
     orderObj.courierPartner = orderObj.courier_name || "BLUE_DART";
+    const { returnEligibility, returnRequest } = await attachReturnEligibilityToOrder(order);
+    orderObj.returnEligibility = returnEligibility;
+    orderObj.returnRequest = returnRequest;
 
     return res.status(200).json({
       success: true,

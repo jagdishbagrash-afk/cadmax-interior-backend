@@ -110,7 +110,27 @@ const OrderSchema = new mongoose.Schema(
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     addressId: { type: mongoose.Schema.Types.ObjectId, ref: "Address" },
     shippingAddress: { type: OrderShippingAddressSchema, default: null },
+    orderType: {
+      type: String,
+      enum: ["order", "replacement"],
+      default: "order",
+    },
+    parentOrderId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Order",
+      default: null,
+    },
+    returnRequestId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "ReturnRequest",
+      default: null,
+    },
     PaymentId: { type: String },
+    paymentStatus: {
+      type: String,
+      enum: ["pending", "completed", "not_required"],
+      default: "pending",
+    },
     paymentMethod: {
       type: String,
       enum: ["ONLINE", "COD"],
